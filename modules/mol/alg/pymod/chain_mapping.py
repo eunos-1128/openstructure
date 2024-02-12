@@ -1687,13 +1687,13 @@ class _Aligner:
         :returns: Alignment with s1 as first and s2 as second sequence 
         """
         if chem_type == mol.ChemType.AMINOACIDS:
-            return seq.alg.GlobalAlign(s1, s2, self.pep_subst_mat,
-                                       gap_open=self.pep_gap_open,
-                                       gap_ext=self.pep_gap_ext)[0]
+            return seq.alg.SemiGlobalAlign(s1, s2, self.pep_subst_mat,
+                                           gap_open=self.pep_gap_open,
+                                           gap_ext=self.pep_gap_ext)[0]
         elif chem_type == mol.ChemType.NUCLEOTIDES:
-            return seq.alg.GlobalAlign(s1, s2, self.nuc_subst_mat,
-                                       gap_open=self.nuc_gap_open,
-                                       gap_ext=self.nuc_gap_ext)[0]
+            return seq.alg.SemiGlobalAlign(s1, s2, self.nuc_subst_mat,
+                                           gap_open=self.nuc_gap_open,
+                                           gap_ext=self.nuc_gap_ext)[0]
         else:
             raise RuntimeError("Invalid ChemType")
         return aln

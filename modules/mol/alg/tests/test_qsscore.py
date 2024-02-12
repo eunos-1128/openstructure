@@ -130,8 +130,8 @@ class TestQSScore(unittest.TestCase):
         res = mapper.GetRigidMapping(ent_2, strategy="greedy_iterative_rmsd")
         qs_scorer = QSScorer.FromMappingResult(res)
         score_result = qs_scorer.Score(res.mapping)
-        self.assertAlmostEqual(score_result.QS_global, 0.3131, 2)
-        self.assertAlmostEqual(score_result.QS_best, 0.941, 2)
+        self.assertAlmostEqual(score_result.QS_global, 0.3191, 2)
+        self.assertAlmostEqual(score_result.QS_best, 0.9781, 2)
 
     def test_hetero_case_2_switched_order(self):
         # different stoichiometry
@@ -141,8 +141,8 @@ class TestQSScore(unittest.TestCase):
         res = mapper.GetRigidMapping(ent_2, strategy="greedy_iterative_rmsd")
         qs_scorer = QSScorer.FromMappingResult(res)
         score_result = qs_scorer.Score(res.mapping)
-        self.assertAlmostEqual(score_result.QS_global, 0.3131, 2)
-        self.assertAlmostEqual(score_result.QS_best, 0.941, 2)
+        self.assertAlmostEqual(score_result.QS_global, 0.3191, 2)
+        self.assertAlmostEqual(score_result.QS_best, 0.9781, 2)
 
     def test_hetero_case_3(self):
         # more chains
@@ -196,8 +196,8 @@ class TestQSScore(unittest.TestCase):
         res = mapper.GetRigidMapping(model, strategy="greedy_iterative_rmsd")
         qs_scorer = QSScorer.FromMappingResult(res)
         score_result = qs_scorer.Score(res.mapping)
-        self.assertAlmostEqual(score_result.QS_global, 0.323, 2)
-        self.assertAlmostEqual(score_result.QS_best, 0.921, 2)
+        self.assertAlmostEqual(score_result.QS_global, 0.321, 2)
+        self.assertAlmostEqual(score_result.QS_best, 0.932, 2)
 
     def test_hetero_model_switched_order(self):
         # same as above but with switched order to test for symmetric behaviour
@@ -208,8 +208,8 @@ class TestQSScore(unittest.TestCase):
         res = mapper.GetRigidMapping(model, strategy="greedy_iterative_rmsd")
         qs_scorer = QSScorer.FromMappingResult(res)
         score_result = qs_scorer.Score(res.mapping)
-        self.assertAlmostEqual(score_result.QS_global, 0.323, 2)
-        self.assertAlmostEqual(score_result.QS_best, 0.921, 2)
+        self.assertAlmostEqual(score_result.QS_global, 0.321, 2)
+        self.assertAlmostEqual(score_result.QS_best, 0.932, 2)
 
     def test_homo_1(self):
         # different stoichiometry SOD
