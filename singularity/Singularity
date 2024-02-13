@@ -12,7 +12,7 @@ ln -sf /bin/bash /bin/sh
 # INSTALL SYSTEM DEPS
 #####################
 apt-get update -y && apt-get install -y ipython3 jupyter python3-pip
-pip3 install ipywidgets==7.6.0
+pip3 install ipywidgets==8.1.1
 pip3 install nglview \
              six
 
@@ -44,7 +44,6 @@ cat > $JUPYTER_PATH/kernels/ost-kernel/kernel.json <<EOF
 }
 EOF
 
-jupyter nbextension enable nglview --py --sys-prefix
 
 %environment
 ##############################################################################
