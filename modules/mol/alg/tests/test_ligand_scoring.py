@@ -331,7 +331,7 @@ class TestLigandScoring(unittest.TestCase):
         ed.UpdateXCS()
 
         with self.assertRaises(RuntimeError):
-            sc = LigandScorer(mdl, trg, [mdl.FindResidue("I", 1)], [trg.FindResidue("I", 1)], check_resnames=False)
+            sc = LigandScorer(mdl, trg, [mdl.FindResidue("I", 1)], [trg.FindResidue("I", 1)], check_resnames=True)
             sc._compute_scores()
 
         sc = LigandScorer(mdl, trg, [mdl.FindResidue("I", 1)], [trg.FindResidue("I", 1)], check_resnames=False)
