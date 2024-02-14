@@ -76,7 +76,10 @@ test:centos7.3:
              -DCMAKE_EXE_LINKER_FLAGS=" -pthread"
   - make -j 2
   - echo "    ... done building OST."
-  - echo "    Running unit tests for OST..."  
+  - echo "    Linking the compound library..."
+  - ln -s /scicore/home/schwede/GROUP/OpenStructure/ChemLib/2.6/compounds.chemlib stage/share/openstructure/
+  - echo "    ... done linking the compound library..."
+  - echo "    Running unit tests for OST..."
   - make check
   - echo "    ... done running unit tests for OST..." 
   - echo "... done testing on CentOS 7."
