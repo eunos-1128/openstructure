@@ -10,6 +10,8 @@ stages:
 test:centos7.3:
   stage: test
   image: centos:7.3.1611
+  variables:
+    COMP_LIB: "/scicore/home/schwede/GROUP/OpenStructure/ChemLib/2.6/compounds.chemlib"
   before_script:
     - echo "Running centos7.3 'before_script'..."
     - yum -y -q -e 0 install tcl
@@ -74,11 +76,9 @@ test:centos7.3:
              -DCMAKE_C_FLAGS='-L${EBROOTLIBPNG}/lib/ -L${EBROOTLIBTIFF}/lib/ -L${EBROOTZLIB}/lib/ -isystem ${EBROOTBOOST}/include -isystem ${EBROOTOPENMM}/include'
              -DCMAKE_CXX_FLAGS='-L${EBROOTLIBPNG}/lib/ -L${EBROOTLIBTIFF}/lib/ -L${EBROOTZLIB}/lib/ -isystem ${EBROOTBOOST}/include -isystem ${EBROOTOPENMM}/include'
              -DCMAKE_EXE_LINKER_FLAGS=" -pthread"
+             -DCOMPOUND_LIB="$COMP_LIB"
   - make -j 2
   - echo "    ... done building OST."
-  - echo "    Linking the compound library..."
-  - ln -s /scicore/home/schwede/GROUP/OpenStructure/ChemLib/2.6/compounds.chemlib stage/share/openstructure/
-  - echo "    ... done linking the compound library..."
   - echo "    Running unit tests for OST..."
   - make check
   - echo "    ... done running unit tests for OST..." 
