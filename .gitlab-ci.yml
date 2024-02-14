@@ -10,8 +10,6 @@ stages:
 test:centos7.3:
   stage: test
   image: centos:7.3.1611
-  variables:
-    COMP_LIB: "/scicore/home/schwede/GROUP/OpenStructure/ChemLib/2.6/compounds.chemlib"
   before_script:
     - echo "Running centos7.3 'before_script'..."
     - yum -y -q -e 0 install tcl
@@ -28,6 +26,7 @@ test:centos7.3:
     - source /export/soft/lua_lmod/centos7/lmod/lmod/init/bash
     - module use /scicore/soft/modules/all
     - module load foss/2021a
+    - module load wget/1.21.1-GCCcore-10.3.0
     - module load CMake/3.23.1-GCCcore-10.3.0
     - module load Python/3.9.5-GCCcore-10.3.0
     - module load Eigen/3.4.0-GCCcore-10.3.0
@@ -48,6 +47,7 @@ test:centos7.3:
   - echo "    Building OST..."
   - mkdir build-ci
   - cd build-ci
+  - wget ftp://ftp.wwpdb.org/pub/pdb/data/monomers/components.cif.gz
   - cmake .. -DENABLE_MM=1
              -DOPEN_MM_LIBRARY=$EBROOTOPENMM/lib/libOpenMM.so
              -DOPEN_MM_PLUGIN_DIR=$EBROOTOPENMM/lib/plugins
@@ -76,9 +76,15 @@ test:centos7.3:
              -DCMAKE_C_FLAGS='-L${EBROOTLIBPNG}/lib/ -L${EBROOTLIBTIFF}/lib/ -L${EBROOTZLIB}/lib/ -isystem ${EBROOTBOOST}/include -isystem ${EBROOTOPENMM}/include'
              -DCMAKE_CXX_FLAGS='-L${EBROOTLIBPNG}/lib/ -L${EBROOTLIBTIFF}/lib/ -L${EBROOTZLIB}/lib/ -isystem ${EBROOTBOOST}/include -isystem ${EBROOTOPENMM}/include'
              -DCMAKE_EXE_LINKER_FLAGS=" -pthread"
-             -DCOMPOUND_LIB="$COMP_LIB"
   - make -j 2
   - echo "    ... done building OST."
+  - echo "    Building a compound library..."
+  - stage/bin/chemdict_tool create components.cif.gz compounds.chemlib pdb
+    stage/bin/chemdict_tool update ../modules/conop/data/charmm.cif compounds.chemlib charmm
+  - echo "    ... done building the compound lib."
+  - echo "    Building OST with the compound lib..."
+  - cmake .. -DCOMPOUND_LIB=compounds.chemlib
+  - echo "    ... done building OST with the compound library..."
   - echo "    Running unit tests for OST..."
   - make check
   - echo "    ... done running unit tests for OST..." 
