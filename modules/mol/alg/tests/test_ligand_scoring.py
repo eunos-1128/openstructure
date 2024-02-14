@@ -313,20 +313,28 @@ class TestLigandScoring(unittest.TestCase):
         self.assertTrue(np.isnan(sc.lddt_pli_matrix[6, 0]))
 
     def test_check_resnames(self):
-        """Test check_resname argument works
-        """
-        # 4C0A has mismatching sequence and fails with check_resnames=True
-        mdl_1r8q = _LoadMMCIF("1r8q.cif.gz")
-        trg_4c0a = _LoadMMCIF("4c0a.cif.gz")
+        """Test that the check_resname argument works.
 
-        mdl = mdl_1r8q.Select("cname=D or cname=F")
+        When set to True, it should raise an error if any residue in the
+        representation of the binding site in the model has a different
+        name than in the reference. Here we manually modify a residue
+        name to achieve that effect.
+        """
+        trg_4c0a = _LoadMMCIF("4c0a.cif.gz")
         trg = trg_4c0a.Select("cname=C or cname=I")
 
+        # Here we modify the name of a residue in 4C0A (THR => TPO in C.15)
+        # This residue is in the binding site and should trigger the error
+        mdl = ost.mol.CreateEntityFromView(trg, include_exlusive_atoms=False)
+        ed = mdl.EditICS()
+        ed.RenameResidue(mdl.FindResidue("C", 15), "TPO")
+        ed.UpdateXCS()
+
         with self.assertRaises(RuntimeError):
-            sc = LigandScorer(mdl, trg, [mdl.FindResidue("F", 1)], [trg.FindResidue("I", 1)], check_resnames=True)
+            sc = LigandScorer(mdl, trg, [mdl.FindResidue("I", 1)], [trg.FindResidue("I", 1)], check_resnames=True)
             sc._compute_scores()
 
-        sc = LigandScorer(mdl, trg, [mdl.FindResidue("F", 1)], [trg.FindResidue("I", 1)], check_resnames=False)
+        sc = LigandScorer(mdl, trg, [mdl.FindResidue("I", 1)], [trg.FindResidue("I", 1)], check_resnames=False)
         sc._compute_scores()
 
     def test__scores(self):
