@@ -76,7 +76,7 @@ Details on the usage (output of ``ost compare-structures --help``):
    * "chem_groups": Groups of polypeptides/polynucleotides from reference that
      are considered chemically equivalent. You can derive stoichiometry from this.
      Contains only chains that are considered in chain mapping, i.e. pass a
-     size threshold (defaults: 10 for peptides, 4 for nucleotides).
+     size threshold (defaults: 6 for peptides, 4 for nucleotides).
    * "chem_mapping": List of same length as "chem_groups". Assigns model chains to
      the respective chem group. Again, only contains chains that are considered
      in chain mapping.
@@ -359,25 +359,25 @@ Details on the usage (output of ``ost compare-structures --help``):
                           Dump additional info on model and reference residues
                           that occur in pepnuc alignments.
     --min-pep-length MIN_PEP_LENGTH
-                          Relevant parameter if short peptides are involved in
-                          scoring.Minimum peptide length for a chain in the
-                          target structure to be considered in chain mapping.
-                          The chain mapping algorithm first performs an all vs.
-                          all pairwise sequence alignment to identify "equal"
-                          chains within the target structure. We go for simple
-                          sequence identity there. Short sequences can be
-                          problematic as they may produce high sequence identity
-                          alignments by pure chance.
+                          Default: 6 - Relevant parameter if short peptides are
+                          involved in scoring. Minimum peptide length for a
+                          chain in the target structure to be considered in
+                          chain mapping. The chain mapping algorithm first
+                          performs an all vs. all pairwise sequence alignment to
+                          identify "equal" chains within the target structure.
+                          We go for simple sequence identity there. Short
+                          sequences can be problematic as they may produce high
+                          sequence identity alignments by pure chance.
     --min-nuc-length MIN_NUC_LENGTH
-                          Relevant parameter if short nucleotides are involved
-                          in scoring.Minimum nucleotide length for a chain in
-                          the target structure to be considered in chain
-                          mapping. The chain mapping algorithm first performs an
-                          all vs. all pairwise sequence alignment to identify
-                          "equal" chains within the target structure. We go for
-                          simple sequence identity there. Short sequences can be
-                          problematic as they may produce high sequence identity
-                          alignments by pure chance.
+                          Default: 4 - Relevant parameter if short nucleotides
+                          are involved in scoring.Minimum nucleotide length for
+                          a chain in the target structure to be considered in
+                          chain mapping. The chain mapping algorithm first
+                          performs an all vs. all pairwise sequence alignment to
+                          identify "equal" chains within the target structure.
+                          We go for simple sequence identity there. Short
+                          sequences can be problematic as they may produce high
+                          sequence identity alignments by pure chance.
 
 
 .. _ost compare ligand structures:
