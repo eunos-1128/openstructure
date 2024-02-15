@@ -344,7 +344,8 @@ ost::mol::EntityHandle CreateBU(const ost::mol::EntityHandle& asu,
       // connect
       for(auto it = bond_list.begin(); it != bond_list.end(); ++it) {
         ed.Connect(atom_mapper[it->GetFirst().GetHashCode()],
-                   atom_mapper[it->GetSecond().GetHashCode()]);
+                   atom_mapper[it->GetSecond().GetHashCode()],
+                   it->GetBondOrder());
       }
 
     }
