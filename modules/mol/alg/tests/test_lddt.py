@@ -44,7 +44,11 @@ class TestlDDT(unittest.TestCase):
         for a,b in zip(aws_per_res_scores, classic_per_res_scores):
             if a is None and b is None:
                 continue
-            self.assertAlmostEqual(a, b, places = 5)
+            # only check for 3 places. Reason for that is that the distance
+            # difference between GLN30.CB and TYR35.O is within floating point
+            # accuracy of the 0.5A threshold. So the two involved residues may
+            # have a difference of 1 with respect to conserved distances.
+            self.assertAlmostEqual(a, b, places = 3)
 
         # do 7W1F_B
         model = _LoadFile("7W1F_B_model.pdb")
