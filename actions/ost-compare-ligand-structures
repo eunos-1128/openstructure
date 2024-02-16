@@ -635,7 +635,8 @@ def _Main():
         out = dict()
         out["status"] = "FAILURE"
         out["traceback"] = traceback.format_exc(limit=1000)
-        out["exception"] = " ".join(traceback.format_exception_only(exc))
+        etype, evalue, tb = sys.exc_info()
+        out["exception"] = " ".join(traceback.format_exception_only(etype, evalue))
         with open(args.output, 'w') as fh:
             json.dump(out, fh, indent=4, sort_keys=False)
         raise
