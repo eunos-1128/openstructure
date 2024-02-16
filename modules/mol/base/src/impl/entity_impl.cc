@@ -323,7 +323,7 @@ AtomImplPtr EntityImpl::CreateAtom(const ResidueImplPtr& rp,
 
 void EntityImpl::DeleteAtom(const AtomImplPtr& atom) {
   atom_map_.erase(atom.get());
-  atom_organizer_.Remove(atom);
+  atom_organizer_.Remove(atom, atom->TransformedPos());
 }
 
 ResidueImplPtr EntityImpl::CreateResidue(const ChainImplPtr& cp,
