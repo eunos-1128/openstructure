@@ -200,9 +200,9 @@ class ContactEntity:
 
         for cname in self.chain_names:
             # q1 selects stuff in current chain that is close to any other chain
-            q1 = f"cname={cname} and {self.contact_d} <> [cname!={cname}]"
+            q1 = f"cname={mol.QueryQuoteName(cname)} and {self.contact_d} <> [cname!={mol.QueryQuoteName(cname)}]"
             # q2 selects stuff in other chains that is close to current chain
-            q2 = f"cname!={cname} and {self.contact_d} <> [cname={cname}]"
+            q2 = f"cname!={mol.QueryQuoteName(cname)} and {self.contact_d} <> [cname={mol.QueryQuoteName(cname)}]"
             v1 = self.view.Select(q1)
             v2 = self.view.Select(q2)
             v1_p = [geom.Vec3List([a.pos for a in r.atoms]) for r in v1.residues]

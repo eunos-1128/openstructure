@@ -91,10 +91,6 @@ def _Setup(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2):
         # Interface with more chains...
         raise NotImplementedError("DockQ computations beyond two interacting "
                                   "chains has not been properly tested...")
-        #mdl_chain_names = mdl_ch1 + mdl_ch2
-        #ref_chain_names = ref_ch1 + ref_ch2
-        #mdl_to_dump = mdl_to_dump.Select(f"cname={','.join(mdl_chain_names)}")
-        #ref_to_dump = ref_to_dump.Select(f"cname={','.join(ref_chain_names)}")
 
     # first write structures to string, only create a tmpdir and the actual
     # files if this succeeds

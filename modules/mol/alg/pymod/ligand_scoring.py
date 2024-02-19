@@ -1537,8 +1537,8 @@ class LigandScorer:
             for ref_ch, mdl_ch in zip(ref_group, mdl_group):
                 if ref_ch is not None and mdl_ch is not None:
                     aln = ref_mdl_alns[(ref_ch, mdl_ch)]
-                    trg_view = chain_mapper.target.Select(f"cname={ref_ch}")
-                    mdl_view = mdl.Select(f"cname={mdl_ch}")
+                    trg_view = chain_mapper.target.Select(f"cname={mol.QueryQuoteName(ref_ch)}")
+                    mdl_view = mdl.Select(f"cname={mol.QueryQuoteName(mdl_ch)}")
                     aln.AttachView(0, trg_view)
                     aln.AttachView(1, mdl_view)
                     alns[(ref_ch, mdl_ch)] = aln

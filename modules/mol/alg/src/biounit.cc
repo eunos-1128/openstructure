@@ -255,9 +255,9 @@ ost::mol::EntityHandle CreateBU(const ost::mol::EntityHandle& asu,
     // derive all bonds related to that chain_intvl
     // potentially also interchain bonds
     std::stringstream query_ss;
-    query_ss << "cname=" << au_chains[chain_intvl][0];
+    query_ss << "cname=" << mol::QueryQuoteName(au_chains[chain_intvl][0]);
     for(uint i = 1; i < au_chains[chain_intvl].size(); ++i) {
-      query_ss << ',' << au_chains[chain_intvl][i];
+      query_ss << ',' << mol::QueryQuoteName(au_chains[chain_intvl][i]);
     }
     ost::mol::EntityView asu_view = asu.Select(query_ss.str());
     const ost::mol::BondHandleList& bond_list = asu_view.GetBondList();
