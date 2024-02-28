@@ -451,7 +451,7 @@ class lDDTScorer:
                                       number of intra-chain contacts of each
                                       extra chain to the expected contacts, thus
                                       adding a penalty.
-        :param penalize_extra_chains: :class:`bool`
+        :type penalize_extra_chains: :class:`bool`
         :param residue_mapping: By default, residue mapping is based on residue
                                 numbers. That means, a model chain and the
                                 respective target chain map to the same
