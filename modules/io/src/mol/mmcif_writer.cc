@@ -878,9 +878,10 @@ namespace {
         }
       }
 
+      bool all_hetatm = entity_info.type == "non-polymer";
       for(auto at: at_list) {
         // group_PDB
-        if(at.IsHetAtom()) {
+        if(at.IsHetAtom() || all_hetatm) {
           at_data[0] = ost::io::StarWriterValue::FromString("HETATM");
         } else {
           at_data[0] = ost::io::StarWriterValue::FromString("ATOM");
@@ -1182,8 +1183,25 @@ namespace {
           String poly_type = poly_types[i];
           if(poly_chains[i]->size() <= 2) {
             // must have length of at least 3 to be polymer
+            // feed them as separate non-polymers
             type = "non-polymer";
             poly_type = "";
+            String branch_type = "";
+            for(auto r: *poly_chains[i]) {
+              T tmp;
+              tmp.push_back(r);
+              String chain_name = chain_name_gen.Get();
+              int entity_id = SetupEntity(chain_name,
+                                          type,
+                                          poly_type,
+                                          branch_type,
+                                          tmp,
+                                          false,
+                                          entity_info);
+              Feed_atom_site(atom_site, chain_name, entity_id+1, entity_info[entity_id],
+                             tmp);
+            }
+            continue;
           }
           String branch_type = "";
           String chain_name = chain_name_gen.Get();
