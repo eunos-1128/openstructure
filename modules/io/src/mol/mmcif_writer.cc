@@ -878,7 +878,7 @@ namespace {
         }
       }
 
-      bool all_hetatm = entity_info.type == "non-polymer";
+      bool all_hetatm = entity_info.type != "polymer";
       for(auto at: at_list) {
         // group_PDB
         if(at.IsHetAtom() || all_hetatm) {

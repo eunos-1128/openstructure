@@ -34,15 +34,102 @@ BOOST_AUTO_TEST_SUITE( io );
 conop::CompoundLibPtr SetDefaultCompoundLib() {
   // return NULL if not successful, else return newly set default lib
   // REQ: OST_ROOT to be set
-  char * ost_root = getenv("OST_ROOT");
+  char * ost_root=getenv("OST_ROOT");
   if (!ost_root) return conop::CompoundLibPtr();
   SetPrefixPath(ost_root);
-  String lib_path = GetSharedDataPath() + "/compounds.chemlib";
-  conop::CompoundLibPtr compound_lib = conop::CompoundLib::Load(lib_path);
+  String lib_path=GetSharedDataPath() + "/compounds.chemlib";
+  conop::CompoundLibPtr compound_lib=conop::CompoundLib::Load(lib_path);
   if (compound_lib) {
     conop::Conopology::Instance().SetDefaultLib(compound_lib);
   }
   return compound_lib;
+}
+
+BOOST_AUTO_TEST_CASE(mmcif_writer_force_hetatm)
+{
+  BOOST_TEST_MESSAGE("  Running mmcif_force_hetatm tests...");
+  /*
+    Make sure that atoms set to HETATM are written as HETATM. There is some
+    logic in place to deal with HETAM for mmcif_conform=false, check that this
+    is working.
+   */
+  // Create small entity
+  mol::EntityHandle ent=mol::CreateEntity();
+  mol::XCSEditor edi=ent.EditXCS();
+  mol::ChainHandle ch=edi.InsertChain("A");
+  mol::ResidueHandle r1=edi.AppendResidue(ch, "GLY");
+  edi.InsertAtom(r1, "N", geom::Vec3(1, 1, 1), "N", 1.0, 0.0, true);
+  edi.InsertAtom(r1, "C", geom::Vec3(4, 1, 2), "C", 1.0, 0.0, true);
+  mol::ResidueHandle r2=edi.AppendResidue(ch, "GLY");
+  edi.InsertAtom(r2, "N", geom::Vec3(5, 2, 3), "N", 1.0, 0.0, true);
+  edi.InsertAtom(r2, "C", geom::Vec3(4, 1, 1), "C", 1.0, 0.0, true);
+  mol::ResidueHandle r3=edi.AppendResidue(ch, "GLY");
+  edi.InsertAtom(r3, "N", geom::Vec3(5, 2, 2), "N", 1.0, 0.0, true);
+  edi.InsertAtom(r3, "C", geom::Vec3(4, 1, 0), "C", 1.0, 0.0, true);
+  edi.SetChainType(ch, mol::CHAINTYPE_UNKNOWN);
+  // make sure we have a proper polypeptide
+  conop::HeuristicProcessor heu_proc;
+  heu_proc.Process(ent);
+  BOOST_CHECK_EQUAL(mol::InSequence(r1, r2), true);
+  BOOST_CHECK_EQUAL(mol::InSequence(r2, r3), true);
+
+  // Create mmCIF stream
+  MMCifWriter writer;
+  writer.SetStructure(ent, SetDefaultCompoundLib(), false);
+  std::stringstream out;
+  writer.Write("test", out);
+
+  String s=out.str();
+  // make sure the entity is a polymer
+  BOOST_CHECK_NE(s.find("_entity.id\n_entity.type\n1 polymer"), String::npos);
+  // check all atom records to be HETATMs
+  for(auto i: ch.GetAtomList()){
+    BOOST_CHECK_NE(s.find("HETATM "+
+                          i.GetElement()+" "+
+                          i.GetName()+" "+
+                          i.GetResidue().GetName()),
+                   String::npos);
+  }
+
+  // check that ATOM is written, if HETATM is not set
+  // Create small entity
+  ent=mol::CreateEntity();
+  edi=ent.EditXCS();
+  ch=edi.InsertChain("A");
+  r1=edi.AppendResidue(ch, "GLY");
+  edi.InsertAtom(r1, "N", geom::Vec3(1, 1, 1), "N");
+  edi.InsertAtom(r1, "C", geom::Vec3(4, 1, 2), "C");
+  r2=edi.AppendResidue(ch, "GLY");
+  edi.InsertAtom(r2, "N", geom::Vec3(5, 2, 3), "N");
+  edi.InsertAtom(r2, "C", geom::Vec3(4, 1, 1), "C");
+  r3=edi.AppendResidue(ch, "GLY");
+  edi.InsertAtom(r3, "N", geom::Vec3(5, 2, 2), "N");
+  edi.InsertAtom(r3, "C", geom::Vec3(4, 1, 0), "C");
+  edi.SetChainType(ch, mol::CHAINTYPE_UNKNOWN);
+  // make sure we have a proper polypeptide
+  heu_proc.Process(ent);
+  BOOST_CHECK_EQUAL(mol::InSequence(r1, r2), true);
+  BOOST_CHECK_EQUAL(mol::InSequence(r2, r3), true);
+
+  // Create mmCIF stream
+  writer=MMCifWriter();
+  writer.SetStructure(ent, SetDefaultCompoundLib(), false);
+  out=std::stringstream();
+  writer.Write("test", out);
+
+  s=out.str();
+  // make sure the entity is a polymer
+  BOOST_CHECK_NE(s.find("_entity.id\n_entity.type\n1 polymer"), String::npos);
+  // check all atom records to be ATOMs
+  for(auto i: ch.GetAtomList()){
+    BOOST_CHECK_NE(s.find("ATOM "+
+                          i.GetElement()+" "+
+                          i.GetName()+" "+
+                          i.GetResidue().GetName()),
+                   String::npos);
+  }
+
+  BOOST_TEST_MESSAGE("  done.");
 }
 
 BOOST_AUTO_TEST_CASE(mmcif_writer_entity1)
@@ -59,8 +146,7 @@ BOOST_AUTO_TEST_CASE(mmcif_writer_entity1)
   mol::XCSEditor edi=ent.EditXCS();
   mol::ChainHandle ch=edi.InsertChain("A");
   mol::ResidueHandle r=edi.AppendResidue(ch, "GLY");
-  mol::AtomHandle a=edi.InsertAtom(r, "CA", geom::Vec3(32.0, -128.0, -2.5),
-                                   "C", 1.0, 128.0);
+  edi.InsertAtom(r, "CA", geom::Vec3(32.0, -128.0, -2.5), "C");
   edi.SetChainType(ch, mol::CHAINTYPE_UNKNOWN);
 
   // Create mmCIF stream
@@ -83,7 +169,7 @@ BOOST_AUTO_TEST_CASE(mmcif_writer_poly_vs_non_poly)
   /*
     Go for small polymers that are not polymer... the story of 2 amino acids (to
     be handled like RCSB as 2 separated chains) plus how the same thing works
-    for nucleic acids and branched molecules (sugars).
+    for nucleic acids.
    */
 
   // Polypeptide: 2aa in a chain are 2 separated entities for RCSB (check 1E8K)
@@ -209,8 +295,9 @@ BOOST_AUTO_TEST_CASE(mmcif_writer_poly_vs_non_poly)
   BOOST_CHECK_EQUAL(mol::InSequence(r1, r2), true);
 
   // Create mmCIF stream
-  writer = MMCifWriter();
+  writer=MMCifWriter();
   writer.SetStructure(ent, SetDefaultCompoundLib(), false);
+  out=std::stringstream();
   writer.Write("test", out);
 
   s=out.str();
@@ -230,7 +317,112 @@ BOOST_AUTO_TEST_CASE(mmcif_writer_poly_vs_non_poly)
                    String::npos);
   }
 
-  //  3AXH, 1A4G
+  BOOST_TEST_MESSAGE("  done.");
+}
+
+BOOST_AUTO_TEST_CASE(mmcif_writer_small_sugars)
+{
+  BOOST_TEST_MESSAGE("  Running mmcif_writer_small_sugars tests...");
+  /*
+    While RCSB marks dipeptides and dinucleotides as non-ploymers, sugarse are
+    marked branched as soon as there are 2 connected.
+   */
+  // Branched: 2 sugars connected (check RCSB 3AXH)
+  mol::EntityHandle ent=mol::CreateEntity();
+  mol::XCSEditor edi=ent.EditXCS();
+  mol::ChainHandle ch=edi.InsertChain("A");
+  edi.SetChainType(ch, mol::CHAINTYPE_OLIGOSACCHARIDE);
+  // GLC
+  mol::ResidueHandle r1=edi.AppendResidue(ch, "GLC");
+  r1.SetChemClass(mol::ChemClass('Y'));
+  edi.InsertAtom(r1, "C1", geom::Vec3(-17.103, -7.005, -18.605), "C");
+  edi.InsertAtom(r1, "C2", geom::Vec3(-18.238, -7.769, -17.910), "C");
+  edi.InsertAtom(r1, "C3", geom::Vec3(-18.607, -9.018, -18.701), "C");
+  edi.InsertAtom(r1, "C4", geom::Vec3(-18.909, -8.623, -20.136), "C");
+  edi.InsertAtom(r1, "C5", geom::Vec3(-17.692, -7.925, -20.738), "C");
+  edi.InsertAtom(r1, "C6", geom::Vec3(-17.985, -7.413, -22.123), "C");
+  edi.InsertAtom(r1, "O1", geom::Vec3(-15.956, -7.805, -18.503), "O");
+  edi.InsertAtom(r1, "O2", geom::Vec3(-17.855, -8.167, -16.612), "O");
+  edi.InsertAtom(r1, "O3", geom::Vec3(-19.758, -9.617, -18.139), "O");
+  edi.InsertAtom(r1, "O4", geom::Vec3(-19.249, -9.772, -20.895), "O");
+  edi.InsertAtom(r1, "O5", geom::Vec3(-17.381, -6.775, -19.989), "O");
+  edi.InsertAtom(r1, "O6", geom::Vec3(-19.210, -6.695, -22.028), "O");
+  // GLC
+  mol::ResidueHandle r2=edi.AppendResidue(ch, "GLC");
+  r2.SetChemClass(mol::ChemClass('Y'));
+  edi.InsertAtom(r2, "C1", geom::Vec3(-20.076, -6.111, -23.424), "C");
+  edi.InsertAtom(r2, "C2", geom::Vec3(-21.506, -5.777, -22.960), "C");
+  edi.InsertAtom(r2, "C3", geom::Vec3(-22.102, -7.005, -22.273), "C");
+  edi.InsertAtom(r2, "C4", geom::Vec3(-22.152, -8.101, -23.352), "C");
+  edi.InsertAtom(r2, "C5", geom::Vec3(-20.802, -8.397, -24.036), "C");
+  edi.InsertAtom(r2, "C6", geom::Vec3(-21.027, -9.040, -25.414), "C");
+  edi.InsertAtom(r2, "O2", geom::Vec3(-21.398, -4.714, -22.066), "O");
+  edi.InsertAtom(r2, "O3", geom::Vec3(-23.396, -6.675, -21.796), "O");
+  edi.InsertAtom(r2, "O4", geom::Vec3(-22.738, -9.283, -22.830), "O");
+  edi.InsertAtom(r2, "O5", geom::Vec3(-20.007, -7.236, -24.284), "O");
+  edi.InsertAtom(r2, "O6", geom::Vec3(-21.528, -8.081, -26.325), "O");
+
+  // Connect the two sugars
+  edi.Connect(r1.FindAtom("O6"), r2.FindAtom("C1"));
+
+  // Create mmCIF stream
+  MMCifWriter writer;
+  writer.SetStructure(ent, SetDefaultCompoundLib(), false);
+  std::stringstream out;
+  writer.Write("test", out);
+
+  String s=out.str();
+  // Check that the mmCIF output contains 2 non-polymer entities
+  BOOST_CHECK_NE(s.find("loop_\n_entity.id\n_entity.type\n1 branched"),
+                 String::npos);
+  // Check that atoms are HETATMs since non-poly
+  for(auto i: ch.GetAtomList()){
+    BOOST_CHECK_NE(s.find("HETATM "+
+                          i.GetElement()+" "+
+                          i.GetName()+" "+
+                          i.GetResidue().GetName()),
+                   String::npos);
+  }
+
+  // Non-poly: single sugar (check RCSB 1BDG)
+  ent=mol::CreateEntity();
+  edi=ent.EditXCS();
+  ch=edi.InsertChain("A");
+  edi.SetChainType(ch, mol::CHAINTYPE_OLIGOSACCHARIDE);
+  // GLC
+  r1=edi.AppendResidue(ch, "GLC");
+  r1.SetChemClass(mol::ChemClass('Y'));
+  edi.InsertAtom(r1, "C1", geom::Vec3(-17.103, -7.005, -18.605), "C");
+  edi.InsertAtom(r1, "C2", geom::Vec3(-18.238, -7.769, -17.910), "C");
+  edi.InsertAtom(r1, "C3", geom::Vec3(-18.607, -9.018, -18.701), "C");
+  edi.InsertAtom(r1, "C4", geom::Vec3(-18.909, -8.623, -20.136), "C");
+  edi.InsertAtom(r1, "C5", geom::Vec3(-17.692, -7.925, -20.738), "C");
+  edi.InsertAtom(r1, "C6", geom::Vec3(-17.985, -7.413, -22.123), "C");
+  edi.InsertAtom(r1, "O1", geom::Vec3(-15.956, -7.805, -18.503), "O");
+  edi.InsertAtom(r1, "O2", geom::Vec3(-17.855, -8.167, -16.612), "O");
+  edi.InsertAtom(r1, "O3", geom::Vec3(-19.758, -9.617, -18.139), "O");
+  edi.InsertAtom(r1, "O4", geom::Vec3(-19.249, -9.772, -20.895), "O");
+  edi.InsertAtom(r1, "O5", geom::Vec3(-17.381, -6.775, -19.989), "O");
+  edi.InsertAtom(r1, "O6", geom::Vec3(-19.210, -6.695, -22.028), "O");
+
+  // Create mmCIF stream
+  writer=MMCifWriter();
+  writer.SetStructure(ent, SetDefaultCompoundLib(), false);
+  out = std::stringstream();
+  writer.Write("test", out);
+
+  s=out.str();
+  // Check that the mmCIF output contains 2 non-polymer entities
+  BOOST_CHECK_NE(s.find("loop_\n_entity.id\n_entity.type\n1 non-polymer"),
+                 String::npos);
+  // Check that atoms are HETATMs since non-poly
+  for(auto i: ch.GetAtomList()){
+    BOOST_CHECK_NE(s.find("HETATM "+
+                          i.GetElement()+" "+
+                          i.GetName()+" "+
+                          i.GetResidue().GetName()),
+                   String::npos);
+  }
 
   BOOST_TEST_MESSAGE("  done.");
 }
