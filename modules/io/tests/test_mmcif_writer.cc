@@ -92,37 +92,25 @@ BOOST_AUTO_TEST_CASE(mmcif_writer_poly_vs_non_poly)
   mol::ChainHandle ch=edi.InsertChain("A");
   edi.SetChainType(ch, mol::CHAINTYPE_POLY_PEPTIDE_L);
   // ALA
-  mol::ResidueHandle r1=edi.AppendResidue(ch, "ALA");  // is_hetatm=false
-  edi.InsertAtom(r1, "N",  geom::Vec3(44.987, 17.389, 12.362), "N", 0.81,
-                 25.57);
-  edi.InsertAtom(r1, "CA", geom::Vec3(45.936, 16.434, 12.890), "C", 0.81,
-                 28.21);
-  edi.InsertAtom(r1, "C",  geom::Vec3(47.196, 17.227, 13.152), "C", 0.81,
-                 33.78);
-  edi.InsertAtom(r1, "O",  geom::Vec3(47.506, 18.153, 12.401), "O", 0.81,
-                 23.02);
-  edi.InsertAtom(r1, "CB", geom::Vec3(46.244, 15.293, 11.961), "C", 0.81,
-                 29.85);
+  mol::ResidueHandle r1=edi.AppendResidue(ch, "ALA");
+  edi.InsertAtom(r1, "N",  geom::Vec3(44.987, 17.389, 12.362), "N");
+  edi.InsertAtom(r1, "CA", geom::Vec3(45.936, 16.434, 12.890), "C");
+  edi.InsertAtom(r1, "C",  geom::Vec3(47.196, 17.227, 13.152), "C");
+  edi.InsertAtom(r1, "O",  geom::Vec3(47.506, 18.153, 12.401), "O");
+  edi.InsertAtom(r1, "CB", geom::Vec3(46.244, 15.293, 11.961), "C");
   // PRO
-  mol::ResidueHandle r2=edi.AppendResidue(ch, "PRO");  // is_hetatm=false
-  edi.InsertAtom(r2, "N",   geom::Vec3(47.953, 16.910, 14.229), "N", 0.81,
-                 32.19 );
-  edi.InsertAtom(r2, "CA",  geom::Vec3(47.673, 15.829, 15.187), "C", 0.81,
-                 33.89 );
-  edi.InsertAtom(r2, "C",   geom::Vec3(46.564, 16.052, 16.233), "C", 0.81,
-                 37.97 );
-  edi.InsertAtom(r2, "O",   geom::Vec3(46.059, 17.169, 16.417), "O", 0.81,
-                 34.43 );
-  edi.InsertAtom(r2, "CB",  geom::Vec3(49.054, 15.755, 15.880), "C", 0.81,
-                 36.60 );
-  edi.InsertAtom(r2, "CG",  geom::Vec3(49.357, 17.213, 16.030), "C", 0.81,
-                 34.77 );
-  edi.InsertAtom(r2, "CD",  geom::Vec3(49.098, 17.714, 14.637), "C", 0.81,
-                 34.62 );
-  edi.InsertAtom(r2, "OXT", geom::Vec3(46.144, 15.129, 16.950), "O", 0.81,
-                 34.03 );
-  conop::HeuristicProcessor heu_proc;
+  mol::ResidueHandle r2=edi.AppendResidue(ch, "PRO");
+  edi.InsertAtom(r2, "N",   geom::Vec3(47.953, 16.910, 14.229), "N");
+  edi.InsertAtom(r2, "CA",  geom::Vec3(47.673, 15.829, 15.187), "C");
+  edi.InsertAtom(r2, "C",   geom::Vec3(46.564, 16.052, 16.233), "C");
+  edi.InsertAtom(r2, "O",   geom::Vec3(46.059, 17.169, 16.417), "O");
+  edi.InsertAtom(r2, "CB",  geom::Vec3(49.054, 15.755, 15.880), "C");
+  edi.InsertAtom(r2, "CG",  geom::Vec3(49.357, 17.213, 16.030), "C");
+  edi.InsertAtom(r2, "CD",  geom::Vec3(49.098, 17.714, 14.637), "C");
+  edi.InsertAtom(r2, "OXT", geom::Vec3(46.144, 15.129, 16.950), "O");
+
   // Make sure that the two residues r1, r2 are actually connected
+  conop::HeuristicProcessor heu_proc;
   heu_proc.Process(ent);
   BOOST_CHECK_EQUAL(mol::InSequence(r1, r2), true);
 
@@ -132,14 +120,15 @@ BOOST_AUTO_TEST_CASE(mmcif_writer_poly_vs_non_poly)
   std::stringstream out;
   writer.Write("test", out);
 
-  // Check that the mmCIF output contains 2 non-polymer entities
   String s=out.str();
+  // Check that the mmCIF output contains 2 non-polymer entities
   BOOST_CHECK_NE(
         s.find("loop_\n_entity.id\n_entity.type\n1 non-polymer\n2 non-polymer"),
         String::npos);
   BOOST_CHECK_NE(
              s.find("loop_\n_struct_asym.id\n_struct_asym.entity_id\nA 1\nB 2"),
              String::npos);
+  // Check that atoms are HETATMs since non-poly
   BOOST_CHECK_NE(s.find("HETATM N N ALA"), String::npos);
   BOOST_CHECK_NE(s.find("HETATM C CA ALA"), String::npos);
   BOOST_CHECK_NE(s.find("HETATM C C ALA"), String::npos);
@@ -154,7 +143,94 @@ BOOST_AUTO_TEST_CASE(mmcif_writer_poly_vs_non_poly)
   BOOST_CHECK_NE(s.find("HETATM C CD PRO"), String::npos);
   BOOST_CHECK_NE(s.find("HETATM O OXT PRO"), String::npos);
 
-  // write mmCIF, check atoms are marked HETATM
+  // Nucleic acid: 2 bases in a chain are 2 entities for RCSB (check 4K9A)
+  ent=mol::CreateEntity();
+  edi=ent.EditXCS();
+  ch=edi.InsertChain("A");
+  edi.SetChainType(ch, mol::CHAINTYPE_POLY_RN);
+  // G
+  r1=edi.AppendResidue(ch, "G");
+  r1.SetChemClass(mol::ChemClass('R'));
+  edi.InsertAtom(r1, "OP3", geom::Vec3(-19.992, -12.612, -22.535), "O");
+  edi.InsertAtom(r1, "P",   geom::Vec3(-20.743, -13.990, -22.451), "P");
+  edi.InsertAtom(r1, "OP1", geom::Vec3(-20.093, -14.853, -23.494), "O");
+  edi.InsertAtom(r1, "OP2", geom::Vec3(-20.592, -14.510, -21.074), "O");
+  edi.InsertAtom(r1, "O5'", geom::Vec3(-22.258, -13.779, -22.864), "O");
+  edi.InsertAtom(r1, "C5'", geom::Vec3(-22.956, -12.621, -22.414), "C");
+  edi.InsertAtom(r1, "C4'", geom::Vec3(-24.433, -12.831, -22.071), "C");
+  edi.InsertAtom(r1, "O4'", geom::Vec3(-24.958, -11.618, -21.688), "O");
+  edi.InsertAtom(r1, "C3'", geom::Vec3(-25.196, -13.187, -23.283), "C");
+  edi.InsertAtom(r1, "O3'", geom::Vec3(-26.335, -13.801, -22.833), "O");
+  edi.InsertAtom(r1, "C2'", geom::Vec3(-25.568, -11.908, -23.910), "C");
+  edi.InsertAtom(r1, "O2'", geom::Vec3(-26.792, -12.071, -24.602), "O");
+  edi.InsertAtom(r1, "C1'", geom::Vec3(-25.819, -11.112, -22.709), "C");
+  edi.InsertAtom(r1, "N9",  geom::Vec3(-25.646, -9.689,  -22.974), "N");
+  edi.InsertAtom(r1, "C8",  geom::Vec3(-26.518, -8.728,  -22.814), "C");
+  edi.InsertAtom(r1, "N7",  geom::Vec3(-25.994, -7.595,  -23.153), "N");
+  edi.InsertAtom(r1, "C5",  geom::Vec3(-24.781, -7.838,  -23.527), "C");
+  edi.InsertAtom(r1, "C6",  geom::Vec3(-23.815, -7.062,  -23.942), "C");
+  edi.InsertAtom(r1, "O6",  geom::Vec3(-23.953, -5.880,  -24.055), "O");
+  edi.InsertAtom(r1, "N1",  geom::Vec3(-22.652, -7.575,  -24.269), "N");
+  edi.InsertAtom(r1, "C2",  geom::Vec3(-22.453, -8.886,  -24.153), "C");
+  edi.InsertAtom(r1, "N2",  geom::Vec3(-21.312, -9.419,  -24.474), "N");
+  edi.InsertAtom(r1, "N3",  geom::Vec3(-23.422, -9.638,  -23.738), "N");
+  edi.InsertAtom(r1, "C4",  geom::Vec3(-24.577, -9.122,  -23.422), "C");
+  // A
+  r2=edi.AppendResidue(ch, "A");
+  r2.SetChemClass(mol::ChemClass('R'));
+  edi.InsertAtom(r2, "P",   geom::Vec3(-27.082, -11.572, -26.017), "P");
+  edi.InsertAtom(r2, "OP1", geom::Vec3(-28.487, -11.993, -26.469), "O");
+  edi.InsertAtom(r2, "OP2", geom::Vec3(-27.228, -10.079, -25.961), "O");
+  edi.InsertAtom(r2, "O5'", geom::Vec3(-26.066, -11.826, -27.005), "O");
+  edi.InsertAtom(r2, "C5'", geom::Vec3(-25.894, -13.010, -27.689), "C");
+  edi.InsertAtom(r2, "C4'", geom::Vec3(-24.500, -13.055, -28.234), "C");
+  edi.InsertAtom(r2, "O4'", geom::Vec3(-24.168, -11.802, -28.703), "O");
+  edi.InsertAtom(r2, "C3'", geom::Vec3(-23.540, -13.333, -27.140), "C");
+  edi.InsertAtom(r2, "O3'", geom::Vec3(-22.424, -13.995, -27.663), "O");
+  edi.InsertAtom(r2, "C2'", geom::Vec3(-23.101, -11.988, -26.770), "C");
+  edi.InsertAtom(r2, "O2'", geom::Vec3(-21.831, -12.081, -26.257), "O");
+  edi.InsertAtom(r2, "C1'", geom::Vec3(-23.037, -11.318, -28.071), "C");
+  edi.InsertAtom(r2, "N9",  geom::Vec3(-23.277, -9.902,  -27.855), "N");
+  edi.InsertAtom(r2, "C8",  geom::Vec3(-24.331, -9.311,  -27.370), "C");
+  edi.InsertAtom(r2, "N7",  geom::Vec3(-24.073, -8.040,  -27.362), "N");
+  edi.InsertAtom(r2, "C5",  geom::Vec3(-22.856, -7.821,  -27.812), "C");
+  edi.InsertAtom(r2, "C6",  geom::Vec3(-22.091, -6.735,  -27.998), "C");
+  edi.InsertAtom(r2, "N6",  geom::Vec3(-22.544, -5.535,  -27.711), "N");
+  edi.InsertAtom(r2, "N1",  geom::Vec3(-20.885, -6.823,  -28.480), "N");
+  edi.InsertAtom(r2, "C2",  geom::Vec3(-20.381, -8.034,  -28.799), "C");
+  edi.InsertAtom(r2, "N3",  geom::Vec3(-21.167, -9.113,  -28.595), "N");
+  edi.InsertAtom(r2, "C4",  geom::Vec3(-22.379, -8.993,  -28.116), "C");
+
+  // Make sure that the two residues r1, r2 are actually connected
+  /* In the RCSB entry 4K9A, G O2' and A P are linked, but we force a regular
+     nucleotide link for the test
+  */
+  edi.Connect(r1.FindAtom("O3'"), r2.FindAtom("P"));
+  BOOST_CHECK_EQUAL(mol::InSequence(r1, r2), true);
+
+  // Create mmCIF stream
+  writer = MMCifWriter();
+  writer.SetStructure(ent, SetDefaultCompoundLib(), false);
+  writer.Write("test", out);
+
+  s=out.str();
+  // Check that the mmCIF output contains 2 non-polymer entities
+  BOOST_CHECK_NE(
+        s.find("loop_\n_entity.id\n_entity.type\n1 non-polymer\n2 non-polymer"),
+        String::npos);
+  BOOST_CHECK_NE(
+             s.find("loop_\n_struct_asym.id\n_struct_asym.entity_id\nA 1\nB 2"),
+             String::npos);
+  // Check that atoms are HETATMs since non-poly
+  for(auto i: ch.GetAtomList()){
+    BOOST_CHECK_NE(s.find("HETATM "+
+                          i.GetElement()+" "+
+                          i.GetName()+" "+
+                          i.GetResidue().GetName()),
+                   String::npos);
+  }
+
+  //  3AXH, 1A4G
 
   BOOST_TEST_MESSAGE("  done.");
 }
