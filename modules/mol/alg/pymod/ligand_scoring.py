@@ -740,7 +740,14 @@ class LigandScorer:
                                 no_intrachain=True,
                                 return_dist_test=True,
                                 check_resnames=self.check_resnames)
-                        LogDebug("lDDT-PLI for symmetry %d: %.4f" % (i, global_lddt))
+                        if lddt_tot == 0:
+                            LogDebug("lDDT-PLI is undefined for %d" % i)
+                            self._unassigned_target_ligands_reason[
+                                target_ligand] = ("no_contact",
+                                                  "No lDDT-PLI contacts in the"
+                                                  " reference structure")
+                        else:
+                            LogDebug("lDDT-PLI for symmetry %d: %.4f" % (i, global_lddt))
 
                         # Save results?
                         if not lddt_pli_full_matrix[target_i, model_i]:
@@ -832,7 +839,7 @@ class LigandScorer:
 
         # First only consider top coverage matches.
         min_coverage = np.max(coverage)
-        while min_coverage > 0:
+        while min_coverage > 0 and not np.all(np.isnan(mat1)):
             LogVerbose("Looking for matches with coverage >= %s" % min_coverage)
             min_mat1 = LigandScorer._nanmin_nowarn(mat1, coverage < min_coverage)
             while not np.isnan(min_mat1):
@@ -1362,6 +1369,9 @@ class LigandScorer:
           This indicates different stoichiometries.
         * `symmetries`: too many symmetries were found (by graph isomorphisms).
           Increase `max_symmetries`.
+        * `no_contact`: there were no lDDT contacts between the binding site
+          and the ligand, and lDDT-PLI is undefined. Increase the value of
+          `lddt_pli_radius` to at least the value of the binding site `radius`.
 
         Some of these reasons can be overlapping, but a single reason will be
         reported.
@@ -1424,6 +1434,10 @@ class LigandScorer:
           This indicates different stoichiometries.
         * `symmetries`: too many symmetries were found (by graph isomorphisms).
           Increase `max_symmetries`.
+        * `no_contact`: there were no lDDT contacts between the binding site
+          and the ligand in the target structure, and lDDT-PLI is undefined.
+          Increase the value of `lddt_pli_radius` to at least the value of the
+          binding site `radius`.
 
         Some of these reasons can be overlapping, but a single reason will be
         reported.

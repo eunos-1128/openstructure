@@ -708,6 +708,40 @@ class TestLigandScoring(unittest.TestCase):
         sc.unassigned_target_ligands["F"][1] == "symmetries"
 
 
+    def test_no_lddt_pli_contact(self):
+        """
+        Test behaviour where a binding site has no lDDT-PLI contacts.
+
+        We give two copies of the target ligand which have binding site atoms
+        within radius=5A but no atoms at 4A. We set lddt_pli_radius=4 so that
+        there are no contacts for the lDDT-PLI computation, and lDDT is None.
+
+        We check that:
+        - We don't get an lDDT-PLI assignment
+        - Both target ligands are unassigned and have the
+        - We get an RMSD assignment
+        - The second copy of the target and model ligands ensure that the
+          disambiguation code (which checks for the best lDDT-PLI when 2 RMSDs
+          are identical) works in this case (where there is no lDDT-PLI to
+          disambiguate the RMSDs).
+        """
+        trg = _LoadPDB("T1118v1.pdb")
+        trg_lig = _LoadEntity("T1118v1_001.sdf")
+        mdl = _LoadPDB("T1118v1LG035_1.pdb")
+        mdl_lig = _LoadEntity("T1118v1LG035_1_1_1.sdf")
+
+        # Ensure it's unassigned in lDDT
+        sc = LigandScorer(mdl, trg, [mdl_lig, mdl_lig], [trg_lig, trg_lig],
+                          radius=5, lddt_pli_radius=4, rename_ligand_chain=True)
+        assert sc.lddt_pli == {}
+        assert sc.unassigned_target_ligands['00001_C'][1] == "no_contact"
+        assert sc.unassigned_target_ligands['00001_C_2'][1] == "no_contact"
+        assert sc.unassigned_model_ligands['00001_FE'][1] == "no_contact"
+        assert sc.unassigned_model_ligands['00001_FE_2'][1] == "no_contact"
+        # However the first ligand should have an RMSD
+        self.assertAlmostEqual(sc.rmsd['00001_FE'][1], 2.1703031063079834, 4)
+
+
 if __name__ == "__main__":
     from ost import testutils
     if testutils.DefaultCompoundLibIsSet():
