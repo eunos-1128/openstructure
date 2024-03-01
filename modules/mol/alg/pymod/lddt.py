@@ -489,9 +489,11 @@ class lDDTScorer:
                                between mapped model and target residues.
         :type check_resnames: :class:`bool`
         :returns: global and per-residue lDDT scores as a tuple -
-                  first element is global lDDT score and second element
-                  a list of per-residue scores with length len(*model*.residues)
-                  None is assigned to residues that are not covered by target
+                  first element is global lDDT score (None if *target* has no
+                  contacts) and second element a list of per-residue scores with
+                  length len(*model*.residues). None is assigned to residues that
+                  are not covered by target. If a residue is covered but has no
+                  contacts in *target*, 0.0 is assigned.
         """
         if chain_mapping is None:
             if len(self.chain_names) > 1 or len(model.chains) > 1:
