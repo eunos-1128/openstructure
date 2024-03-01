@@ -724,6 +724,7 @@ class TestLigandScoring(unittest.TestCase):
           disambiguation code (which checks for the best lDDT-PLI when 2 RMSDs
           are identical) works in this case (where there is no lDDT-PLI to
           disambiguate the RMSDs).
+        - We get lDDT-PLI = None with RMSD assignment
         """
         trg = _LoadPDB("T1118v1.pdb")
         trg_lig = _LoadEntity("T1118v1_001.sdf")
@@ -733,13 +734,25 @@ class TestLigandScoring(unittest.TestCase):
         # Ensure it's unassigned in lDDT
         sc = LigandScorer(mdl, trg, [mdl_lig, mdl_lig], [trg_lig, trg_lig],
                           radius=5, lddt_pli_radius=4, rename_ligand_chain=True)
-        assert sc.lddt_pli == {}
-        assert sc.unassigned_target_ligands['00001_C'][1] == "no_contact"
-        assert sc.unassigned_target_ligands['00001_C_2'][1] == "no_contact"
-        assert sc.unassigned_model_ligands['00001_FE'][1] == "no_contact"
-        assert sc.unassigned_model_ligands['00001_FE_2'][1] == "no_contact"
-        # However the first ligand should have an RMSD
-        self.assertAlmostEqual(sc.rmsd['00001_FE'][1], 2.1703031063079834, 4)
+        self.assertEqual(sc.lddt_pli,  {})
+        self.assertEqual(sc.unassigned_target_ligands['00001_C'][1], "no_contact")
+        self.assertEqual(sc.unassigned_target_ligands['00001_C_2'][1], "no_contact")
+        self.assertEqual(sc.unassigned_model_ligands['00001_FE'][1], "no_contact")
+        self.assertEqual(sc.unassigned_model_ligands['00001_FE_2'][1], "no_contact")
+        # However RMSD should be assigned
+        self.assertAlmostEqual(sc.rmsd['00001_FE'][1], 2.1703, 4)
+        self.assertAlmostEqual(sc.rmsd['00001_FE_2'][1], 2.1703, 4)
+
+        # Check with RMSD assignment
+        sc2 = LigandScorer(mdl, trg, [mdl_lig, mdl_lig], [trg_lig, trg_lig],
+                          radius=5, lddt_pli_radius=4, rename_ligand_chain=True,
+                          rmsd_assignment=True)
+        self.assertEqual(sc2.unassigned_target_ligands, {})
+        self.assertEqual(sc2.unassigned_model_ligands, {})
+        self.assertIsNone(sc2.lddt_pli['00001_FE'][1])
+        self.assertIsNone(sc2.lddt_pli['00001_FE_2'][1])
+        self.assertAlmostEqual(sc2.rmsd['00001_FE'][1], 2.1703, 4)
+        self.assertAlmostEqual(sc2.rmsd['00001_FE_2'][1], 2.1703, 4)
 
 
 if __name__ == "__main__":
