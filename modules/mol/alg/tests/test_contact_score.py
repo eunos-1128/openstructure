@@ -57,7 +57,7 @@ class TestContactScore(unittest.TestCase):
 
         # we need to derive a chain mapping prior to scoring
         mapper = ChainMapper(target)
-        res = mapper.GetRigidMapping(model, strategy="greedy_iterative_rmsd")
+        res = mapper.GetRMSDMapping(model, strategy="greedy_iterative")
         contact_scorer = ContactScorer.FromMappingResult(res)
         score_result = contact_scorer.ScoreICS(res.mapping)
         self.assertAlmostEqual(score_result.precision, 0.583, places=2)
