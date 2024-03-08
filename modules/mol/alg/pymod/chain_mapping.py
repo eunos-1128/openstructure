@@ -1159,7 +1159,7 @@ class ChainMapper:
                                 heuristic_n_max_naive):
                 strategy = "naive"
             else:
-                strategy = "greedy_full"
+                strategy = "greedy_iterative"
 
         mapping = None
 
