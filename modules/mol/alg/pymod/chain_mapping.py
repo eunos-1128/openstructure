@@ -1077,7 +1077,7 @@ class ChainMapper:
         return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
                              mapping, alns, opt_score = opt_qsscore)
 
-    def GetRMSDMapping(self, model, strategy = "heuristic", subsampling=None,
+    def GetRMSDMapping(self, model, strategy = "heuristic", subsampling=50,
                        chem_mapping_result = None, heuristic_n_max_naive = 24):
         """Identify chain mapping based on minimal RMSD superposition
 
@@ -1110,7 +1110,7 @@ class ChainMapper:
                          "greedy_single", "greedy_iterative"]
         :type strategy: :class:`str`
         :param subsampling: If given, only an equally distributed subset
-                            of all CA/C3' positions are used for
+                            of CA/C3' positions in each chain are used for
                             superposition/scoring.
         :type subsampling: :class:`int`
         :param chem_mapping_result: Pro param. The result of
