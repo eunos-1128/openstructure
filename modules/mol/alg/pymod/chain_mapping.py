@@ -786,10 +786,11 @@ class ChainMapper:
 
 
     def GetlDDTMapping(self, model, inclusion_radius=15.0,
-                       thresholds=[0.5, 1.0, 2.0, 4.0], strategy="naive",
+                       thresholds=[0.5, 1.0, 2.0, 4.0], strategy="heuristic",
                        steep_opt_rate = None, block_seed_size = 5,
                        block_blocks_per_chem_group = 5,
-                       chem_mapping_result = None):
+                       chem_mapping_result = None,
+                       heuristic_n_max_naive = 40320):
         """ Identify chain mapping by optimizing lDDT score
 
         Maps *model* chain sequences to :attr:`~chem_groups` and find mapping
@@ -821,6 +822,12 @@ class ChainMapper:
           all ref/mdl chain combinations within the respective chem groups and
           extend them to *block_seed_size*. *block_blocks_per_chem_group*
           for each chem group are selected for exhaustive extension.
+
+        * **heuristic**: Uses *naive* strategy if number of possible mappings
+          is within *heuristic_n_max_naive*. The default of 40320 corresponds
+          to an octamer (8!=40320). A structure with stoichiometry A6B2 would be
+          6!*2!=1440 etc. If the number of possible mappings is larger,
+          *greedy_full* is used.
 
         Sets :attr:`MappingResult.opt_score` in case of no trivial one-to-one
         mapping. 
@@ -859,7 +866,8 @@ class ChainMapper:
         :returns: A :class:`MappingResult`
         """
 
-        strategies = ["naive", "greedy_fast", "greedy_full", "greedy_block"]
+        strategies = ["naive", "greedy_fast", "greedy_full", "greedy_block",
+                      "heuristic"]
         if strategy not in strategies:
             raise RuntimeError(f"Strategy must be in {strategies}")
 
@@ -886,6 +894,13 @@ class ChainMapper:
                         alns[(ref_ch, mdl_ch)] = aln
             return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
                                  one_to_one, alns)
+
+        if strategy == "heuristic":
+            if _NMappingsWithin(self.chem_groups, chem_mapping,
+                                heuristic_n_max_naive):
+                strategy = "naive"
+            else:
+                strategy = "greedy_full"
 
         mapping = None
         opt_lddt = None
@@ -925,10 +940,11 @@ class ChainMapper:
                              mapping, alns, opt_score = opt_lddt)
 
 
-    def GetQSScoreMapping(self, model, contact_d = 12.0, strategy = "naive",
+    def GetQSScoreMapping(self, model, contact_d = 12.0, strategy = "heuristic",
                           block_seed_size = 5, block_blocks_per_chem_group = 5,
-                          steep_opt_rate = None, chem_mapping_result = None,
-                          greedy_prune_contact_map = False):
+                          heuristic_n_max_naive = 40320, steep_opt_rate = None,
+                          chem_mapping_result = None,
+                          greedy_prune_contact_map = True):
         """ Identify chain mapping based on QSScore
 
         Scoring is based on CA/C3' positions which are present in all chains of
@@ -953,6 +969,12 @@ class ChainMapper:
           all ref/mdl chain combinations within the respective chem groups and
           extend them to *block_seed_size*. *block_blocks_per_chem_group*
           for each chem group are selected for exhaustive extension.
+
+        * **heuristic**: Uses *naive* strategy if number of possible mappings
+          is within *heuristic_n_max_naive*. The default of 40320 corresponds
+          to an octamer (8!=40320). A structure with stoichiometry A6B2 would be
+          6!*2!=1440 etc. If the number of possible mappings is larger,
+          *greedy_full* is used.
 
         Sets :attr:`MappingResult.opt_score` in case of no trivial one-to-one
         mapping.
@@ -984,7 +1006,7 @@ class ChainMapper:
         :returns: A :class:`MappingResult`
         """
 
-        strategies = ["naive", "greedy_fast", "greedy_full", "greedy_block"]
+        strategies = ["naive", "greedy_fast", "greedy_full", "greedy_block", "heuristic"]
         if strategy not in strategies:
             raise RuntimeError(f"strategy must be {strategies}")
 
@@ -996,7 +1018,6 @@ class ChainMapper:
                                        self.chem_group_alignments,
                                        chem_mapping,
                                        chem_group_alns)
-
         # check for the simplest case
         one_to_one = _CheckOneToOneMapping(self.chem_groups, chem_mapping)
         if one_to_one is not None:
@@ -1010,6 +1031,14 @@ class ChainMapper:
                         alns[(ref_ch, mdl_ch)] = aln
             return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
                                  one_to_one, alns)
+
+        if strategy == "heuristic":
+            if _NMappingsWithin(self.chem_groups, chem_mapping,
+                                heuristic_n_max_naive):
+                strategy = "naive"
+            else:
+                strategy = "greedy_full"
+
         mapping = None
         opt_qsscore = None
 
@@ -1048,8 +1077,8 @@ class ChainMapper:
         return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
                              mapping, alns, opt_score = opt_qsscore)
 
-    def GetRMSDMapping(self, model, strategy = "naive", subsampling=None,
-                       chem_mapping_result = None):
+    def GetRMSDMapping(self, model, strategy = "heuristic", subsampling=None,
+                       chem_mapping_result = None, heuristic_n_max_naive = 24):
         """Identify chain mapping based on minimal RMSD superposition
 
         Superposition and scoring is based on CA/C3' positions which are present
@@ -1070,6 +1099,11 @@ class ChainMapper:
         * **greedy_iterative**: Same as greedy_single_rmsd exept that the
           transformation gets updated with each added chain pair.
 
+        * **heuristic**: Uses *naive* strategy if number of possible mappings
+          is within *heuristic_n_max_naive*. The default of 24 corresponds
+          to a tetramer (4!=24). If the number of possible mappings is larger,
+          *greedy_iterative* is used.
+
         :param model: Model to map
         :type model: :class:`ost.mol.EntityView`/:class:`ost.mol.EntityHandle`
         :param strategy: Strategy for sampling. Must be in ["naive",
@@ -1087,7 +1121,7 @@ class ChainMapper:
         :returns: A :class:`MappingResult`
         """
 
-        strategies = ["naive", "greedy_single", "greedy_iterative"]
+        strategies = ["naive", "greedy_single", "greedy_iterative", "heuristic"]
 
         if strategy not in strategies:
             raise RuntimeError(f"strategy must be {strategies}")
@@ -1119,6 +1153,13 @@ class ChainMapper:
                                                   self.chem_group_alignments,
                                                   chem_group_alns,
                                                   max_pos = subsampling)
+
+        if strategy == "heuristic":
+            if _NMappingsWithin(self.chem_groups, chem_mapping,
+                                heuristic_n_max_naive):
+                strategy = "naive"
+            else:
+                strategy = "greedy_full"
 
         mapping = None
 
@@ -1190,15 +1231,9 @@ class ChainMapper:
         *n_max_naive* of 40320 corresponds to an octamer (8!=40320). A
         structure with stoichiometry A6B2 would be 6!*2!=1440 etc.
         """
-        chem_mapping_res = self.GetChemMapping(model)
-        if _NMappingsWithin(self.chem_groups, chem_mapping_res[0], n_max_naive):
-            return self.GetQSScoreMapping(model, strategy="naive",
-                                          chem_mapping_result=chem_mapping_res)
-        else:
-            return self.GetQSScoreMapping(model, strategy="greedy_full",
-                                          greedy_prune_contact_map=True,
-                                          chem_mapping_result=chem_mapping_res)
-
+        return self.GetQSScoreMapping(model, strategy="heuristic",
+                                      greedy_prune_contact_map=True,
+                                      heuristic_n_max_naive = n_max_naive)
 
     def GetRepr(self, substructure, model, topn=1, inclusion_radius=15.0,
                 thresholds=[0.5, 1.0, 2.0, 4.0], bb_only=False,
