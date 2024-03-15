@@ -214,7 +214,8 @@ class LigandScorer:
                    atoms within this distance of the ligand will be considered
                    for inclusion in the binding site.
     :type radius: :class:`float`
-    :param lddt_pli_radius: lDDT inclusion radius for lDDT-PLI.
+    :param lddt_pli_radius: lDDT inclusion radius for lDDT-PLI. Should be
+                   at least equal to or larger than `radius`.
     :type lddt_pli_radius: :class:`float`
     :param lddt_lp_radius: lDDT inclusion radius for lDDT-LP.
     :type lddt_lp_radius: :class:`float`
