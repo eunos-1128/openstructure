@@ -5,6 +5,10 @@ def show_help(option, opt, value, parser):
   parser.print_help()
   sys.exit(-1)
 
+def show_version(option, opt, value, parser):
+  print("OpenStructure " + ost.__version__)
+  sys.exit(0)
+
 def interactive_flag(option, opt, value, parser):
   pass
 
@@ -34,19 +38,20 @@ class OstOptionParser(optparse.OptionParser):
     print(error_message, end=' ')
     sys.exit(-1)
 
-parser=OstOptionParser(usage=usage,conflict_handler="resolve", prog='ost''')
-parser.add_option("-i", "--interactive", action="callback", callback=interactive_flag, help="start interpreter interactively (must be first parameter, ignored otherwise)")
-parser.add_option("-h", "--help", action="callback", callback=show_help, help="show this help message and exit")
-parser.add_option("-v", "--verbosity_level", action="store", type="int", dest="vlevel", default=2, help="sets the verbosity level [default: %default]")
-parser.disable_interspersed_args()
-(options, args) = parser.parse_args()
-
 _site_packs='python%d.%d/site-packages' % sys.version_info[0:2]
 _base_dir=os.getenv('DNG_ROOT')
 sys.path.insert(0, os.path.join(_base_dir, '@LIBDIR@', _site_packs))
 
 from ost import *
 import ost
+
+parser=OstOptionParser(usage=usage,conflict_handler="resolve", prog='ost''')
+parser.add_option("-i", "--interactive", action="callback", callback=interactive_flag, help="start interpreter interactively (must be first parameter, ignored otherwise)")
+parser.add_option("-h", "--help", action="callback", callback=show_help, help="show this help message and exit")
+parser.add_option("-V", "--version", action="callback", callback=show_version, help="show OST version and exit")
+parser.add_option("-v", "--verbosity_level", action="store", type="int", dest="vlevel", default=2, help="sets the verbosity level [default: %default]")
+parser.disable_interspersed_args()
+(options, args) = parser.parse_args()
 
 HistoryFile=os.path.expanduser('~/.ost_history')
 
