@@ -1078,7 +1078,7 @@ class ChainMapper:
                              mapping, alns, opt_score = opt_qsscore)
 
     def GetRMSDMapping(self, model, strategy = "heuristic", subsampling=50,
-                       chem_mapping_result = None, heuristic_n_max_naive = 24):
+                       chem_mapping_result = None, heuristic_n_max_naive = 120):
         """Identify chain mapping based on minimal RMSD superposition
 
         Superposition and scoring is based on CA/C3' positions which are present
@@ -1100,9 +1100,9 @@ class ChainMapper:
           transformation gets updated with each added chain pair.
 
         * **heuristic**: Uses *naive* strategy if number of possible mappings
-          is within *heuristic_n_max_naive*. The default of 24 corresponds
-          to a tetramer (4!=24). If the number of possible mappings is larger,
-          *greedy_iterative* is used.
+          is within *heuristic_n_max_naive*. The default of 120 corresponds
+          to a homo-pentamer (5!=120). If the number of possible mappings is
+          larger, *greedy_iterative* is used.
 
         :param model: Model to map
         :type model: :class:`ost.mol.EntityView`/:class:`ost.mol.EntityHandle`
