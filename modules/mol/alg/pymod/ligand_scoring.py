@@ -56,14 +56,12 @@ class LigandScorer:
     Note that this global chain mapping currently ignores non polymer entities
     such as small ligands, and may result in overly pessimistic scores.
 
-    By default, target-model ligand assignments are computed independently
-    for the RMSD and lDDT-PLI scores. For RMSD, each model ligand is uniquely
-    assigned to a target ligand, starting from the "best" possible mapping
-    (lowest RMSD) and using each target and model ligand in a single
-    assignment. Ties are resolved by best (highest) lDDT-PLI. Similarly,
-    for lDDT-PLI, the assignment is based on the highest lDDT-PLI, and ties
-    broken by lowest RMSD. Setting `rmsd_assignment=True` forces a single
-    ligand assignment, based on RMSD only. Ties are broken arbitrarily.
+    By default, target-model ligand assignments are computed identically
+    for the RMSD and lDDT-PLI scores. Each model ligand is uniquely assigned
+    to a target ligand, starting from the lowest RMSD and using each target and
+    model ligand in a single assignment.  If `rmsd_assignment` is set to False,
+    RMSD and lDDT-PLI are assigned separately to optimize each score, and the
+    other score is used as a tiebreaker.
 
     By default, only exact matches between target and model ligands are
     considered. This is a problem when the target only contains a subset
@@ -236,9 +234,10 @@ class LigandScorer:
                            chain names as value. Only has an effect if
                            *global_chain_mapping* is True.
     :type custom_mapping: :class:`dict`
-    :param rmsd_assignment: assign ligands based on RMSD only. The default
-                            (False) is to use a combination of lDDT-PLI and
-                            RMSD for the assignment.
+    :param rmsd_assignment: set to False to assign lDDT-PLI and RMSD separately
+                            using  a combination of these two scores to
+                            optimize the assignment. By default (True), only
+                            RMSD is considered for the ligand assignment.
     :type rmsd_assignment: :class:`bool`
     :param n_max_naive: Parameter for global chain mapping. If *model* and
                         *target* have less or equal that number of chains,
