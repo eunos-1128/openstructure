@@ -227,9 +227,19 @@ def _ParseArgs():
         "-ra",
         "--rmsd-assignment",
         dest="rmsd_assignment",
-        default=False,
+        default=True,
         action="store_true",
-        help=("Use RMSD for ligand assignment."))
+        help=("Use RMSD only for ligand assignment "
+              "(default since OpenStructure 2.8)."))
+
+    parser.add_argument(
+        "-sa",
+        "--separate-assignment",
+        dest="rmsd_assignment",
+        default=True,
+        action="store_false",
+        help=("Use separate ligand assignments for RMSD and lDDT-PLI "
+              "(opposite of --rmsd-assignment)."))
 
     parser.add_argument(
         "-u",
