@@ -154,7 +154,8 @@ def _ContactScores(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2,
 
     return (nnat, nmdl, fnat, fnonnat)
 
-def _RMSDScores(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2, dist_thresh=10.0):
+def _RMSDScores(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2, dist_thresh=10.0,
+                cb_mode=False):
 
     # backbone atoms used for superposition
     sup_atoms = ['CA','C','N','O']
@@ -173,8 +174,11 @@ def _RMSDScores(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2, dist_thresh=10.0):
 
     # iRMSD
     #######
-    int1 = ref.Select(f"cname={mol.QueryQuoteName(ref_ch1)} and {dist_thresh} <> [cname={mol.QueryQuoteName(ref_ch2)}]")
-    int2 = ref.Select(f"cname={mol.QueryQuoteName(ref_ch2)} and {dist_thresh} <> [cname={mol.QueryQuoteName(ref_ch1)}]")
+    i_ref = ref
+    if cb_mode:
+        i_ref = ref.Select("aname=CB or (rname=GLY and aname=CA)")
+    int1 = i_ref.Select(f"cname={mol.QueryQuoteName(ref_ch1)} and {dist_thresh} <> [cname={mol.QueryQuoteName(ref_ch2)}]")
+    int2 = i_ref.Select(f"cname={mol.QueryQuoteName(ref_ch2)} and {dist_thresh} <> [cname={mol.QueryQuoteName(ref_ch1)}]")
     ref_pos = geom.Vec3List()
     mdl_pos = geom.Vec3List()
     for r in int1.residues:
@@ -263,7 +267,8 @@ def _DockQ(fnat, lrmsd, irmsd, d1, d2):
     return (fnat + _ScaleRMSD(lrmsd, d1) + _ScaleRMSD(irmsd, d2))/3
 
 def DockQ(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2,
-          ch1_aln=None, ch2_aln=None):
+          ch1_aln=None, ch2_aln=None, contact_dist_thresh = 5.0,
+          interface_dist_thresh = 10.0, interface_cb = False):
     """ Computes DockQ for specified interface
 
     DockQ is described in: Sankar Basu and Bjoern Wallner (2016), "DockQ: A
@@ -294,6 +299,25 @@ def DockQ(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2,
                     The first sequence must match the sequence in *ref_ch2* and
                     the second to *mdl_ch2*.
     :type ch2_aln: :class:`ost.seq.AlignmentHandle`
+    :param contact_dist_thresh: Residues with any atom within this threshold
+                                are considered to be in contact. Affects contact
+                                based scores fnat and fnonnat. CAPRI suggests
+                                to lower the default of 5.0 to 4.0 for
+                                protein-peptide interactions.
+    :type contact_dist_thresh: :class:`float`
+    :param interface_dist_thresh: Residues with any atom within this threshold
+                                  to another chain are considered interface
+                                  residues. Affects irmsd. CAPRI suggests to
+                                  lower the default of 10.0 to 8.0 in
+                                  combination with interface_cb=True for
+                                  protein-peptide interactions.
+    :type interface_dist_thresh: :class:`float`
+    :param interface_cb: Only use CB atoms (CA for GLY) to identify interface
+                         residues for irmsd. CAPRI suggests to enable this
+                         flag in combination with lowering
+                         *interface_dist_thresh* to 8.0 for protein-peptide
+                         interactions.
+    :type interface_cb: :class:`bool`
     :returns: :class:`dict` with keys nnat, nmdl, fnat, fnonnat, irmsd, lrmsd,
               DockQ which corresponds to the equivalent values in the original
               DockQ implementation.
@@ -301,8 +325,11 @@ def DockQ(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2,
     _PreprocessStructures(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2,
                           ch1_aln = ch1_aln, ch2_aln = ch2_aln)
     nnat, nmdl, fnat, fnonnat = _ContactScores(mdl, ref, mdl_ch1, mdl_ch2,
-                                               ref_ch1, ref_ch2)
-    irmsd, lrmsd = _RMSDScores(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2)
+                                               ref_ch1, ref_ch2,
+                                               dist_thresh = contact_dist_thresh)
+    irmsd, lrmsd = _RMSDScores(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2,
+                               dist_thresh = interface_dist_thresh,
+                               cb_mode = interface_cb)
     return {"nnat": nnat,
             "nmdl": nmdl,
             "fnat": fnat,

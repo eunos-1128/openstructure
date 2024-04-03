@@ -13,6 +13,7 @@ set(OST_MOL_ALG_UNIT_TESTS
   test_stereochemistry.py
   test_contact_score.py
   test_biounit.py
+  test_ost_dockq.py
 )
 
 if (COMPOUND_LIB)
