@@ -5,6 +5,7 @@ from ost import io
 from ost import conop
 from ost import settings
 from ost import geom
+from ost import LogScript, LogInfo, LogDebug
 from ost.mol.alg import lddt
 from ost.mol.alg import qsscore
 from ost.mol.alg import chain_mapping
@@ -191,6 +192,7 @@ class Scorer:
                                            colored=False,
                                            map_nonstd_res=True,
                                            assign_elem=True)
+        LogScript("Cleaning up input structures")
         Molck(self._model, conop.GetDefaultLib(), molck_settings)
         Molck(self._target, conop.GetDefaultLib(), molck_settings)
         self._model = self._model.Select("peptide=True or nucleotide=True")
@@ -343,6 +345,7 @@ class Scorer:
 
         if custom_mapping is not None:
             self._set_custom_mapping(custom_mapping)
+        LogDebug("Scorer sucessfully initialized")
 
     @property
     def model(self):
@@ -526,6 +529,7 @@ class Scorer:
         :type: :class:`ost.mol.alg.chain_mapping.MappingResult` 
         """
         if self._mapping is None:
+            LogScript("Computing chain mapping")
             self._mapping = \
             self.chain_mapper.GetMapping(self.model,
                                          n_max_naive = self.n_max_naive)
@@ -1220,6 +1224,7 @@ class Scorer:
         :type: :class:`float`
         """
         if self._gdtts is None:
+            LogScript("Computing GDT-TS score")
             n = \
             self.mapped_target_pos.GetGDTTS(self.transformed_mapped_model_pos,
                                             norm=False)
@@ -1240,6 +1245,7 @@ class Scorer:
         :type: :class:`float`
         """
         if self._gdtha is None:
+            LogScript("Computing GDT-HA score")
             n = \
             self.mapped_target_pos.GetGDTHA(self.transformed_mapped_model_pos,
                                             norm=False)
@@ -1260,6 +1266,7 @@ class Scorer:
         :type: :class:`float`
         """
         if self._rmsd is None:
+            LogScript("Computing RMSD")
             self._rmsd = \
             self.mapped_target_pos.GetRMSD(self.transformed_mapped_model_pos)
         return self._rmsd
@@ -1413,6 +1420,7 @@ class Scorer:
                                                    self.stereochecked_model)
 
     def _compute_lddt(self):
+        LogScript("Computing all-atom lDDT")
         # lDDT requires a flat mapping with mdl_ch as key and trg_ch as value
         flat_mapping = self.mapping.GetFlatMapping(mdl_as_key=True)
 
@@ -1499,7 +1507,7 @@ class Scorer:
         self._local_lddt = local_lddt
 
     def _compute_bb_lddt(self):
-
+        LogScript("Computing backbone lDDT")
         # make alignments accessible by mdl seq name
         alns = dict()
         for aln in self.aln:
@@ -1535,11 +1543,13 @@ class Scorer:
         self._bb_local_lddt = local_lddt
 
     def _compute_qs(self):
+        LogScript("Computing global QS-score")
         qs_score_result = self.qs_scorer.Score(self.mapping.mapping)
         self._qs_global = qs_score_result.QS_global
         self._qs_best = qs_score_result.QS_best
 
     def _compute_per_interface_qs_scores(self):
+        LogScript("Computing per-interface QS-score")
         self._per_interface_qs_global = list()
         self._per_interface_qs_best = list()
 
@@ -1554,6 +1564,7 @@ class Scorer:
             self._per_interface_qs_global.append(qs_res.QS_global)
 
     def _compute_ics_scores(self):
+        LogScript("Computing ICS scores")
         contact_scorer_res = self.contact_scorer.ScoreICS(self.mapping.mapping)
         self._ics_precision = contact_scorer_res.precision
         self._ics_recall = contact_scorer_res.recall
@@ -1579,6 +1590,7 @@ class Scorer:
                 self._per_interface_ics.append(None)
 
     def _compute_ips_scores(self):
+        LogScript("Computing IPS scores")
         contact_scorer_res = self.contact_scorer.ScoreIPS(self.mapping.mapping)
         self._ips_precision = contact_scorer_res.precision
         self._ips_recall = contact_scorer_res.recall
@@ -1605,6 +1617,7 @@ class Scorer:
                 self._per_interface_ips.append(None)
 
     def _compute_dockq_scores(self):
+        LogScript("Computing DockQ")
         # lists with values in contact_target_interfaces
         self._dockq_scores = list()
         self._fnat = list()
@@ -1708,6 +1721,7 @@ class Scorer:
                                "chains, i.e. only work if resnum_alignments "
                                "is True at Scorer construction.")
         try:
+            LogScript("Computing CAD score")
             cad_score_exec = \
             settings.Locate("voronota-cadscore",
                             explicit_file_name=self.cad_score_exec)
@@ -1774,6 +1788,7 @@ class Scorer:
     def _do_stereochecks(self):
         """ Perform stereochemistry checks on model and target
         """
+        LogInfo("Performing stereochemistry checks on model and target")
         data = stereochemistry.GetDefaultStereoData()
         l_data = stereochemistry.GetDefaultStereoLinkData()
 
@@ -1908,6 +1923,7 @@ class Scorer:
                 trg_patch_one, trg_patch_two)
 
     def _compute_patchqs_scores(self):
+        LogScript("Computing patch QS-scores")
         self._patch_qs = dict()
         for cname, rnums in self.model_interface_residues.items():
             scores = list()
@@ -1925,6 +1941,7 @@ class Scorer:
             self._patch_qs[cname] = scores
 
     def _compute_patchdockq_scores(self):
+        LogScript("Computing patch DockQ scores")
         self._patch_dockq = dict()
         for cname, rnums in self.model_interface_residues.items():
             scores = list()
@@ -2034,6 +2051,7 @@ class Scorer:
         :param mapping: mapping with trg chains as key and mdl ch as values
         :type mapping: :class:`dict`
         """
+        LogInfo("Setting custom chain mapping")
 
         chain_mapper = self.chain_mapper
         chem_mapping, chem_group_alns, mdl = \
@@ -2125,14 +2143,18 @@ class Scorer:
     def _compute_tmscore(self):
         res = None
         if self.usalign_exec is None:
+            LogScript("Computing patch TM-score with USalign exectuable")
             if self.oum:
                 flat_mapping = self.mapping.GetFlatMapping()
+                LogInfo("Overriding TM-score chain mapping")
                 res = res = bindings.WrappedMMAlign(self.model, self.target,
                                                     mapping=flat_mapping)
             else:
                 res = bindings.WrappedMMAlign(self.model, self.target)
         else:
+            LogScript("Computing patch TM-score with built-in USalign")
             if self.oum:
+                LogInfo("Overriding TM-score chain mapping")
                 flat_mapping = self.mapping.GetFlatMapping()
                 res = tmtools.USAlign(self.model, self.target,
                                       usalign = self.usalign_exec,
