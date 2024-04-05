@@ -134,7 +134,6 @@ dependencies = [
     ('FFTW', '3.3.3', '-dynamic', ('gompi', '1.4.10')), 
 ]
 
-configopts = " -DOPTIMIZE=1 -DCOMPILE_TMTOOLS=1 -DENABLE_GFX=OFF -DENABLE_GUI=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS_RELEASE='-O3 -DNDEBUG -Wno-unused-local-typedefs' -DUSE_NUMPY=1 -DUSE_RPATH=1"
 
 configopts += " -DCOMPOUND_LIB=/scicore/home/schwede/GROUP/OpenStructure/ChemLib/1.6/compounds.chemlib"
 

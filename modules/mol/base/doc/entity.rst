@@ -131,14 +131,6 @@ Entity Handle
 
     :type: Vec3
 
-  .. attribute:: positions
-
-    Equivalent to calling :meth:`GetPositions` with *sort_by_index = True*. This
-    property is read-only and only available if OpenStructure was compiled with
-    an enabled ``USE_NUMPY`` flag (see :ref:`here <cmake-flags>` for details).
-
-    :type: :class:`numpy.array`
-
   .. attribute:: valid
 
     Validity of handle.
@@ -321,17 +313,6 @@ Entity Handle
   .. method:: GetGeometricCenter()
 
     See :attr:`geometric_center`
-
-  .. method:: GetPositions(sort_by_index=True)
-
-    :return: Array of atom positions for this entity.
-    :rtype:  :class:`numpy.array` (shape [:attr:`atom_count`, 3])
-    :param sort_by_index: If True, the atoms are sorted by their
-                          :attr:`~AtomHandle.index`. Otherwise, they are sorted
-                          as they appear in the :attr:`atoms` list.
-
-    This method is only available if OpenStructure was compiled with an enabled
-    ``USE_NUMPY`` flag (see :ref:`here <cmake-flags>` for details).
     
   .. method:: FindWithin(pos, radius)
   

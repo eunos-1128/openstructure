@@ -36,8 +36,6 @@ option(OPENGLPREFERENCE_LEGACY "whether to use the OpenGL Legacy GL implementati
        OFF)
 option(ENABLE_INFO "whether openstructure should be compiled with support for the info library"
        ON)
-option(USE_NUMPY "whether numpy support is added"
-      OFF)
 option(USE_DOUBLE_PRECISION "whether to compile in double precision" 
        OFF)
 option(ENABLE_SPNAV "whether 3DConnexion devices should be supported"
@@ -116,11 +114,6 @@ if (USE_SHADER)
   set(_SHADER ON)
 else()
   set(_SHADER OFF)
-endif()
-if (USE_NUMPY)
-  set(_NUMPY ON)
-else()
-  set(_NUMPY OFF)
 endif()
 if (COMPILE_TMTOOLS)
   set(_TM_TOOLS ON)
@@ -228,10 +221,6 @@ find_package(PNG REQUIRED)
 find_package(FFTW REQUIRED)
 find_package(TIFF REQUIRED)
 
-if(USE_NUMPY)
-  find_package(Numpy REQUIRED)
-endif()
-
 if(ENABLE_MM)
   find_package(OpenMM REQUIRED)
   set(_OPENMM_PLUGINS "${OPEN_MM_PLUGIN_DIR}")
@@ -302,9 +291,6 @@ include_directories(${Boost_INCLUDE_DIRS}
                     ${OPEN_MM_INCLUDE_DIRS}
                     ${SQLITE3_INCLUDE_DIRS}
                     )
-if(USE_NUMPY)
-include_directories(${PYTHON_NUMPY_INCLUDE_DIR})
-endif()
 
 if (UNIX)
   SET(CMAKE_SKIP_BUILD_RPATH  FALSE)
@@ -353,7 +339,6 @@ message(STATUS
         "   Graphical interface               (-DENABLE_GUI) : ${_UI}\n"
         "   OpenGL support                    (-DENABLE_GFX) : ${_OPENGL}\n"
         "   Shader support                    (-DUSE_SHADER) : ${_SHADER}\n"
-        "   Numpy support                      (-DUSE_NUMPY) : ${_NUMPY}\n"
         "   SpaceNav Device support         (-DENABLE_SPNAV) : ${_SPNAV}\n"
         "   OpenMM support                     (-DENABLE_MM) : ${_OPENMM}\n"
         "   OpenMM plugins            (-DOPEN_MM_PLUGIN_DIR) : ${_OPENMM_PLUGINS}\n"

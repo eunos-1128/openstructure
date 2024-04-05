@@ -178,9 +178,6 @@ can influence it.
   then available at python level. This option requires a Fortran compiler. 
   By default, this option is switched off.
 
-* `USE_NUMPY` allows OpenStructure to pass back data in NumPy format. By 
-  default, this is switched off.
-
 * `ENABLE_MM` controls whether the molecular mechanics module is enabled. By
   default, this is switched off. If it is turned on, you should also set the
   paths to your local OpenMM installation:
