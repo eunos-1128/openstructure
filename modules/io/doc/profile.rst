@@ -52,7 +52,7 @@ STRICT
 
   .. code-block:: python
 
-    IOProfile(dialect='PDB', fault_tolerant=False, quack_mode=False,
+    IOProfile(dialect='PDB', fault_tolerant=False,
               processor=conop.RuleBasedProcessor(conop.GetDefaultLib()))
 
 SLOPPY:
@@ -61,7 +61,7 @@ SLOPPY:
 
   .. code-block:: python
 
-    IOProfile(dialect='PDB', fault_tolerant=True, quack_mode=True,
+    IOProfile(dialect='PDB', fault_tolerant=True,
               processor=conop.RuleBasedProcessor(conop.GetDefaultLib()))
 
 CHARMM:
@@ -71,7 +71,7 @@ CHARMM:
 
   .. code-block:: python
 
-    IOProfile(dialect='CHARMM', fault_tolerant=True, quack_mode=False,
+    IOProfile(dialect='CHARMM', fault_tolerant=True,
               processor=conop.RuleBasedProcessor(conop.GetDefaultLib()))
 
 .. note:: 
@@ -92,7 +92,7 @@ CHARMM:
 The IOProfile Class
 --------------------------------------------------------------------------------
 
-.. class:: IOProfile(dialect='PDB', quack_mode=False, fault_tolerant=False,\
+.. class:: IOProfile(dialect='PDB', fault_tolerant=False,\
                      join_spread_atom_records=False, no_hetatms=False,\
                      calpha_only=False, read_conect=False, processor=None)
 
@@ -107,16 +107,6 @@ The IOProfile Class
     CHARMM, the loading is optimized for CHARMM PDB files. This turns on
     support for chain names with length up to 4 characters (column 72-76) and
     increase the size of the residue name to 4 residues.
-
-  .. attribute:: quack_mode
-
-    :type: bool
-
-    Read/write property. When quack_mode is enabled, the chemical class for
-    unknown residues is guessed based on its atoms and connectivity. Turn this
-    on if you are working with non-standard conforming PDB files and are
-    experiencing problems with the rendering of the backbone trace and/or see
-    peptidic residues with unknown chemical classes.
 
   .. attribute:: fault_tolerant
 

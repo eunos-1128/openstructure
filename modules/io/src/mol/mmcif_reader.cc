@@ -700,10 +700,10 @@ void MMCifReader::ParseAndAddAtom(const std::vector<StringRef>& columns)
       }
   } else {
     mol::AtomHandle atom=curr_residue_.FindAtom(aname);
-    if (atom.IsValid() && !profile_.quack_mode) { // unit test
+    if (atom.IsValid()) { // unit test
       if (profile_.fault_tolerant) { // unit test
         LOG_WARNING("duplicate atom '" << aname << "' in residue " 
-                    << curr_residue_);
+                    << curr_residue_ << " only first atom added");
         return;
       }
       throw IOException(this->FormatDiagnostic(STAR_DIAG_ERROR,

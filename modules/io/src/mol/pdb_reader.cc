@@ -844,26 +844,24 @@ void PDBReader::ParseAndAddAtom(const StringRef& line, int line_num,
          << "residue with number " << res_num << " has more than one name.";
       throw IOException(ss.str());
     }
-    if(!profile_.quack_mode) {
-      if (!warned_name_mismatch_) {
-        if (alt_loc==' ') {
-          LOG_WARNING("Residue with number " << res_num << " has more than one name. "
-                      "Ignoring atoms for everything but the first");        
-        } else {
-          LOG_WARNING("Residue with number " << res_num 
-                      << " contains a microheterogeneity. Everything but atoms for "
-                      << "the residue '" << curr_residue_.GetName() 
-                      << "' will be ignored");
-        }
+    if (!warned_name_mismatch_) {
+      if (alt_loc==' ') {
+        LOG_WARNING("Residue with number " << res_num << " has more than one name. "
+                    "Ignoring atoms for everything but the first");        
+      } else {
+        LOG_WARNING("Residue with number " << res_num 
+                    << " contains a microheterogeneity. Everything but atoms for "
+                    << "the residue '" << curr_residue_.GetName() 
+                    << "' will be ignored");
       }
-      warned_name_mismatch_=true;
-      return;
     }
+    warned_name_mismatch_=true;
+    return;
   }
   Real b=temp.first ? temp.second : 0.0;
   Real o=occ.first ? occ.second : 1.0;
 
-  if (!profile_.quack_mode && alt_loc!=' ') {
+  if (alt_loc!=' ') {
     // Check if there is already a atom with the same name.
     mol::AtomHandle me=curr_residue_.FindAtom(aname);
     if (me.IsValid()) {
@@ -871,7 +869,7 @@ void PDBReader::ParseAndAddAtom(const StringRef& line, int line_num,
         editor.AddAltAtomPos(String(1, alt_loc), me, apos, o, b);
       } catch (Error&) {
         LOG_INFO("Ignoring atom alt location since there is already an atom "
-                     "with name " << aname << ", but without an alt loc");
+                 "with name " << aname << ", but without an alt loc");
         return;
       }
       return;
@@ -882,10 +880,10 @@ void PDBReader::ParseAndAddAtom(const StringRef& line, int line_num,
     }
   } else {
     mol::AtomHandle atom=curr_residue_.FindAtom(aname);
-    if (atom.IsValid() && !profile_.quack_mode) {
+    if (atom.IsValid()) {
       if (profile_.fault_tolerant) {
         LOG_WARNING("duplicate atom '" << aname << "' in residue " 
-                    << curr_residue_);
+                    << curr_residue_ << " only first atom added");
         return;
       }
       throw IOException("duplicate atom '"+aname+"' in residue "+

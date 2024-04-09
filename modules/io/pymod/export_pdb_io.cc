@@ -45,9 +45,8 @@ void remove_profiles() {
 void export_pdb_io()
 {
   class_<IOProfile>("IOProfile",
-         init<String,bool,bool,bool,bool,bool,bool,
+         init<String,bool,bool,bool,bool,bool,
               conop::ProcessorPtr>((arg("dialect")="PDB",
-                                    arg("quack_mode")=false,
                                     arg("fault_tolerant")=false,
                                     arg("join_spread_atom_records")=false,
                                     arg("no_hetatms")=false,
@@ -57,7 +56,6 @@ void export_pdb_io()
     .def(init<const IOProfile&>())
     .def_readwrite("dialect", &IOProfile::dialect)
     .def_readwrite("fault_tolerant", &IOProfile::fault_tolerant)
-    .def_readwrite("quack_mode", &IOProfile::quack_mode)
     .def_readwrite("no_hetatms", &IOProfile::no_hetatms)
     .def_readwrite("calpha_only", &IOProfile::calpha_only)
     .def_readwrite("join_spread_atom_records", &IOProfile::join_spread_atom_records)
