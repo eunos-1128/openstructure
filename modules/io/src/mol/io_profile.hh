@@ -60,7 +60,7 @@ public:
 
 inline  std::ostream& operator<<(std::ostream& stream, const IOProfile& p)
 {
-  stream << "IOProfile(dialect='" << p.dialect
+  stream << "IOProfile(dialect='" << p.dialect << ", "
          << "join_spread_atom_records=" << (p.join_spread_atom_records ? "True" : "False") << ", "
          << "calpha_only=" << (p.calpha_only ? "True" : "False") << ", "
          << "fault_tolerant=" << (p.fault_tolerant ? "True" : "False") << ", "
