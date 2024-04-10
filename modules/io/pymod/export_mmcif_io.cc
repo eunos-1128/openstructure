@@ -466,22 +466,14 @@ void export_mmcif_io()
   ;
 
   class_<MMCifInfoEntityBranchLink>("MMCifInfoEntityBranchLink",
-                                    init<mol::AtomHandle,
-                                    mol::AtomHandle, unsigned char>())
-    .def("GetAtom1", &MMCifInfoEntityBranchLink::GetAtom1)
-    .def("GetAtom2", &MMCifInfoEntityBranchLink::GetAtom2)
-    .def("GetBondOrder", &MMCifInfoEntityBranchLink::GetBondOrder)
-    .def("ConnectBranchLink", &MMCifInfoEntityBranchLink::ConnectBranchLink)
-    .def("SetAtom1", &MMCifInfoEntityBranchLink::SetAtom1)
-    .def("SetAtom2", &MMCifInfoEntityBranchLink::SetAtom2)
-    .def("SetBondOrder", &MMCifInfoEntityBranchLink::SetBondOrder)
-    .def(self_ns::str(self))
-    .add_property("atom1", &MMCifInfoEntityBranchLink::GetAtom1,
-                  &MMCifInfoEntityBranchLink::SetAtom1)
-    .add_property("atom2", &MMCifInfoEntityBranchLink::GetAtom2,
-                  &MMCifInfoEntityBranchLink::SetAtom2)
-    .add_property("bond_order", &MMCifInfoEntityBranchLink::GetBondOrder,
-                  &MMCifInfoEntityBranchLink::SetBondOrder)
+                                    init<int, int, const String&,
+                                         const String&,
+                                         unsigned char>())
+    .add_property("rnum1", &MMCifInfoEntityBranchLink::rnum1)
+    .add_property("rnum2", &MMCifInfoEntityBranchLink::rnum2)
+    .add_property("aname1", &MMCifInfoEntityBranchLink::aname1)
+    .add_property("aname2", &MMCifInfoEntityBranchLink::aname2)
+    .add_property("bond_order", &MMCifInfoEntityBranchLink::bond_order)
   ;
 
   class_<MMCifInfoEntityBranchLinkMap>("MMCifInfoEntityBranchLinkMap", init<>())
@@ -544,11 +536,8 @@ void export_mmcif_io()
           arg("minor")=-1))
     .def("GetRevisions", &MMCifInfo::GetRevisions)
     .def("AddEntityBranchLink", &MMCifInfo::AddEntityBranchLink)
-    .def("GetEntityBranchLinks", &MMCifInfo::GetEntityBranchLinks)
     .def("GetEntityBranchByChain", &MMCifInfo::GetEntityBranchByChain)
-    .def("ConnectBranchLinks", &MMCifInfo::ConnectBranchLinks)
     .def("GetEntityBranchChainNames", &WrapGetNames)
-    .def("GetEntityBranchChains", &MMCifInfo::GetEntityBranchChains)
     .def("SetEntityDesc", &MMCifInfo::SetEntityDesc)
     .def("GetEntityDesc", &MMCifInfo::GetEntityDesc, return_value_policy<copy_const_reference>())
     .def("GetEntityIds", &MMCifInfo::GetEntityIds)

@@ -268,52 +268,63 @@ class TestMMCifInfo(unittest.TestCase):
 
   def test_mmcifinfo_entitybranch(self):
     # test MMCifInfoEntityBranchLink
-    eh = mol.CreateEntity()
-    editor = eh.EditXCS();
-    ch = editor.InsertChain("A");
-    res1 = editor.AppendResidue(ch, "BMA");
-    res2 = editor.AppendResidue(ch, "MAN");
-    atom1 = editor.InsertAtom(res2, "C1", geom.Vec3());
-    atom2 = editor.InsertAtom(res1, "O3", geom.Vec3());
-    branch = io.MMCifInfoEntityBranchLink(atom1, atom2, 1)
-    self.assertEqual(branch.atom1.qualified_name, "A.MAN2.C1")
-    self.assertEqual(branch.bond_order, 1)
 
-    branch.ConnectBranchLink(editor)
-    self.assertEqual(atom2.GetBondPartners()[0].qualified_name, "A.MAN2.C1")
-
-    # test entity_branches_
-    ch = editor.InsertChain("B");
-    res1 = editor.AppendResidue(ch, "NAG");
-    res2 = editor.AppendResidue(ch, "NAG");
-    atom3 = editor.InsertAtom(res2, "C1", geom.Vec3());
-    atom4 = editor.InsertAtom(res1, "O4", geom.Vec3());
     info = io.MMCifInfo()
-    info.AddEntityBranchLink("A", atom1, atom2, 1)
-    info.AddEntityBranchLink(ch.name, atom3, atom4, 1)
+    info.AddEntityBranchLink("A", 42, 43, "O3", "C4", 2)
+    info.AddEntityBranchLink("B", 142, 143, "XXO3", "XXC4", 3)
+    info.AddEntityBranchLink("B", 1142, 1143, "XXXXO3", "XXXXC4", 5)
 
-    blinks = info.GetEntityBranchLinks()
-    self.assertEqual(blinks[0].GetAtom1().qualified_name, "A.MAN2.C1")
-    self.assertEqual(blinks[0].atom2.qualified_name, "A.BMA1.O3")
-    self.assertEqual(blinks[0].GetBondOrder(), 1)
-    self.assertEqual(blinks[1].atom1.qualified_name, "B.NAG2.C1")
-    self.assertEqual(blinks[1].GetAtom2().qualified_name, "B.NAG1.O4")
-    self.assertEqual(blinks[1].GetBondOrder(), 1)
+    self.assertEqual(len(info.GetEntityBranchChainNames()), 2)
+    self.assertEqual(len(info.GetEntityBranchByChain("A")), 1)
+    self.assertEqual(len(info.GetEntityBranchByChain("B")), 2)
+    self.assertEqual(len(info.GetEntityBranchByChain("X")), 0) 
 
-    info.ConnectBranchLinks()
-    self.assertEqual(atom4.GetBondPartners()[0].qualified_name, "B.NAG2.C1")
+    self.assertEqual(info.GetEntityBranchByChain("A")[0].rnum1, 42)
+    self.assertEqual(info.GetEntityBranchByChain("A")[0].rnum2, 43)
+    self.assertEqual(info.GetEntityBranchByChain("A")[0].aname1, "O3")
+    self.assertEqual(info.GetEntityBranchByChain("A")[0].aname2, "C4")
+    self.assertEqual(info.GetEntityBranchByChain("A")[0].bond_order, 2)
 
-    chain_names = info.GetEntityBranchChainNames()
-    self.assertEqual(chain_names, ['A', 'B'])
-    chains = info.GetEntityBranchChains()
-    self.assertEqual(chains[0].name, 'A')
-    self.assertEqual(chains[1].name, 'B')
+    self.assertEqual(info.GetEntityBranchByChain("B")[0].rnum1, 142);
+    self.assertEqual(info.GetEntityBranchByChain("B")[0].rnum2, 143);
+    self.assertEqual(info.GetEntityBranchByChain("B")[0].aname1, "XXO3");
+    self.assertEqual(info.GetEntityBranchByChain("B")[0].aname2, "XXC4");
+    self.assertEqual(info.GetEntityBranchByChain("B")[0].bond_order, 3);
 
-    blinks = info.GetEntityBranchByChain('B')
-    self.assertEqual(len(blinks), 1)
-    self.assertEqual(blinks[0].atom1.qualified_name, "B.NAG2.C1")
-    blinks = info.GetEntityBranchByChain('C')
-    self.assertEqual(len(blinks), 0)
+    self.assertEqual(info.GetEntityBranchByChain("B")[1].rnum1, 1142)
+    self.assertEqual(info.GetEntityBranchByChain("B")[1].rnum2, 1143)
+    self.assertEqual(info.GetEntityBranchByChain("B")[1].aname1, "XXXXO3")
+    self.assertEqual(info.GetEntityBranchByChain("B")[1].aname2, "XXXXC4")
+    self.assertEqual(info.GetEntityBranchByChain("B")[1].bond_order, 5)
+
+  def test_mmcif_connect_branch_links(self):
+
+    p = os.path.join("testfiles", "mmcif", "154L.cif")
+    ent = mol.CreateEntity()
+    reader = io.MMCifReader(p, ent, io.profiles['STRICT'])
+    reader.Parse()
+
+    # there are two branch links specified and they should be connected
+    # in reader.Parse()
+    bonds = ent.bonds
+    self.assertEqual(len(bonds), 2)
+
+    # first branch link manually parsed from cif file
+    r1 = ent.FindResidue("B", mol.ResNum(2))
+    a1 = r1.FindAtom("C1")
+    r2 = ent.FindResidue("B", mol.ResNum(1))
+    a2 = r2.FindAtom("O4")
+
+    self.assertTrue(mol.BondExists(a1, a2))
+
+    # second branch link manually parsed from cif file
+    r1 = ent.FindResidue("B", mol.ResNum(3))
+    a1 = r1.FindAtom("C1")
+    r2 = ent.FindResidue("B", mol.ResNum(2))
+    a2 = r2.FindAtom("O4")
+
+    self.assertTrue(mol.BondExists(a1, a2))
+
 
   def test_mmcif_fault_tolerant_citation(self):
 

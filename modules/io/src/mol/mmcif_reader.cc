@@ -1969,14 +1969,24 @@ void MMCifReader::OnEndData()
     if (blm_it != entity_branch_link_map_.end()) {
       for (bl_it = blm_it->second.begin(); bl_it != blm_it->second.end();
            ++bl_it) {
+        info_.AddEntityBranchLink(css->second,
+                                  bl_it->res_num_1, bl_it->res_num_2,
+                                  bl_it->atm_nm_1, bl_it->atm_nm_2,
+                                  bl_it->bond_order);
+
+        // and directly connect if respective atoms are available...
         mol::ResidueHandle res1 = css->first.FindResidue(to_res_num(
                                                          bl_it->res_num_1, ' '));
         mol::ResidueHandle res2 = css->first.FindResidue(to_res_num(
                                                          bl_it->res_num_2, ' '));
-        info_.AddEntityBranchLink(css->first.GetName(),
-                                  res1.FindAtom(bl_it->atm_nm_1),
-                                  res2.FindAtom(bl_it->atm_nm_2),
-                                  bl_it->bond_order);
+        if(res1.IsValid() && res2.IsValid()) {
+          mol::AtomHandle a1 = res1.FindAtom(bl_it->atm_nm_1);
+          mol::AtomHandle a2 = res2.FindAtom(bl_it->atm_nm_2);
+          if(a1.IsValid() && a2.IsValid()) {
+            editor.Connect(a1, a2, bl_it->bond_order);
+            std::cout << a1 << ' ' << a2 << std::endl;
+          }
+        }
       }
     }
   }
