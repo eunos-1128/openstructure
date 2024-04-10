@@ -14,6 +14,7 @@ from ost.mol.alg import dockq
 from ost.mol.alg.lddt import lDDTScorer
 from ost.mol.alg.qsscore import QSScorer
 from ost.mol.alg.contact_score import ContactScorer
+from ost.mol.alg import GDT
 from ost.mol.alg import Molck, MolckSettings
 from ost import bindings
 from ost.bindings import cadscore
@@ -268,6 +269,7 @@ class Scorer:
         self._target_bad_angles = None
         self._chain_mapper = None
         self._mapping = None
+        self._rigid_mapping = None
         self._model_interface_residues = None
         self._target_interface_residues = None
         self._aln = None
@@ -330,6 +332,18 @@ class Scorer:
         self._transformed_mapped_model_pos = None
         self._n_target_not_mapped = None
         self._transform = None
+
+        self._rigid_mapped_target_pos = None
+        self._rigid_mapped_model_pos = None
+        self._rigid_transformed_mapped_model_pos = None
+        self._rigid_n_target_not_mapped = None
+        self._rigid_transform = None
+
+        self._gdt_05 = None
+        self._gdt_1 = None
+        self._gdt_2 = None
+        self._gdt_4 = None
+        self._gdt_8 = None
         self._gdtts = None
         self._gdtha = None
         self._rmsd = None
@@ -526,6 +540,8 @@ class Scorer:
     def mapping(self):
         """ Full chain mapping result for :attr:`target`/:attr:`model`
 
+        Computed with :func:`ost.mol.alg.ChainMapper.GetMapping`
+
         :type: :class:`ost.mol.alg.chain_mapping.MappingResult` 
         """
         if self._mapping is None:
@@ -534,6 +550,20 @@ class Scorer:
             self.chain_mapper.GetMapping(self.model,
                                          n_max_naive = self.n_max_naive)
         return self._mapping
+
+    @property
+    def rigid_mapping(self):
+        """ Full chain mapping result for :attr:`target`/:attr:`model`
+
+        Computed with :func:`ost.mol.alg.ChainMapper.GetRMSDMapping`
+
+        :type: :class:`ost.mol.alg.chain_mapping.MappingResult` 
+        """
+        if self._rigid_mapping is None:
+            LogScript("Computing rigid chain mapping")
+            self._rigid_mapping = \
+            self.chain_mapper.GetRMSDMapping(self.model)
+        return self._rigid_mapping
 
     @property
     def model_interface_residues(self):
@@ -1215,60 +1245,198 @@ class Scorer:
         return self._transform
 
     @property
-    def gdtts(self):
-        """ GDT with thresholds: 8.0A, 4.0A, 2.0A and 1.0A
+    def rigid_mapped_target_pos(self):
+        """ Mapped representative positions in target
 
-        Computed on :attr:`~transformed_mapped_model_pos` and
-        :attr:`mapped_target_pos`
+        Thats CA positions for peptide residues and C3' positions for
+        nucleotides. Has same length as :attr:`~rigid_mapped_model_pos` and mapping
+        is based on :attr:`~rigid_mapping`.
+
+        :type: :class:`ost.geom.Vec3List`
+        """
+        if self._rigid_mapped_target_pos is None:
+            self._extract_rigid_mapped_pos()
+        return self._rigid_mapped_target_pos
+
+    @property
+    def rigid_mapped_model_pos(self):
+        """ Mapped representative positions in model
+
+        Thats CA positions for peptide residues and C3' positions for
+        nucleotides. Has same length as :attr:`~mapped_target_pos` and mapping
+        is based on :attr:`~rigid_mapping`.
+
+        :type: :class:`ost.geom.Vec3List`
+        """
+        if self._rigid_mapped_model_pos is None:
+            self._extract_rigid_mapped_pos()
+        return self._rigid_mapped_model_pos
+
+    @property
+    def rigid_transformed_mapped_model_pos(self):
+        """ :attr:`~rigid_mapped_model_pos` with :attr:`~rigid_transform` applied
+
+        :type: :class:`ost.geom.Vec3List`
+        """
+        if self._rigid_transformed_mapped_model_pos is None:
+            self._rigid_transformed_mapped_model_pos = \
+            geom.Vec3List(self.rigid_mapped_model_pos)
+            self._rigid_transformed_mapped_model_pos.ApplyTransform(self.rigid_transform)
+        return self._rigid_transformed_mapped_model_pos
+
+    @property
+    def rigid_n_target_not_mapped(self):
+        """ Number of target residues which have no rigid mapping to model
+
+        :type: :class:`int`
+        """
+        if self._rigid_n_target_not_mapped is None:
+            self._extract_rigid_mapped_pos()
+        return self._rigid_n_target_not_mapped
+
+    @property
+    def rigid_transform(self):
+        """ Transform: :attr:`~rigid_mapped_model_pos` onto :attr:`~rigid_mapped_target_pos`
+
+        Computed using Kabsch minimal rmsd algorithm
+
+        :type: :class:`ost.geom.Mat4`
+        """
+        if self._rigid_transform is None:
+            try:
+                res = mol.alg.SuperposeSVD(self.rigid_mapped_model_pos,
+                                           self.rigid_mapped_target_pos)
+                self._rigid_transform = res.transformation
+            except:
+                self._rigid_transform = geom.Mat4()
+        return self._rigid_transform
+
+    @property
+    def gdt_05(self):
+        """ Fraction CA (C3' for nucleotides) that can be superposed within 0.5A
+
+        Uses :attr:`~rigid_mapped_model_pos` and :attr:`~rigid_mapped_target_pos`.
+        Similar iterative algorithm as LGA tool
+
+        :type: :class:`float` 
+        """
+        if self._gdt_05 is None:
+            n, m = GDT(self.rigid_mapped_model_pos, self.rigid_mapped_target_pos, 7, 1000, 0.5)
+            n_full = len(self.rigid_mapped_target_pos) + self.rigid_n_target_not_mapped
+            if n_full > 0:
+                self._gdt_05 = float(n) / n_full
+            else:
+                self._gdt_05 = 0.0
+        return self._gdt_05
+
+    @property
+    def gdt_1(self):
+        """ Fraction CA (C3' for nucleotides) that can be superposed within 1.0A
+
+        Uses :attr:`~rigid_mapped_model_pos` and :attr:`~rigid_mapped_target_pos`.
+        Similar iterative algorithm as LGA tool
+
+        :type: :class:`float` 
+        """
+        if self._gdt_1 is None:
+            n, m = GDT(self.rigid_mapped_model_pos, self.rigid_mapped_target_pos, 7, 1000, 1.0)
+            n_full = len(self.rigid_mapped_target_pos) + self.rigid_n_target_not_mapped
+            if n_full > 0:
+                self._gdt_1 = float(n) / n_full
+            else:
+                self._gdt_1 = 0.0
+        return self._gdt_1
+
+    @property
+    def gdt_2(self):
+        """ Fraction CA (C3' for nucleotides) that can be superposed within 2.0A
+
+        Uses :attr:`~rigid_mapped_model_pos` and :attr:`~rigid_mapped_target_pos`.
+        Similar iterative algorithm as LGA tool
+
+
+        :type: :class:`float` 
+        """
+        if self._gdt_2 is None:
+            n, m = GDT(self.rigid_mapped_model_pos, self.rigid_mapped_target_pos, 7, 1000, 2.0)
+            n_full = len(self.rigid_mapped_target_pos) + self.rigid_n_target_not_mapped
+            if n_full > 0:
+                self._gdt_2 = float(n) / n_full
+            else:
+                self._gdt_2 = 0.0
+        return self._gdt_2
+
+    @property
+    def gdt_4(self):
+        """ Fraction CA (C3' for nucleotides) that can be superposed within 4.0A
+
+        Uses :attr:`~rigid_mapped_model_pos` and :attr:`~rigid_mapped_target_pos`.
+        Similar iterative algorithm as LGA tool
+
+        :type: :class:`float` 
+        """
+        if self._gdt_4 is None:
+            n, m = GDT(self.rigid_mapped_model_pos, self.rigid_mapped_target_pos, 7, 1000, 4.0)
+            n_full = len(self.rigid_mapped_target_pos) + self.rigid_n_target_not_mapped
+            if n_full > 0:
+                self._gdt_4 = float(n) / n_full
+            else:
+                self._gdt_4 = 0.0
+        return self._gdt_4
+
+    @property
+    def gdt_8(self):
+        """ Fraction CA (C3' for nucleotides) that can be superposed within 8.0A
+
+        Similar iterative algorithm as LGA tool
+
+        :type: :class:`float` 
+        """
+        if self._gdt_8 is None:
+            n, m = GDT(self.rigid_mapped_model_pos, self.rigid_mapped_target_pos, 7, 1000, 8.0)
+            n_full = len(self.rigid_mapped_target_pos) + self.rigid_n_target_not_mapped
+            if n_full > 0:
+                self._gdt_8 = float(n) / n_full
+            else:
+                self._gdt_8 = 0.0
+        return self._gdt_8
+    
+
+    @property
+    def gdtts(self):
+        """ avg GDT with thresholds: 8.0A, 4.0A, 2.0A and 1.0A
 
         :type: :class:`float`
         """
         if self._gdtts is None:
             LogScript("Computing GDT-TS score")
-            n = \
-            self.mapped_target_pos.GetGDTTS(self.transformed_mapped_model_pos,
-                                            norm=False)
-            n_full = 4*len(self.mapped_target_pos) + 4*self.n_target_not_mapped
-            if n_full > 0:
-                self._gdtts = float(n) / n_full
-            else:
-                self._gdtts = 0.0
+            self._gdtts = (self.gdt_1 + self.gdt_2 + self.gdt_4 + self.gdt_8) / 4
         return self._gdtts
 
     @property
     def gdtha(self):
-        """ GDT with thresholds: 4.0A, 2.0A, 1.0A and 0.5A
-
-        Computed on :attr:`~transformed_mapped_model_pos` and
-        :attr:`mapped_target_pos`
+        """ avg GDT with thresholds: 4.0A, 2.0A, 1.0A and 0.5A
 
         :type: :class:`float`
         """
         if self._gdtha is None:
             LogScript("Computing GDT-HA score")
-            n = \
-            self.mapped_target_pos.GetGDTHA(self.transformed_mapped_model_pos,
-                                            norm=False)
-            n_full = 4*len(self.mapped_target_pos) + 4*self.n_target_not_mapped
-            if n_full > 0:
-                self._gdtha = float(n) / n_full
-            else:
-                self._gdtha = 0.0
+            self._gdtha = (self.gdt_05 + self.gdt_1 + self.gdt_2 + self.gdt_4) / 4
         return self._gdtha
 
     @property
     def rmsd(self):
         """ RMSD
 
-        Computed on :attr:`~transformed_mapped_model_pos` and
-        :attr:`mapped_target_pos`
+        Computed on :attr:`~rigid_transformed_mapped_model_pos` and
+        :attr:`rigid_mapped_target_pos`
 
         :type: :class:`float`
         """
         if self._rmsd is None:
             LogScript("Computing RMSD")
             self._rmsd = \
-            self.mapped_target_pos.GetRMSD(self.transformed_mapped_model_pos)
+            self.rigid_mapped_target_pos.GetRMSD(self.rigid_transformed_mapped_model_pos)
         return self._rmsd
 
     @property
@@ -1713,6 +1881,35 @@ class Scorer:
         for ch in self.mapping.target.chains:
             if ch.GetName() not in processed_trg_chains:
                 self._n_target_not_mapped += len(ch.residues)
+
+
+    def _extract_rigid_mapped_pos(self):
+        self._rigid_mapped_target_pos = geom.Vec3List()
+        self._rigid_mapped_model_pos = geom.Vec3List()
+        self._rigid_n_target_not_mapped = 0
+        processed_trg_chains = set()
+        for trg_ch, mdl_ch in self.rigid_mapping.GetFlatMapping().items():
+            processed_trg_chains.add(trg_ch)
+            aln = self.rigid_mapping.alns[(trg_ch, mdl_ch)]
+            for col in aln:
+                if col[0] != '-' and col[1] != '-':
+                    trg_res = col.GetResidue(0)
+                    mdl_res = col.GetResidue(1)
+                    trg_at = trg_res.FindAtom("CA")
+                    mdl_at = mdl_res.FindAtom("CA")
+                    if not trg_at.IsValid():
+                        trg_at = trg_res.FindAtom("C3'")
+                    if not mdl_at.IsValid():
+                        mdl_at = mdl_res.FindAtom("C3'")
+                    self._rigid_mapped_target_pos.append(trg_at.GetPos())
+                    self._rigid_mapped_model_pos.append(mdl_at.GetPos())
+                elif col[0] != '-':
+                    self._rigid_n_target_not_mapped += 1
+        # count number of trg residues from non-mapped chains
+        for ch in self.rigid_mapping.target.chains:
+            if ch.GetName() not in processed_trg_chains:
+                self._rigid_n_target_not_mapped += len(ch.residues)
+
 
     def _compute_cad_score(self):
         if not self.resnum_alignments:
