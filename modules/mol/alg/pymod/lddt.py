@@ -590,7 +590,7 @@ class lDDTScorer:
                         symmetries.append(sym_indices)
 
         if no_interchain and no_intrachain:
-            raise RuntimeError("on_interchain and no_intrachain flags are "
+            raise RuntimeError("no_interchain and no_intrachain flags are "
                                "mutually exclusive")
 
         if no_interchain:
