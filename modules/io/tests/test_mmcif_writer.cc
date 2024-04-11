@@ -324,7 +324,7 @@ BOOST_AUTO_TEST_CASE(mmcif_writer_small_sugars)
 {
   BOOST_TEST_MESSAGE("  Running mmcif_writer_small_sugars tests...");
   /*
-    While RCSB marks dipeptides and dinucleotides as non-ploymers, sugarse are
+    While RCSB marks dipeptides and dinucleotides as non-ploymers, sugars are
     marked branched as soon as there are 2 connected.
    */
   // Branched: 2 sugars connected (check RCSB 3AXH)
