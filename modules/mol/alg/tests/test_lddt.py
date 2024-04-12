@@ -221,6 +221,22 @@ class TestlDDT(unittest.TestCase):
         # same for the conserved contacts
         self.assertEqual(lDDT_cons_ic + lDDT_cons_sc, lDDT_cons)
 
+    def test_add_mdl_contacts(self):
+        model = _LoadFile("7SGN_C_model.pdb")
+        target = _LoadFile("7SGN_C_target.pdb")
+
+        lddt_scorer = lDDTScorer(target)
+        lDDT, per_res_lDDT, lDDT_tot, lDDT_cons, res_indices, per_res_exp, \
+        per_res_conserved = lddt_scorer.lDDT(model,
+                                             return_dist_test = True,
+                                             add_mdl_contacts=True)
+
+        # this value is just blindly copied in without checking whether it makes
+        # any sense... it's sole purpose is to trigger the respective flag
+        # in lDDT computation
+        self.assertEqual(lDDT, 0.6171511842396518)
+
+
 
 class TestlDDTBS(unittest.TestCase):
 

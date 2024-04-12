@@ -2085,7 +2085,7 @@ class _lDDTDecomposer:
                     s = lddt.lDDTScorer(dimer_ref, bb_only=True)
                     self.interface_scorer[k1] = s
                     self.interface_scorer[k2] = s
-                    self.n += self.interface_scorer[k1].n_distances_ic
+                    self.n += sum([len(x) for x in self.interface_scorer[k1].ref_indices_ic])
                     self.ref_interfaces.append(k1)
                     # single chain scorer are actually interface scorers to save
                     # some distance calculations
