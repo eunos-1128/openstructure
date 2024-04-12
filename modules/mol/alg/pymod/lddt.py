@@ -849,7 +849,7 @@ class lDDTScorer:
                                 self.symmetric_atoms.add(
                                     self.atom_indices[hashcode]
                                 )
-        self.positions = np.vstack(positions, dtype=np.float32)
+        self.positions = np.vstack(positions)
         self.n_atoms = current_idx
 
     def _GetTargetResidueNumbers(self, target, seqres_mapping):
