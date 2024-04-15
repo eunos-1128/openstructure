@@ -1041,6 +1041,11 @@ class lDDTScorer:
                 mask_start.extend([r_start_idx] * n_valid_atoms)
                 mask_end.extend([r_start_idx + n_valid_atoms] * n_valid_atoms)
                 r_start_idx += n_valid_atoms
+
+            if len(pos_list) == 0:
+                # nothing to do...
+                continue
+
             pos = np.vstack(pos_list)
             atom_indices = np.asarray(atom_indices)
             dists = cdist(pos, pos)
