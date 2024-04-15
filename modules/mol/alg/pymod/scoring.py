@@ -164,12 +164,24 @@ class Scorer:
                            produce high sequence identity alignments by pure
                            chance.
     :type min_nuc_length: :class:`int`
+    :param lddt_add_mdl_contacts: lDDT specific flag. Only using contacts in
+                                  lDDT that are within a certain distance 
+                                  threshold in the target does not penalize
+                                  for added model contacts. If set to True, this
+                                  flag will also consider target contacts
+                                  that are within the specified distance
+                                  threshold in the model but not necessarily in
+                                  the target. No contact will be added if the
+                                  respective atom pair is not resolved in the
+                                  target.
+    :type lddt_add_mdl_contacts: :class:`bool`
     """
     def __init__(self, model, target, resnum_alignments=False,
                  molck_settings = None, cad_score_exec = None,
                  custom_mapping=None, usalign_exec = None,
                  lddt_no_stereochecks=False, n_max_naive=40320,
-                 oum=False, min_pep_length = 6, min_nuc_length = 4):
+                 oum=False, min_pep_length = 6, min_nuc_length = 4,
+                 lddt_add_mdl_contacts=False):
 
         self._target_orig = target
         self._model_orig = model
@@ -257,6 +269,7 @@ class Scorer:
         self.oum = oum
         self.min_pep_length = min_pep_length
         self.min_nuc_length = min_nuc_length
+        self.lddt_add_mdl_contacts = lddt_add_mdl_contacts
 
         # lazily evaluated attributes
         self._stereochecked_model = None
@@ -1615,7 +1628,8 @@ class Scorer:
                                                chain_mapping = lddt_chain_mapping,
                                                residue_mapping = alns,
                                                check_resnames=False,
-                                               local_lddt_prop="lddt")[0]
+                                               local_lddt_prop="lddt",
+                                               add_mdl_contacts = self.lddt_add_mdl_contacts)[0]
             local_lddt = dict()
             for r in self.model.residues:
                 cname = r.GetChain().GetName()
@@ -1638,7 +1652,8 @@ class Scorer:
                                                chain_mapping = lddt_chain_mapping,
                                                residue_mapping = stereochecked_alns,
                                                check_resnames=False,
-                                               local_lddt_prop="lddt")[0]
+                                               local_lddt_prop="lddt",
+                                               add_mdl_contacts = self.lddt_add_mdl_contacts)[0]
             local_lddt = dict()
             for r in self.model.residues:
                 cname = r.GetChain().GetName()
@@ -1693,7 +1708,8 @@ class Scorer:
                                               chain_mapping = lddt_chain_mapping,
                                               residue_mapping = alns,
                                               check_resnames=False,
-                                              local_lddt_prop="bb_lddt")[0]
+                                              local_lddt_prop="bb_lddt",
+                                              add_mdl_contacts = self.lddt_add_mdl_contacts)[0]
         local_lddt = dict()
         for r in self.model.residues:
             cname = r.GetChain().GetName()

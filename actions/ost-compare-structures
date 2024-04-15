@@ -59,6 +59,7 @@ results:
  * "lddt_no_stereochecks"
  * "min_pep_length"
  * "min_nuc_length"
+ * "lddt_add_mdl_contacts"
 
 The pairwise sequence alignments are computed with Needleman-Wunsch using
 BLOSUM62 (NUC44 for nucleotides). Many benchmarking scenarios preprocess the
@@ -534,6 +535,21 @@ def _ParseArgs():
         type=int,
         default=2,
         help="Set verbosity level. Defaults to 3 (Script).")
+
+    parser.add_argument(
+        "--lddt-add-mdl-contacts",
+        dest="lddt_add_mdl_contacts",
+        default=False,
+        action="store_true",
+        help=("Only using contacts in lDDT that"
+              "are within a certain distance threshold in the "
+              "reference does not penalize for added model "
+              "contacts. If set to True, this flag will also "
+              "consider reference contacts that are within the "
+              "specified distance threshold in the model but "
+              "not necessarily in the reference. No contact will "
+              "be added if the respective atom pair is not "
+              "resolved in the reference."))
  
     return parser.parse_args()
 
@@ -731,7 +747,8 @@ def _Process(model, reference, args, model_format, reference_format):
                             n_max_naive = args.n_max_naive,
                             oum = args.oum,
                             min_pep_length = args.min_pep_length,
-                            min_nuc_length = args.min_nuc_length)
+                            min_nuc_length = args.min_nuc_length,
+                            lddt_add_mdl_contacts = args.lddt_add_mdl_contacts)
 
     ir = _GetInconsistentResidues(scorer.aln)
     if len(ir) > 0 and args.enforce_consistency:
@@ -907,6 +924,7 @@ def _Main():
         out["lddt_no_stereochecks"] = args.lddt_no_stereochecks
         out["min_pep_length"] = args.min_pep_length
         out["min_nuc_length"] = args.min_nuc_length
+        out["lddt_add_mdl_contacts"] = args.lddt_add_mdl_contacts
         out["status"] = "SUCCESS"
         with open(args.output, 'w') as fh:
             json.dump(out, fh, indent=4, sort_keys=False)
