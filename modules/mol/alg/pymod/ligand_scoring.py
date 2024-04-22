@@ -659,47 +659,53 @@ class LigandScorer:
         for target_i, target_ligand in enumerate(self.target_ligands):
             LogVerbose("Analyzing target ligand %s" % target_ligand)
 
-            for binding_site in self._get_binding_sites(target_ligand):
-                LogVerbose("Found binding site with chain mapping %s" % (binding_site.GetFlatChainMapping()))
+            for model_i, model_ligand in enumerate(self.model_ligands):
+                try:
+                    symmetries = _ComputeSymmetries(
+                        model_ligand, target_ligand,
+                        substructure_match=self.substructure_match,
+                        by_atom_index=True,
+                        max_symmetries=self.max_symmetries)
+                    LogVerbose("Ligands %s and %s symmetry match" % (
+                        str(model_ligand), str(target_ligand)))
+                except NoSymmetryError:
+                    # Ligands are different - skip
+                    LogVerbose("No symmetry between %s and %s" % (
+                        str(model_ligand), str(target_ligand)))
+                    self._assignment_isomorphisms[target_i, model_i] = 0.
+                    continue
+                except TooManySymmetriesError:
+                    # Ligands are too symmetrical - skip
+                    LogVerbose("Too many symmetries between %s and %s" % (
+                        str(model_ligand), str(target_ligand)))
+                    self._assignment_isomorphisms[target_i, model_i] = -1.
+                    continue
+                except DisconnectedGraphError:
+                    # Disconnected graph is handled elsewhere
+                    continue
 
-                ref_bs_ent = self._build_binding_site_entity(
-                    target_ligand, binding_site.ref_residues,
-                    binding_site.substructure.residues)
-                ref_bs_ent_ligand = ref_bs_ent.FindResidue("_", 1)  # by definition
+                # for binding_site in _get_binding_site_matches(target_ligand, model_ligand):
+                for binding_site in self._get_binding_sites(target_ligand):
+                    LogVerbose("Found binding site with chain mapping %s" % (
+                        binding_site.GetFlatChainMapping()))
 
-                custom_compounds = {
-                    ref_bs_ent_ligand.name:
-                        mol.alg.lddt.CustomCompound.FromResidue(
-                            ref_bs_ent_ligand)}
-                lddt_scorer = mol.alg.lddt.lDDTScorer(
-                    ref_bs_ent,
-                    custom_compounds=custom_compounds,
-                    inclusion_radius=self.lddt_pli_radius)
+                    # Build the reference binding site and scorer
+                    # Note: this could be refactored to avoid building the
+                    # binding site entity and lDDT scorer repeatedly
+                    ref_bs_ent = self._build_binding_site_entity(
+                        target_ligand, binding_site.ref_residues,
+                        binding_site.substructure.residues)
+                    ref_bs_ent_ligand = ref_bs_ent.FindResidue("_", 1)  # by definition
 
-                for model_i, model_ligand in enumerate(self.model_ligands):
-                    try:
-                        symmetries = _ComputeSymmetries(
-                            model_ligand, target_ligand,
-                            substructure_match=self.substructure_match,
-                            by_atom_index=True,
-                            max_symmetries=self.max_symmetries)
-                        LogVerbose("Ligands %s and %s symmetry match" % (
-                            str(model_ligand), str(target_ligand)))
-                    except NoSymmetryError:
-                        # Ligands are different - skip
-                        LogVerbose("No symmetry between %s and %s" % (
-                            str(model_ligand), str(target_ligand)))
-                        self._assignment_isomorphisms[target_i, model_i] = 0.
-                        continue
-                    except TooManySymmetriesError:
-                        # Ligands are too symmetrical - skip
-                        LogVerbose("Too many symmetries between %s and %s" % (
-                            str(model_ligand), str(target_ligand)))
-                        self._assignment_isomorphisms[target_i, model_i] = -1.
-                        continue
-                    except DisconnectedGraphError:
-                        # Disconnected graph is handled elsewhere
-                        continue
+                    custom_compounds = {
+                        ref_bs_ent_ligand.name:
+                            mol.alg.lddt.CustomCompound.FromResidue(
+                                ref_bs_ent_ligand)}
+                    lddt_scorer = mol.alg.lddt.lDDTScorer(
+                        ref_bs_ent,
+                        custom_compounds=custom_compounds,
+                        inclusion_radius=self.lddt_pli_radius)
+
                     substructure_match = len(symmetries[0][0]) != len(
                         model_ligand.atoms)
                     coverage = len(symmetries[0][0]) / len(model_ligand.atoms)
