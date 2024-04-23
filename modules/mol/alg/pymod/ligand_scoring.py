@@ -1384,9 +1384,9 @@ class LigandScorer:
         * `disconnected`: the ligand graph was disconnected.
         * `binding_site`: no residues were in proximity of the ligand.
         * `model_representation`: no representation of the reference binding
-          site was found in the model. (I.e. the binding site was not modeled.
-          Remember: the binding site is defined in the target structure,
-          the position of the model ligand itself is ignored at this point.)
+          site was found in the model. (I.e. the binding site was not modeled,
+          or the model ligand was positioned too far in combination with
+          `full_bs_search=False`)
         * `identity`: the ligand was not found in the model (by graph
           isomorphism). Check your ligand connectivity, and enable the
           `substructure_match` option if the target ligand is incomplete.
@@ -1449,9 +1449,8 @@ class LigandScorer:
           target.
         * `model_representation`: a potential assignment was found in the target,
           but no representation of the binding site was found in the model.
-          (I.e. the binding site was not modeled. Remember: the binding site
-          is defined in the target structure, the position of the model ligand
-          itself is ignored at this point.)
+          (I.e. the binding site was not modeled, or the model ligand was
+          positioned too far in combination with `full_bs_search=False`)
         * `identity`: the ligand was not found in the target (by graph
           isomorphism). Check your ligand connectivity, and enable the
           `substructure_match` option if the target ligand is incomplete.
