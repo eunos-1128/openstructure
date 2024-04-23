@@ -513,9 +513,9 @@ class TestLigandScoring(unittest.TestCase):
 
         # Add 3 MG in model: assignment/stoichiometry
         mg_pos = [
-            mdl.geometric_center,
-            mdl.geometric_center + 1,
-            mdl.geometric_center + 100
+            geom.Vec3(3.871, 12.343, 44.485),
+            geom.Vec3(3.871, 12.343, 44.485) + 1,
+            geom.Vec3(3.871, 12.343, 44.485) + 100
         ]
         for i in range(3):
             new_chain = mdl_ed.InsertChain("L_MG_%d" % i)
