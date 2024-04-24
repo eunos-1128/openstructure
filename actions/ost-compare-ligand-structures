@@ -227,8 +227,9 @@ def _ParseArgs():
     parser.add_argument(
         "-fbs",
         "--full-bs-search",
-        default=False,
         dest="full_bs_search",
+        default=False,
+        action="store_true",
         help=("Enumerate all potential binding sites in the model."))
 
     parser.add_argument(
