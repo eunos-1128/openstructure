@@ -218,6 +218,12 @@ class LigandScorer:
     :type lddt_pli_radius: :class:`float`
     :param lddt_lp_radius: lDDT inclusion radius for lDDT-LP.
     :type lddt_lp_radius: :class:`float`
+    :param model_bs_radius: inclusion radius for model binding sites.
+                            Only used when full_bs_search=False, otherwise the
+                            radius is effectively infinite. Only chains with
+                            atoms within this distance of a model ligand will
+                            be considered in the chain mapping.
+    :type model_bs_radius: :class:`float`
     :param binding_sites_topn: maximum number of target binding site
                                representations to assess, per target ligand.
                                Ignored if `global_chain_mapping` is True.
@@ -258,10 +264,11 @@ class LigandScorer:
     :param full_bs_search: If True, all potential binding sites in the model
                            are searched for each target binding site. If False,
                            the search space in the model is reduced to chains
-                           around model ligands. This speeds up computations,
-                           but may result in ligands not being scored if the
-                           predicted ligand is too far from the actual binding
-                           site. When that's the case, the value in the
+                           around (`model_bs_radius` Å) model ligands.
+                           This speeds up computations, but may result in
+                           ligands not being scored if the predicted ligand
+                           pose is too far from the actual binding site.
+                           When that's the case, the value in the
                            `unassigned_*_ligands` property will be
                            `model_representation` and is indistinguishable from
                            cases where the binding site was not modeled at all.
@@ -270,10 +277,9 @@ class LigandScorer:
     """
     def __init__(self, model, target, model_ligands=None, target_ligands=None,
                  resnum_alignments=False, check_resnames=True,
-                 rename_ligand_chain=False,
-                 chain_mapper=None, substructure_match=False,
-                 coverage_delta=0.2,
-                 radius=4.0, lddt_pli_radius=6.0, lddt_lp_radius=10.0,
+                 rename_ligand_chain=False, chain_mapper=None,
+                 substructure_match=False, coverage_delta=0.2, radius=4.0,
+                 lddt_pli_radius=6.0, lddt_lp_radius=10.0, model_bs_radius=20,
                  binding_sites_topn=100000, global_chain_mapping=False,
                  rmsd_assignment=False, n_max_naive=12, max_symmetries=1e5,
                  custom_mapping=None, unassigned=False, full_bs_search=False):
@@ -320,6 +326,7 @@ class LigandScorer:
         self.rename_ligand_chain = rename_ligand_chain
         self.substructure_match = substructure_match
         self.radius = radius
+        self.model_bs_radius = model_bs_radius
         self.lddt_pli_radius = lddt_pli_radius
         self.lddt_lp_radius = lddt_lp_radius
         self.binding_sites_topn = binding_sites_topn
@@ -1760,7 +1767,7 @@ class LigandScorer:
             # figure out what chains in the model are in contact with the ligand
             # that may give a non-zero contribution to lDDT in
             # chain_mapper.GetRepr
-            radius = self.lddt_lp_radius + 4.0
+            radius = self.model_bs_radius
             chains = set()
             for at in mdl_ligand.atoms:
                 close_atoms = self.chain_mapping_mdl.FindWithin(at.GetPos(),
