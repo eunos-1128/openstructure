@@ -256,8 +256,14 @@ class LigandScorer:
     :type unassigned: :class:`bool`
     :param full_bs_search: If True, all potential binding sites in the model
                            are searched for each target binding site. If False,
-                           the search space in the model is reduced to regions
-                           around model ligands.
+                           the search space in the model is reduced to chains
+                           around model ligands. This speeds up computations,
+                           but may result in ligands not being scored if the
+                           predicted ligand is too far from the actual binding
+                           site. When that's the case, the value in the
+                           `unassigned_*_ligands` property will be
+                           `model_representation` and is indistinguishable from
+                           cases where the binding site was not modeled at all.
     :type full_bs_search: :class:`bool`
     """
     def __init__(self, model, target, model_ligands=None, target_ligands=None,
