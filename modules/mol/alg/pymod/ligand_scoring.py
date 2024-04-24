@@ -265,6 +265,7 @@ class LigandScorer:
                            `unassigned_*_ligands` property will be
                            `model_representation` and is indistinguishable from
                            cases where the binding site was not modeled at all.
+                           Ignored when `global_chain_mapping` is True.
     :type full_bs_search: :class:`bool`
     """
     def __init__(self, model, target, model_ligands=None, target_ligands=None,
@@ -1802,28 +1803,20 @@ class LigandScorer:
             key = (target_ligand.handle.hash_code, model_ligand.handle.hash_code)
 
         if key not in self._repr:
-            reprs = list()
             ref_bs = self.get_target_binding_site(target_ligand)
-            if self.full_bs_search:
-                if self.global_chain_mapping:
-                    reprs = self.chain_mapper.GetRepr(
-                        ref_bs, self.model, inclusion_radius=self.lddt_lp_radius,
-                        global_mapping = self._model_mapping)
-                else:
-                    reprs = self.chain_mapper.GetRepr(
-                        ref_bs, self.model, inclusion_radius=self.lddt_lp_radius,
-                        topn=self.binding_sites_topn)
+            if self.global_chain_mapping:
+                reprs = self.chain_mapper.GetRepr(
+                    ref_bs, self.model, inclusion_radius=self.lddt_lp_radius,
+                    global_mapping = self._model_mapping)
+            elif self.full_bs_search:
+                reprs = self.chain_mapper.GetRepr(
+                    ref_bs, self.model, inclusion_radius=self.lddt_lp_radius,
+                    topn=self.binding_sites_topn)
             else:
-                if self.global_chain_mapping:
-                    reprs = self.chain_mapper.GetRepr(ref_bs, self.model,
-                                                     inclusion_radius=self.lddt_lp_radius,
-                                                     chem_mapping_result = self.get_get_repr_input(model_ligand),
-                                                     global_mapping = self._model_mapping)
-                else:
-                    reprs = self.chain_mapper.GetRepr(ref_bs, self.model,
-                                                      inclusion_radius=self.lddt_lp_radius,
-                                                      topn=self.binding_sites_topn,
-                                                      chem_mapping_result = self.get_get_repr_input(model_ligand))
+                reprs = self.chain_mapper.GetRepr(ref_bs, self.model,
+                                                  inclusion_radius=self.lddt_lp_radius,
+                                                  topn=self.binding_sites_topn,
+                                                  chem_mapping_result = self.get_get_repr_input(model_ligand))
             self._repr[key] = reprs
             if len(reprs) == 0:
                 # whatever is in there already has precedence
