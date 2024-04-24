@@ -224,6 +224,13 @@ def _ParseArgs():
               "model. Only has an effect if global-chain-mapping flag is set."))
 
     parser.add_argument(
+        "-fbs",
+        "--full-bs-search",
+        default=False,
+        dest="full_bs_search",
+        help=("Enumerate all potential binding sites in the model."))
+
+    parser.add_argument(
         "-ra",
         "--rmsd-assignment",
         dest="rmsd_assignment",
@@ -457,6 +464,7 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
         substructure_match=args.substructure_match,
         coverage_delta=args.coverage_delta,
         global_chain_mapping=args.global_chain_mapping,
+        full_bs_search=args.full_bs_search,
         rmsd_assignment=args.rmsd_assignment,
         unassigned=args.unassigned,
         radius=args.radius,
