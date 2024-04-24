@@ -527,7 +527,8 @@ class TestLigandScoring(unittest.TestCase):
         mdl_ed.UpdateICS()
         trg_ed.UpdateICS()
 
-        sc = LigandScorer(mdl, trg, None, None, unassigned=True)
+        sc = LigandScorer(mdl, trg, None, None, unassigned=True,
+                          full_bs_search=True)
 
         # Check unassigned targets
         # NA: not in contact with target
@@ -585,7 +586,7 @@ class TestLigandScoring(unittest.TestCase):
 
         # Should work with rmsd_assignment too
         sc = LigandScorer(mdl, trg, None, None, unassigned=True,
-                          rmsd_assignment=True)
+                          rmsd_assignment=True, full_bs_search=True)
         self.assertEqual(sc.unassigned_model_ligands, {
             'L_ZN': {1: 'model_representation'},
             'L_NA': {1: 'binding_site'},
@@ -622,6 +623,28 @@ class TestLigandScoring(unittest.TestCase):
         with self.assertRaises(ValueError):
             sc = LigandScorer(mdl.Select("cname=A"), trg.Select("cname=A"), None, None,
                               unassigned=True, rmsd_assignment=True)
+
+        # Test with partial bs search (full_bs_search=False)
+        # Here we expect L_MG_2 to be unassigned because of model_representation
+        # rather than stoichiometry, as it is so far from the binding site that
+        # there is no longer a model binding site.
+        sc = LigandScorer(mdl, trg, None, None, unassigned=True,
+                          rmsd_assignment=True, full_bs_search=False)
+        self.assertEqual(sc.unassigned_model_ligands, {
+            'L_ZN': {1: 'model_representation'},
+            'L_NA': {1: 'binding_site'},
+            'L_OXY': {1: 'identity'},
+            'L_MG_2': {1: 'model_representation'},
+            "L_CMO": {1: 'disconnected'}
+        })
+        self.assertEqual(sc.unassigned_target_ligands, {
+            'G': {1: 'identity'},
+            'H': {1: 'model_representation'},
+            'J': {1: 'stoichiometry'},
+            'K': {1: 'identity'},
+            'L_NA': {1: 'binding_site'},
+            "L_CMO": {1: 'disconnected'}
+        })
 
 
     def test_substructure_match(self):
