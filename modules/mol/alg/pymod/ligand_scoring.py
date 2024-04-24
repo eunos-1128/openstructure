@@ -274,7 +274,7 @@ class LigandScorer:
                  radius=4.0, lddt_pli_radius=6.0, lddt_lp_radius=10.0,
                  binding_sites_topn=100000, global_chain_mapping=False,
                  rmsd_assignment=False, n_max_naive=12, max_symmetries=1e5,
-                 custom_mapping=None, unassigned=False, full_bs_search=True):
+                 custom_mapping=None, unassigned=False, full_bs_search=False):
 
         if isinstance(model, mol.EntityView):
             self.model = mol.CreateEntityFromView(model, False)
