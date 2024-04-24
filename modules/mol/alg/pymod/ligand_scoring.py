@@ -204,7 +204,8 @@ class LigandScorer:
                          If None (default), a chain mapper will be initialized
                          lazily as required.
     :type chain_mapper:  :class:`ost.mol.alg.chain_mapping.ChainMapper`
-    :param substructure_match: Set this to True to allow partial target ligand.
+    :param substructure_match: Set this to True to allow incomplete (ie
+                               partially resolved) target ligands.
     :type substructure_match: :class:`bool`
     :param coverage_delta: the coverage delta for partial ligand assignment.
     :type coverage_delta: :class:`float`

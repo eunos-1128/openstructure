@@ -196,7 +196,7 @@ def _ParseArgs():
         dest="substructure_match",
         default=False,
         action="store_true",
-        help=("Allow incomplete target ligands."))
+        help=("Allow incomplete (ie partially resolved) target ligands."))
 
     parser.add_argument(
         "-cd",
@@ -221,7 +221,8 @@ def _ParseArgs():
         help=("Custom mapping of chains between the reference and the model. "
               "Each separate mapping consist of key:value pairs where key "
               "is the chain name in reference and value is the chain name in "
-              "model. Only has an effect if global-chain-mapping flag is set."))
+              "model. Only has an effect if the --global-chain-mapping flag "
+              "is set."))
 
     parser.add_argument(
         "-fbs",

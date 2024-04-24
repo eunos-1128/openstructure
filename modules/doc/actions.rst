@@ -388,7 +388,8 @@ Comparing two structures with ligands
 You can compare two structures with non-polymer/small molecule ligands and
 compute lDDT-PLI and ligand RMSD scores from the command line with the
 ``ost compare-ligand-structures`` action. This can be considered a command
-line interface to :class:`ost.mol.alg.ligand_scoring.LigandScorer`.
+line interface to :class:`ost.mol.alg.ligand_scoring.LigandScorer` and more
+information about arguments and outputs can be found there.
 
 Details on the usage (output of ``ost compare-ligand-structures --help``):
 
