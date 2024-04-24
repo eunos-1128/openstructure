@@ -3,6 +3,12 @@ Changes in Release x.x.x
 
  * heavy water (DOD) is now recognised as 'water' instead of 'non-polymer' by
    the compounds library.
+ * Added a '--version' argument to the 'ost' executable
+ * Changed default value of '--rmsd-assignment' to False for ligand scoring
+ * Added 'full_bs_search' argument in ligand scoring to optionally speed up
+   computations in large complexes.
+   the number of model binding sites
+ * Several bug fixes and improvements.
 
 Changes in Release 2.7.0
 --------------------------------------------------------------------------------
