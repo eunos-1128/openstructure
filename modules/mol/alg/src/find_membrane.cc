@@ -986,6 +986,21 @@ FindMemParam FindMembrane(ost::mol::EntityView& ent,
                      "of heavy atoms!");
   }
 
+  // number of atom position with non-zero accessibility is relevant too
+  int n_nonzero_asa = 0;
+  for(Real acc: asas) {
+    if(acc != 0.0) {
+      ++n_nonzero_asa;
+    }
+  }
+  if(n_nonzero_asa < 10) {
+    throw ost::Error("Cannot detect membrane with such a low number of "
+                     "atoms with non-zero accessibility. Potential failure "
+                     "mode: Atoms on top of each other result in zero "
+                     "solvent accessibility (yes this happens).");
+  }
+
+
   // we always optimizer along the z-axis. 
   // We therefore have to transform the positions. We use a rotation 
   // around the z-axis with subsequent rotation around the x-axis for this task
