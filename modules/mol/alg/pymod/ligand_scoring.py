@@ -695,11 +695,6 @@ class LigandScorer:
                     # Disconnected graph is handled elsewhere
                     continue
 
-                substructure_match = len(symmetries[0][0]) != len(model_ligand.atoms)
-                coverage = len(symmetries[0][0]) / len(model_ligand.atoms)
-                self._assignment_match_coverage[target_id, model_id] = coverage
-                self._assignment_isomorphisms[target_id, model_id] = 1.
-
                 ################################################################
                 # Compute best rmsd/lddt-pli by naively enumerating symmetries #
                 ################################################################
@@ -713,13 +708,25 @@ class LigandScorer:
                 ###########################################
                 # Extend results by symmetry related info #
                 ###########################################
+                if (rmsd_result is None) != (lddt_pli_result is None):
+                    # Ligand assignment makes assumptions here, and is likely
+                    # to not work properly if this differs. There is no reason
+                    # it would ever do, so let's just check it
+                    raise Exception("Ligand scoring bug: discrepency between "
+                                    "RMSD and lDDT-PLI definition.")
                 if rmsd_result is not None:
+                    # Now we assume both rmsd_result and lddt_pli_result are defined
+                    # Add coverage
+                    substructure_match = len(symmetries[0][0]) != len(model_ligand.atoms)
+                    coverage = len(symmetries[0][0]) / len(model_ligand.atoms)
+                    self._assignment_match_coverage[target_id, model_id] = coverage
+                    self._assignment_isomorphisms[target_id, model_id] = 1.
+                    # Add RMSD
                     rmsd_result["substructure_match"] = substructure_match
                     rmsd_result["coverage"] = coverage
                     if self.unassigned:
                         rmsd_result["unassigned"] = False
-
-                if lddt_pli_result is not None:
+                    # Add lDDT-PLI
                     lddt_pli_result["substructure_match"] = substructure_match
                     lddt_pli_result["coverage"] = coverage
                     if self.unassigned:

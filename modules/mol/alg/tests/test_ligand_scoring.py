@@ -731,6 +731,35 @@ class TestLigandScoring(unittest.TestCase):
         sc.unassigned_target_ligands["F"][1] == "symmetries"
 
 
+    def test_no_binding_site(self):
+        """
+        Test the behavior when there's no binding site in proximity of
+        the ligand. This test was introduced to identify some subtle issues
+        with the ligand assignment that can cause it to enter an infinite
+        loop when the data matrices are not filled properly.
+        """
+        trg = _LoadMMCIF("1r8q.cif.gz").Copy()
+        mdl = trg.Copy()
+
+        trg_zn = trg.FindResidue("H", 1)
+        trg_g3d = trg.FindResidue("F", 1)
+
+
+        # Move the zinc out of the reference binding site...
+        ed = trg.EditXCS()
+        ed.SetAtomPos(trg_zn.FindAtom("ZN"),
+                      trg_zn.FindAtom("ZN").pos + geom.Vec3(6, 0, 0))
+        # Remove some atoms from G3D to decrease coverage. This messed up
+        # the assignment in the past.
+        ed.DeleteAtom(trg_g3d.FindAtom("O6"))
+        ed.UpdateICS()
+
+        sc = LigandScorer(mdl, trg, target_ligands=[trg_zn, trg_g3d],
+                          coverage_delta=0, substructure_match=True)
+        self.assertTrue(np.isnan(sc.rmsd_matrix[0, 3]))
+        self.assertEqual(sc.unassigned_target_ligands["H"][1], "binding_site")
+
+
     def test_no_lddt_pli_contact(self):
         """
         Test behaviour where a binding site has no lDDT-PLI contacts.
