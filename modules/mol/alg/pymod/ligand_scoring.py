@@ -880,6 +880,7 @@ class LigandScorer:
 
         # First only consider top coverage matches.
         min_coverage = np.max(coverage)
+        i = mat1.size + 1
         while min_coverage > 0 and not np.all(np.isnan(mat1)):
             LogVerbose("Looking for matches with coverage >= %s" % min_coverage)
             min_mat1 = LigandScorer._nanmin_nowarn(mat1, coverage < min_coverage)
@@ -909,8 +910,14 @@ class LigandScorer:
 
                 # Recompute min
                 min_mat1 = LigandScorer._nanmin_nowarn(mat1, coverage < min_coverage)
+                if i < 0:
+                    raise Exception("Ligand scoring bug: hit appatent infinite loop!")
+                i -= 1
             # Recompute min_coverage
             min_coverage = np.max(coverage)
+            if i < 0:
+                raise Exception("Ligand scoring bug: hit appatent infinite loop!")
+            i -= 1
         return assignments
 
     @staticmethod
