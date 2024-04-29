@@ -372,7 +372,7 @@ BOOST_AUTO_TEST_CASE(mmcif_writer_small_sugars)
   writer.Write("test", out);
 
   String s=out.str();
-  // Check that the mmCIF output contains 2 non-polymer entities
+  // Check that the mmCIF output contains a branched entity
   BOOST_CHECK_NE(s.find("loop_\n_entity.id\n_entity.type\n1 branched"),
                  String::npos);
   // Check that atoms are HETATMs since non-poly

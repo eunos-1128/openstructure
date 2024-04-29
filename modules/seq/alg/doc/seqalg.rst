@@ -226,7 +226,7 @@ Algorithms for Alignments
     calculated as the number of matches divided by the length of the longer
     sequence. If set to `seq.alg.RefMode.ALIGNMENT` (the default), the sequence
     identity is calculated as the number of matches divided by the number of
-    aligned residues. 
+    aligned residues (not including the gaps).
   :type ref_mode: int
   :param seq_a: the index of the first sequence
   :type seq_a: int
