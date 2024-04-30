@@ -495,5 +495,3 @@ most important ones.
 
    :type  maximum: float
 
-   .. method:: GetBins()
-
