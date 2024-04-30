@@ -154,6 +154,7 @@ The advantage is that no intermediate files need to be  generated.
 
 
 .. method:: WrappedTMAlign(pos1, pos2, seq1, seq2 [fast=False, rna=False])
+  :noindex:
 
   Similar as described above, but directly feeding in raw data.
 

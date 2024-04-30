@@ -130,6 +130,7 @@ The Topology Class
                         contains OBC scalings but the **other** not
 
   .. method:: Merge(ent, other, other_ent)
+    :noindex:
 
     Merges in another :class:`Topology` and adds all their particles and 
     interactions. Assuming the actual :class:`Topology` contains n particles, 
@@ -1191,6 +1192,7 @@ The Topology Class
 
 
   .. method:: GetHarmonicBondIndices(index)
+    :noindex:
 
     :param index:       Index of particle
     :type index:        :class:`int`
@@ -1203,6 +1205,7 @@ The Topology Class
 
 
   .. method:: GetHarmonicAngleIndices(index)
+    :noindex:
 
     :param index:       Index of particle
     :type index:        :class:`int`
@@ -1215,6 +1218,7 @@ The Topology Class
 
 
   .. method:: GetUreyBradleyAngleIndices(index)
+    :noindex:
 
     :param index:       Index of particle
     :type index:        :class:`int`
@@ -1228,6 +1232,7 @@ The Topology Class
 
 
   .. method:: GetPeriodicDihedralIndices(index)
+    :noindex:
 
     :param index:       Index of particle
     :type index:        :class:`int`
@@ -1263,6 +1268,7 @@ The Topology Class
 
 
   .. method:: GetCMapIndices(index)
+    :noindex:
 
     :param index:       Index of particle
     :type index:        :class:`int`

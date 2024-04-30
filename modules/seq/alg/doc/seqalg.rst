@@ -941,8 +941,8 @@ etc.) to be set, which is the case if you load a file in hhm format.
     :param filename:    Filename of db
     :type filename:     :class:`str`
 
-
 .. method:: AddAAPseudoCounts(profile, db, a=0.9, b=4.0, c=1.0)
+  :noindex:
 
   Adds pseudo counts to the emission probabilities in *profile* by utilizing 
   context profiles as described in 

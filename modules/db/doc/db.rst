@@ -115,6 +115,7 @@ use an indexer to keep track of where to find data for a certain entry.
 
 
   .. method:: GetDataRange(name, chain_name)
+    :noindex:
 
     Get the range for a chain of an assembly
 

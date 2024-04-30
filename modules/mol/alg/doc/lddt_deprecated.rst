@@ -61,6 +61,7 @@ lDDT (deprecated)
             model and of all the checked distances
 
 .. function:: LocalDistDiffTest(model, reference_list, distance_list, settings)
+  :noindex:
 
   Wrapper around :func:`LocalDistDiffTest` above.
 
@@ -80,6 +81,7 @@ lDDT (deprecated)
 
 .. function:: LocalDistDiffTest(model, target, cutoff, max_dist, \
                                 local_lddt_property_string="")
+  :noindex:
 
   Wrapper around :func:`LocalDistDiffTest` above using:
   *distance_list* = :func:`CreateDistanceList` with *target* and *max_dist* as
@@ -104,6 +106,7 @@ lDDT (deprecated)
 
 .. function:: LocalDistDiffTest(alignment, tolerance, radius, ref_index=0, \
                                 mdl_index=1)
+  :noindex:
 
   Calculates the Local Distance Difference Test score (see previous function)
   starting from an alignment between a reference structure and a model. The

@@ -526,6 +526,7 @@ an alignment:
     :rtype:  :class:`AlignedColumn`
 
   .. method:: __getitem__(slice)
+    :noindex:
 
     :return: Columns defined by by pythonic slicing.
     :rtype:  :class:`AlignedRegion`
