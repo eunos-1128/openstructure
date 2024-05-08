@@ -430,7 +430,8 @@ class lDDTScorer:
              chain_mapping=None, no_interchain=False,
              no_intrachain=False, penalize_extra_chains=False,
              residue_mapping=None, return_dist_test=False,
-             check_resnames=True, add_mdl_contacts=False):
+             check_resnames=True, add_mdl_contacts=False,
+             process_model_out=None, interaction_data=None):
         """Computes lDDT of *model* - globally and per-residue
 
         :param model: Model to be scored - models are preferably scored upon
@@ -520,6 +521,10 @@ class lDDTScorer:
                                  be added if the respective atom pair is not
                                  resolved in the target.
         :type add_mdl_contacts: :class:`bool`
+        :param process_model_out: Pro param - don't use
+        :type process_model_out: :class:`tuple`
+        :param interaction_data: Pro param - don't use
+        :type interaction_data: :class:`tuple`
 
         :returns: global and per-residue lDDT scores as a tuple -
                   first element is global lDDT score (None if *target* has no
@@ -550,38 +555,56 @@ class lDDTScorer:
 
         # data objects defining model data - see _ProcessModel for rough
         # description
-        pos, res_ref_atom_indices, res_atom_indices, res_atom_hashes, \
-        res_indices, symmetries = self._ProcessModel(model, chain_mapping,
-                                                     residue_mapping = residue_mapping,
-                                                     thresholds = thresholds,
-                                                     check_resnames = check_resnames)
+        if process_model_out is None:
+            pos, res_ref_atom_indices, res_atom_indices, res_atom_hashes, \
+            res_indices, ref_res_indices, symmetries = \
+            self._ProcessModel(model, chain_mapping,
+                               residue_mapping = residue_mapping,
+                               thresholds = thresholds,
+                               check_resnames = check_resnames)
+        else:
+            pos, res_ref_atom_indices, res_atom_indices, res_atom_hashes, \
+            res_indices, symmetries = process_model_out
 
         if no_interchain and no_intrachain:
             raise RuntimeError("no_interchain and no_intrachain flags are "
                                "mutually exclusive")
 
-        if no_interchain:
-            sym_ref_indices = self.sym_ref_indices_sc
-            sym_ref_distances = self.sym_ref_distances_sc
-            ref_indices = self.ref_indices_sc
-            ref_distances = self.ref_distances_sc
-        elif no_intrachain:
-            sym_ref_indices = self.sym_ref_indices_ic
-            sym_ref_distances = self.sym_ref_distances_ic
-            ref_indices = self.ref_indices_ic
-            ref_distances = self.ref_distances_ic
-        else:
-            sym_ref_indices = self.sym_ref_indices
-            sym_ref_distances = self.sym_ref_distances
-            ref_indices = self.ref_indices
-            ref_distances = self.ref_distances
 
-        if add_mdl_contacts:
-            ref_indices, ref_distances, \
-            sym_ref_indices, sym_ref_distances = \
-            self._AddMdlContacts(model, res_atom_indices, res_atom_hashes,
-                                 ref_indices, ref_distances,
-                                 no_interchain, no_intrachain)
+        sym_ref_indices = None
+        sym_ref_distances = None
+        ref_indices = None
+        ref_distances = None
+
+        if interaction_data is None:
+            if no_interchain:
+                sym_ref_indices = self.sym_ref_indices_sc
+                sym_ref_distances = self.sym_ref_distances_sc
+                ref_indices = self.ref_indices_sc
+                ref_distances = self.ref_distances_sc
+            elif no_intrachain:
+                sym_ref_indices = self.sym_ref_indices_ic
+                sym_ref_distances = self.sym_ref_distances_ic
+                ref_indices = self.ref_indices_ic
+                ref_distances = self.ref_distances_ic
+            else:
+                sym_ref_indices = self.sym_ref_indices
+                sym_ref_distances = self.sym_ref_distances
+                ref_indices = self.ref_indices
+                ref_distances = self.ref_distances
+
+            if add_mdl_contacts:
+                ref_indices, ref_distances = \
+                self._AddMdlContacts(model, res_atom_indices, res_atom_hashes,
+                                     ref_indices, ref_distances,
+                                     no_interchain, no_intrachain)
+                # recompute symmetry related indices/distances
+                sym_ref_indices, sym_ref_distances = \
+                lDDTScorer._NonSymDistances(self.n_atoms, self.symmetric_atoms,
+                                            ref_indices, ref_distances)
+        else:
+            sym_ref_indices, sym_ref_distances, ref_indices, ref_distances = \
+            interaction_data
 
         self._ResolveSymmetries(pos, thresholds, symmetries, sym_ref_indices,
                                 sym_ref_distances)
@@ -689,6 +712,9 @@ class lDDTScorer:
         # indices of the scored residues
         res_indices = list()
 
+        # respective residue indices in reference
+        ref_res_indices = list()
+
         # Will contain one element per symmetry group
         symmetries = list()
 
@@ -724,6 +750,7 @@ class lDDTScorer:
                 res_atom_indices.append(list())
                 res_atom_hashes.append(list())
                 res_indices.append(current_model_res_idx)
+                ref_res_indices.append(r_idx)
                 for a_idx, a in enumerate(atoms):
                     if a.IsValid():
                         p = a.GetPos()
@@ -748,7 +775,7 @@ class lDDTScorer:
                         symmetries.append(sym_indices)
 
         return (pos, res_ref_atom_indices, res_atom_indices, res_atom_hashes,
-                res_indices, symmetries)
+                res_indices, ref_res_indices, symmetries)
 
 
     def _GetExtraModelChainPenalty(self, model, chain_mapping):
@@ -1006,12 +1033,7 @@ class lDDTScorer:
                 np.sqrt(tmp, out=tmp)  # distances against all relevant atoms
                 ref_distances[i] = np.append(ref_distances[i], tmp)
 
-        # recompute symmetry related indices/distances
-        sym_ref_indices, sym_ref_distances = \
-        lDDTScorer._NonSymDistances(self.n_atoms, self.symmetric_atoms,
-                                    ref_indices, ref_distances)
-
-        return (ref_indices, ref_distances, sym_ref_indices, sym_ref_distances)
+        return (ref_indices, ref_distances)
 
 
 
