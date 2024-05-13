@@ -430,6 +430,7 @@ def LoadMMCIF(filename, fault_tolerant=None, calpha_only=None,
   try:
     ent = mol.CreateEntity()
     reader = MMCifReader(filename, ent, prof)
+    reader.read_seqres = seqres
     
     # NOTE: to speed up things, we could introduce a restrict_chains parameter
     #       similar to the one in LoadPDB. Here, it would have to be a list/set
