@@ -957,7 +957,8 @@ typedef struct {
   String entity_poly_type;       ///< value of _entity_poly.type
   String branched_type;          ///< value of _pdbx_entity_branch.type
   String details;                ///< description of this entity
-  String seqres;                 ///< chain of monomers
+  String seqres_canonical;       ///< _entity_poly.pdbx_seq_one_letter_code_can
+  String seqres_pdbx;            ///< _entity_poly.pdbx_seq_one_letter_code
   std::vector<String> mon_ids;   ///< list of monomer names from _entity_poly_seq
   std::vector<int> hetero_num;   ///< res num of heterogeneous compounds
   std::vector<String> hetero_ids;///< names of heterogeneous compounds

@@ -27,6 +27,15 @@ _entity_poly.nstd_monomer                   no
 _entity_poly.pdbx_seq_one_letter_code       'VTI'
 
 loop_
+_entity_poly_seq.entity_id
+_entity_poly_seq.num
+_entity_poly_seq.mon_id
+_entity_poly_seq.hetero
+1 1  VAL n
+1 2  THR n
+1 3  ILE n
+
+loop_
 _citation.id
 _citation.abstract_id_CAS
 _citation.title

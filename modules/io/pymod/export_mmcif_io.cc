@@ -107,7 +107,6 @@ void export_mmcif_io()
   class_<MMCifReader, boost::noncopyable>("MMCifReader", init<const String&, EntityHandle&, const IOProfile&>())
     .def("Parse", &MMCifReader::Parse)
     .def("SetRestrictChains", &MMCifReader::SetRestrictChains)
-    .def("SetReadCanonicalSeqRes", &MMCifReader::SetReadCanonicalSeqRes)
     .def("GetSeqRes", &MMCifReader::GetSeqRes)
     .def("GetInfo", make_function(&MMCifReader::GetInfo,
                                   return_value_policy<copy_const_reference>()))
@@ -116,8 +115,6 @@ void export_mmcif_io()
                                 return_value_policy<copy_const_reference>()),
                   &MMCifReader::SetRestrictChains)
     .add_property("seqres", &MMCifReader::GetSeqRes)
-    .add_property("read_seqres", &MMCifReader::GetReadSeqRes, 
-                  &MMCifReader::SetReadSeqRes)
     .add_property("info", make_function(&MMCifReader::GetInfo,
                                    return_value_policy<copy_const_reference>()))
     ;
@@ -493,7 +490,8 @@ void export_mmcif_io()
    .add_property("entity_poly_type", &MMCifEntityDesc::entity_poly_type)
    .add_property("branched_type", &MMCifEntityDesc::branched_type)
    .add_property("details", &MMCifEntityDesc::details)
-   .add_property("seqres", &MMCifEntityDesc::seqres)
+   .add_property("seqres_canonical", &MMCifEntityDesc::seqres_canonical)
+   .add_property("seqres_pdbx", &MMCifEntityDesc::seqres_pdbx)
    .add_property("mon_ids", &MMCifEntityDesc::mon_ids)
    .add_property("hetero_num", &MMCifEntityDesc::hetero_num)
    .add_property("hetero_ids", &MMCifEntityDesc::hetero_ids)

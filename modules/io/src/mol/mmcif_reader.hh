@@ -89,16 +89,6 @@ public:
   /// \param restrict_chains chain name
   void SetRestrictChains(const String& restrict_chains);
 
-  /// \brief Toggle reading of canonical sequence residues
-  ///        (entity_poly.pdbx_seq_one_letter_code_can instead of
-  ///        entity_poly.pdbx_seq_one_letter_code). This flag is exclusive.
-  ///
-  /// \param flag True for reading canonical sequences.
-  void SetReadCanonicalSeqRes(bool flag)
-  {
-    seqres_can_ = flag;
-  }
-
   const String& GetRestrictChains() const
   {
     return restrict_chains_;
@@ -141,25 +131,7 @@ public:
   /// \brief Return sequences
   ///
   /// \return List of sequences
-  seq::SequenceList GetSeqRes() const {
-    return seqres_;
-  }
-
-  /// \brief Toggle reading of SEQRES
-  ///
-  /// \param flag True enables, False disables reading SEQRES
-  void SetReadSeqRes(bool flag)
-  {
-    read_seqres_ = flag;
-  }
-
-  /// \brief Check if reading of SEQRES is enabled
-  ///
-  /// \return True if reading of SEQRES is enabled
-  bool GetReadSeqRes() const
-  {
-    return read_seqres_;
-  }
+  seq::SequenceList GetSeqRes() const;
 
   /// \brief Get additional information of the mmCIF file.
   ///
@@ -232,15 +204,7 @@ protected:
   void ParseCitation(const std::vector<StringRef>& columns);
 
 	const MMCifInfoStructRefs& GetStructRefs() const { return struct_refs_; }
-  /// \brief convert the seqres data item to canonical form. 
-  /// 
-  /// The seqres sequence lists non-standard residues in parenthesis. For 
-  /// proper handling of our sequence classes, these need to be converted to 
-  /// one-letter-codes. Ideally, we would use the canonical SEQRES. This is 
-  /// not possible, however, since the PDB assigns multiple one letter codes 
-  /// to some of the residues. To be consistent, we have to do the conversion
-  /// on our own.
-  String ConvertSEQRES(const String& seqres, conop::CompoundLibBasePtr compound_lib);
+
   /// \brief Fetch mmCIF citation_author information
   ///
   /// \param columns data row
@@ -717,7 +681,6 @@ private:
   mol::EntityHandle& ent_handle_;
   String restrict_chains_;
   bool auth_chain_id_;       ///< use chain IDs given by authors rather than pdb
-  bool seqres_can_;          ///< read canonical 1-letter residues?
   mol::ChainHandle curr_chain_;
   mol::ResidueHandle curr_residue_;
   int chain_count_;
@@ -731,8 +694,6 @@ private:
   std::vector<std::pair<mol::ChainHandle, String> > chain_id_pairs_;
   ///< chain and label_entity_id
   MMCifEntityDescMap entity_desc_map_; ///< stores entity items
-  seq::SequenceList seqres_;
-  bool read_seqres_;
   MMCifInfo info_;      ///< info container
   MMCifCitationAuthorMap authors_map_;
   MMCifBioUAssemblyVector bu_assemblies_;

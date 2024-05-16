@@ -65,8 +65,7 @@ Notes:
   It is added as string property named "pdb_auth_chain_name" to the
   :class:`~ost.mol.ChainHandle`. The mapping is also stored in
   :class:`MMCifInfo` as :meth:`~MMCifInfo.GetMMCifPDBChainTr` and
-  :meth:`~MMCifInfo.GetPDBMMCifChainTr` if a non-empty SEQRES record exists for
-  that chain (this should exclude ligands and water).
+  :meth:`~MMCifInfo.GetPDBMMCifChainTr` (the latter only for polymer chains).
 * Molecular entities in mmCIF are identified by an ``entity.id``, which is
   extracted from ``atom_site.label_entity_id`` for the first atom of the chain.
   It is added as string property named "entity_id" to the
@@ -1417,16 +1416,21 @@ of the annotation available.
 
     :class:`str`
 
-  .. attribute:: seqres
+  .. attribute:: seqres_canonical
 
-    SEQRES with gentle preprocessing - empty string if entity is not of type
-    "polymer". By default, the :class:`ost.io.MMCifReader` reads the value of the
-    ``_entity_poly.pdbx_seq_one_letter_code`` token. Copies all letters but
-    searches a :class:`ost.conop.CompoundLib` for compound names in brackets.
-    *seqres* gets an 'X' if no compound is found or the respective compound has
-    one letter code '?'. Uses the one letter code of the found compound
-    otherwise. So it's basically a canonical SEQRES with exactly one character
-    per residue.
+    Canonical SEQRES - empty string if entity is not of type "polymer".
+    This contains the canonical sequence extracted from the
+    ``_entity_poly.pdbx_seq_one_letter_code_can`` data item.
+
+    :type: :class:`str`
+
+  .. attribute:: seqres_pdbx
+
+    PDBx SEQRES - empty string if entity is not of type "polymer".
+    This contains the sequence extracted from the
+    ``_entity_poly.pdbx_seq_one_letter_code`` data item.
+    Modifications and non-standard amino acids are represented by
+    their three letter code in brackets, e.g. "(MSE)"
 
     :type: :class:`str`
 

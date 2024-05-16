@@ -59,15 +59,11 @@ void MMCifReader::Init()
   atom_count_           = 0;
   residue_count_        = 0;
   auth_chain_id_        = false;
-  seqres_can_           = false;
   has_model_            = false;
   restrict_chains_      = "";
   subst_res_id_         = "";
   curr_chain_           = mol::ChainHandle();
   curr_residue_         = mol::ResidueHandle();
-  seqres_               = seq::CreateSequenceList();
-  read_seqres_          = true;
-  warned_rule_based_    = false;
   info_                 = MMCifInfo();
 }
 
@@ -80,7 +76,6 @@ void MMCifReader::ClearState()
   atom_count_           = 0;
   category_             = DONT_KNOW;
   warned_name_mismatch_ = false;
-  seqres_               = seq::CreateSequenceList();
   info_                 = MMCifInfo();
   entity_desc_map_.clear();
   authors_map_.clear();
@@ -737,7 +732,8 @@ MMCifEntityDescMap::iterator MMCifReader::GetEntityDescMapIterator(
                             .entity_poly_type = "",
                             .branched_type = "",
                             .details="",
-                            .seqres="",
+                            .seqres_canonical="",
+                            .seqres_pdbx="",
                             .mon_ids=std::vector<String>(),
                             .hetero_num=std::vector<int>(),
                             .hetero_ids=std::vector<String>()};
@@ -785,93 +781,17 @@ void MMCifReader::ParseEntityPoly(const std::vector<StringRef>& columns)
     edm_it->second.entity_poly_type = columns[indices_[EP_TYPE]].str();
   }
 
-  // store seqres
-  if (edm_it->second.seqres.length() > 0) {
-    throw IOException(this->FormatDiagnostic(STAR_DIAG_ERROR,
-     "entity_poly.pdbx_seq_one_letter_code[_can] clash: sequence for entry '" +
-                                            columns[indices_[ENTITY_ID]].str() +
-                                             "' is already set to '" +
-                                             edm_it->second.seqres + "'.",
-                                             this->GetCurrentLinenum()));
+  // store canonical seqres
+  if (indices_[PDBX_SEQ_ONE_LETTER_CODE_CAN] != -1) {
+    StringRef seqres_can=columns[indices_[PDBX_SEQ_ONE_LETTER_CODE_CAN]];
+    edm_it->second.seqres_canonical = seqres_can.str_no_whitespace();
   }
-  if (read_seqres_) {
-    StringRef seqres;
-    if (seqres_can_) {
-      if (indices_[PDBX_SEQ_ONE_LETTER_CODE_CAN] != -1) {
-        seqres=columns[indices_[PDBX_SEQ_ONE_LETTER_CODE_CAN]];
-        edm_it->second.seqres = seqres.str_no_whitespace();        
-      } else {
-        throw IOException(this->FormatDiagnostic(STAR_DIAG_ERROR,
-                   "'entity_poly.pdbx_seq_one_letter_code_can' not available.'",
-                                                 this->GetCurrentLinenum()));
-      }
-    } else if (indices_[PDBX_SEQ_ONE_LETTER_CODE] != -1) {
-      seqres=columns[indices_[PDBX_SEQ_ONE_LETTER_CODE]];
 
-      conop::CompoundLibBasePtr comp_lib=conop::Conopology::Instance()
-                                                .GetDefaultLib();
-      if (!comp_lib) {
-        if (!warned_rule_based_) {
-          LOG_WARNING("SEQRES import requires a valid compound library to "
-                       "handle non standard compounds. Their One letter "
-                       "codes will be set to X.");      
-        }
-        warned_rule_based_=true;
-        comp_lib = conop::CompoundLibBasePtr(new ost::conop::MinimalCompoundLib);
-      }
-      edm_it->second.seqres = this->ConvertSEQRES(seqres.str_no_whitespace(),
-                                                  comp_lib);
-    } else {
-      throw IOException(this->FormatDiagnostic(STAR_DIAG_ERROR,
-                       "'entity_poly.pdbx_seq_one_letter_code' not available.'",
-                                               this->GetCurrentLinenum()));
+  // store non canonical seqres
+  if (indices_[PDBX_SEQ_ONE_LETTER_CODE] != -1) {
+    StringRef seqres_pdbx=columns[indices_[PDBX_SEQ_ONE_LETTER_CODE]];
+    edm_it->second.seqres_pdbx = seqres_pdbx.str_no_whitespace();
     }
-  }
-}
-
-String MMCifReader::ConvertSEQRES(const String& seqres, 
-                                  conop::CompoundLibBasePtr comp_lib)
-{
-  String can_seqres;
-  for (String::const_iterator i=seqres.begin(), e=seqres.end(); i!=e; ++i) {
-    if (*i=='(') {
-      bool found_end_paren=false;
-      String tlc;
-      tlc.reserve(3);
-      while ((++i)!=seqres.end()) {
-        if (*i==')') {
-          found_end_paren=true;
-          break;
-        }
-        tlc.push_back(*i);
-      }
-      if (!found_end_paren) {
-        throw IOException(this->FormatDiagnostic(STAR_DIAG_ERROR,
-                          "'entity_poly.pdbx_seq_one_letter_code' contains "
-                          "unmatched '('", this->GetCurrentLinenum()));
-      }
-      conop::CompoundPtr compound=comp_lib->FindCompound(tlc, 
-                                                         conop::Compound::PDB);
-      if (!compound) {
-        if (tlc!="UNK") {
-
-          LOG_WARNING("unknown residue '" << tlc << "' in SEQRES record. "
-                      "Setting one-letter-code to 'X'");
-        }
-        can_seqres.push_back('X');
-        continue;
-      }
-      if (compound->GetOneLetterCode()=='?') {
-        can_seqres.push_back('X');
-      } else {
-        can_seqres.push_back(compound->GetOneLetterCode());
-      }
-
-    } else {
-      can_seqres.push_back(*i);
-    }
-  }
-  return can_seqres;
 }
 
 void MMCifReader::ParseCitation(const std::vector<StringRef>& columns)
@@ -1943,11 +1863,13 @@ void MMCifReader::OnEndData()
     if (edm_it != entity_desc_map_.end()) {
       editor.SetChainType(css->first, edm_it->second.type);
       editor.SetChainDescription(css->first, edm_it->second.details);
-      if (edm_it->second.seqres.length() > 0) {
-        seqres_.AddSequence(seq::CreateSequence(css->first.GetName(),
-                                                edm_it->second.seqres));
-        pdb_auth_chain_name = css->first.GetStringProp("pdb_auth_chain_name");
-        info_.AddMMCifPDBChainTr(css->first.GetName(), pdb_auth_chain_name);
+      // Add chain mapping for all chains
+      pdb_auth_chain_name = css->first.GetStringProp("pdb_auth_chain_name");
+      info_.AddMMCifPDBChainTr(css->first.GetName(), pdb_auth_chain_name);
+
+      if (edm_it->second.entity_type=="polymer") {
+        // PDB -> mmCIF chain mapping only for polymers
+        // This is not a 1:1 mapping because of ligands
         info_.AddPDBMMCifChainTr(pdb_auth_chain_name, css->first.GetName());
       } else if (edm_it->second.entity_type=="non-polymer") {
         mol::ChainHandle chain=css->first;
@@ -1959,7 +1881,8 @@ void MMCifReader::OnEndData()
       }
     } else {
       LOG_WARNING("No entity description found for atom_site.label_entity_id '"
-                  << css->second << "'");
+                  << css->second << "'. SEQRES, chain mapping and ligand "
+                  << " annotation will be missing.");
     }
     // find
     blm_it = entity_branch_link_map_.find(css->second);
@@ -2075,19 +1998,19 @@ void MMCifReader::OnEndData()
   }
 
   // conclude EntityDesc (add entity_poly_seq if present) and add to MMCifInfo
-  for(auto entity_it: entity_desc_map_) {
+  for(auto &entity_it: entity_desc_map_) {
     if(entity_poly_seq_map_.find(entity_it.first) != entity_poly_seq_map_.end()) {
       int max_num = 1;
-      for(auto seqres_it: entity_poly_seq_map_[entity_it.first]) {
+      for(auto &seqres_it: entity_poly_seq_map_[entity_it.first]) {
         max_num = std::max(max_num, seqres_it.first);
       }
       entity_it.second.mon_ids.assign(max_num, "?");
-      for(auto seqres_it: entity_poly_seq_map_[entity_it.first]) {
+      for(auto &seqres_it: entity_poly_seq_map_[entity_it.first]) {
         entity_it.second.mon_ids[seqres_it.first-1] = seqres_it.second;
       }
     }
     if(entity_poly_seq_h_map_.find(entity_it.first) != entity_poly_seq_h_map_.end()) {
-      for(auto hetero_it: entity_poly_seq_h_map_[entity_it.first]) {
+      for(auto &hetero_it: entity_poly_seq_h_map_[entity_it.first]) {
         entity_it.second.hetero_num.push_back(hetero_it.first);
         entity_it.second.hetero_ids.push_back(hetero_it.second);
       }
@@ -2161,6 +2084,70 @@ String OSTBondOrderToMMCifValueOrder(const unsigned char bond_order)
   }
   LOG_WARNING("Unknow bond order found: '" << (int)bond_order << "'");
   return String("");
+}
+
+seq::SequenceList MMCifReader::GetSeqRes() const {
+  std::map<String, String> entity_seqres_map; // Map entity_id -> seqres
+  seq::SequenceList seqres_list = seq::CreateSequenceList();
+
+  // We need a compound lib for the conversion
+  conop::CompoundLibBasePtr comp_lib=conop::Conopology::Instance()
+                                            .GetDefaultLib();
+  if (!comp_lib) {
+    LOG_WARNING("SEQRES requires a valid compound library to "
+                 "handle non standard compounds. Their One letter "
+                 "codes will be set to X.");
+    comp_lib = conop::CompoundLibBasePtr(new ost::conop::MinimalCompoundLib);
+  }
+
+  // Generate the SEQRES for every entity
+  for(auto const &entity_it: entity_desc_map_) {
+    if (entity_it.second.entity_type == "polymer") {
+      entity_seqres_map[entity_it.first] = "";
+      auto mon_ids = entity_it.second.mon_ids;
+//      if (mon_ids.size() == 0) {
+//        // We hit this if there was an _entity_poly category but no _entity_poly_seq
+//        LOG_WARNING("No SEQRES found for entity '"
+//                    << entity_it.first << "'.");
+//      }
+      entity_seqres_map[entity_it.first].reserve(mon_ids.size());
+      for (auto const &mon_id: mon_ids) {
+        conop::CompoundPtr compound=comp_lib->FindCompound(mon_id, conop::Compound::PDB);
+        if (!compound) {
+          if (mon_id != "UNK") {
+            LOG_WARNING("unknown residue '" << mon_id << "' in SEQRES record. "
+                        "Setting one-letter-code to 'X'");
+          }
+          entity_seqres_map[entity_it.first].push_back('X');
+          continue;
+        }
+        if (compound->GetOneLetterCode()=='?') {
+          entity_seqres_map[entity_it.first].push_back('X');
+        } else {
+          entity_seqres_map[entity_it.first].push_back(compound->GetOneLetterCode());
+        }
+      }
+    }
+  }
+
+  // Assign
+  for (auto const &css: chain_id_pairs_) {
+    auto entity_seqres_map_it = entity_seqres_map.find(css.second);
+    if (entity_seqres_map_it != entity_seqres_map.end()) {
+      if (entity_seqres_map_it->second == "") {
+        // We hit this if there was an _entity_poly category but no _entity_poly_seq
+        LOG_WARNING("No SEQRES found for chain '"
+                    << css.first << "'. Most likely the entity_poly_seq "
+                    << "category was missing from the input file.");
+      } else {
+        seqres_list.AddSequence(seq::CreateSequence(css.first.GetName(),
+                                                    entity_seqres_map_it->second));
+      }
+    }
+    // else: either non polymer chain, or no entity_poly was available (this
+    // triggered a warning before)
+  }
+  return seqres_list;
 }
 
 }}
