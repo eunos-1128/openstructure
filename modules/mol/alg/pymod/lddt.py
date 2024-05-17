@@ -431,7 +431,7 @@ class lDDTScorer:
              no_intrachain=False, penalize_extra_chains=False,
              residue_mapping=None, return_dist_test=False,
              check_resnames=True, add_mdl_contacts=False,
-             process_model_out=None, interaction_data=None):
+             interaction_data=None):
         """Computes lDDT of *model* - globally and per-residue
 
         :param model: Model to be scored - models are preferably scored upon
@@ -521,8 +521,6 @@ class lDDTScorer:
                                  be added if the respective atom pair is not
                                  resolved in the target.
         :type add_mdl_contacts: :class:`bool`
-        :param process_model_out: Pro param - don't use
-        :type process_model_out: :class:`tuple`
         :param interaction_data: Pro param - don't use
         :type interaction_data: :class:`tuple`
 
@@ -555,16 +553,12 @@ class lDDTScorer:
 
         # data objects defining model data - see _ProcessModel for rough
         # description
-        if process_model_out is None:
-            pos, res_ref_atom_indices, res_atom_indices, res_atom_hashes, \
-            res_indices, ref_res_indices, symmetries = \
-            self._ProcessModel(model, chain_mapping,
-                               residue_mapping = residue_mapping,
-                               thresholds = thresholds,
-                               check_resnames = check_resnames)
-        else:
-            pos, res_ref_atom_indices, res_atom_indices, res_atom_hashes, \
-            res_indices, symmetries = process_model_out
+        pos, res_ref_atom_indices, res_atom_indices, res_atom_hashes, \
+        res_indices, ref_res_indices, symmetries = \
+        self._ProcessModel(model, chain_mapping,
+                           residue_mapping = residue_mapping,
+                           thresholds = thresholds,
+                           check_resnames = check_resnames)
 
         if no_interchain and no_intrachain:
             raise RuntimeError("no_interchain and no_intrachain flags are "
