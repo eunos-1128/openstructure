@@ -10,7 +10,8 @@ Changes in Release x.x.x
    the number of model binding sites
  * SEQRES information is now read from the entity_poly_seq category in mmCIF.
    The canonical as well as semi-canonical (with 3 letter-codes in bracket)
-   SEQRES are now available from the MMCifInfo object.
+   SEQRES are now available from the MMCifInfo object. The
+   (Get|Set)ReadCanonicalSeqRes (Get|Set)ReadSeqRes methods no longer exist.
  * Several bug fixes and improvements.
 
 Changes in Release 2.7.0
