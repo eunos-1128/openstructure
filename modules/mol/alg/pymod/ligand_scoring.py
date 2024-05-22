@@ -2559,33 +2559,42 @@ def _SCRMSD_symmetries(symmetries, model_ligand, target_ligand,
                        transformation):
     """Compute SCRMSD with pre-computed symmetries. Internal. """
 
+    # setup numpy positions for model ligand and apply transformation
+    mdl_ligand_pos = np.ones((model_ligand.GetAtomCount(), 4))
+    for a_idx, a in enumerate(model_ligand.atoms):
+        p = a.GetPos()
+        mdl_ligand_pos[a_idx, 0] = p[0]
+        mdl_ligand_pos[a_idx, 1] = p[1]
+        mdl_ligand_pos[a_idx, 2] = p[2]
+    np_transformation = np.zeros((4,4))
+    for i in range(4):
+        for j in range(4):
+            np_transformation[i,j] = transformation[i,j]
+    mdl_ligand_pos = mdl_ligand_pos.dot(np_transformation.T)[:,:3]
+
+    # setup numpy positions for target ligand
+    trg_ligand_pos = np.zeros((target_ligand.GetAtomCount(), 3))
+    for a_idx, a in enumerate(target_ligand.atoms):
+        p = a.GetPos()
+        trg_ligand_pos[a_idx, 0] = p[0]
+        trg_ligand_pos[a_idx, 1] = p[1]
+        trg_ligand_pos[a_idx, 2] = p[2]
+
+    # position matrices to iterate symmetries
+    # there is a guarantee that
+    # target_ligand.GetAtomCount() <= model_ligand.GetAtomCount()
+    # and that each target ligand atom is part of every symmetry
+    # => target_ligand.GetAtomCount() is size of both position matrices
+    rmsd_mdl_pos = np.zeros((target_ligand.GetAtomCount(), 3))
+    rmsd_trg_pos = np.zeros((target_ligand.GetAtomCount(), 3))
+
+    # iterate symmetries and find the one with lowest RMSD
     best_rmsd = np.inf
     for i, (trg_sym, mdl_sym) in enumerate(symmetries):
-        # Prepare Entities for RMSD
-        trg_lig_rmsd_ent = mol.CreateEntity()
-        trg_lig_rmsd_editor = trg_lig_rmsd_ent.EditXCS()
-        trg_lig_rmsd_chain = trg_lig_rmsd_editor.InsertChain("_")
-        trg_lig_rmsd_res = trg_lig_rmsd_editor.AppendResidue(trg_lig_rmsd_chain, "LIG")
-
-        mdl_lig_rmsd_ent = mol.CreateEntity()
-        mdl_lig_rmsd_editor = mdl_lig_rmsd_ent.EditXCS()
-        mdl_lig_rmsd_chain = mdl_lig_rmsd_editor.InsertChain("_")
-        mdl_lig_rmsd_res = mdl_lig_rmsd_editor.AppendResidue(mdl_lig_rmsd_chain, "LIG")
-
-        for mdl_anum, trg_anum in zip(mdl_sym, trg_sym):
-            # Rename model atoms according to symmetry
-            trg_atom = target_ligand.atoms[trg_anum]
-            mdl_atom = model_ligand.atoms[mdl_anum]
-            # Add atoms in the correct order to the RMSD entities
-            trg_lig_rmsd_editor.InsertAtom(trg_lig_rmsd_res, trg_atom.name, trg_atom.pos)
-            mdl_lig_rmsd_editor.InsertAtom(mdl_lig_rmsd_res, mdl_atom.name, mdl_atom.pos)
-
-        trg_lig_rmsd_editor.UpdateICS()
-        mdl_lig_rmsd_editor.UpdateICS()
-
-        rmsd = mol.alg.CalculateRMSD(mdl_lig_rmsd_ent.CreateFullView(),
-                                     trg_lig_rmsd_ent.CreateFullView(),
-                                     transformation)
+        for idx, (mdl_anum, trg_anum) in enumerate(zip(mdl_sym, trg_sym)):
+            rmsd_mdl_pos[idx,:] = mdl_ligand_pos[mdl_anum, :]
+            rmsd_trg_pos[idx,:] = trg_ligand_pos[trg_anum, :]
+        rmsd = np.sqrt(((rmsd_mdl_pos - rmsd_trg_pos)**2).sum(-1).mean())
         if rmsd < best_rmsd:
             best_rmsd = rmsd
 
