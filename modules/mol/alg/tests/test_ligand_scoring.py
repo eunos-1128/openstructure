@@ -286,7 +286,9 @@ class TestLigandScoring(unittest.TestCase):
         trg = _LoadMMCIF("1r8q.cif.gz")
         mdl = _LoadMMCIF("P84080_model_02.cif.gz")
         mdl_lig = io.LoadEntity(os.path.join('testfiles', "P84080_model_02_ligand_0.sdf"))
-        sc = LigandScorer(mdl, trg, [mdl_lig], None)
+        sc = LigandScorer(mdl, trg, [mdl_lig], None,
+                          add_mdl_contacts = False,
+                          lddt_pli_rmsd_binding_site = True)
 
         # Note: expect warning about Binding site of H.ZN1 not mapped to the model
         sc._compute_scores()
@@ -343,14 +345,13 @@ class TestLigandScoring(unittest.TestCase):
         # 4C0A has more ligands
         trg = _LoadMMCIF("1r8q.cif.gz")
         trg_4c0a = _LoadMMCIF("4c0a.cif.gz")
-        sc = LigandScorer(trg, trg_4c0a, None, None, check_resnames=False)
-
+        sc = LigandScorer(trg, trg_4c0a, None, None, check_resnames=False,
+                          add_mdl_contacts=False, lddt_pli_rmsd_binding_site = True)
         expected_keys = {"J", "F"}
         self.assertFalse(expected_keys.symmetric_difference(sc.rmsd.keys()))
         self.assertFalse(expected_keys.symmetric_difference(sc.rmsd_details.keys()))
         self.assertFalse(expected_keys.symmetric_difference(sc.lddt_pli.keys()))
         self.assertFalse(expected_keys.symmetric_difference(sc.lddt_pli_details.keys()))
-
         # rmsd
         self.assertAlmostEqual(sc.rmsd["J"][mol.ResNum(1)], 0.8016608357429504, 5)
         self.assertAlmostEqual(sc.rmsd["F"][mol.ResNum(1)], 0.9286373257637024, 5)
@@ -372,51 +373,15 @@ class TestLigandScoring(unittest.TestCase):
         self.assertAlmostEqual(sc.lddt_pli["J"][mol.ResNum(1)], 0.9127105666156202, 5)
         self.assertAlmostEqual(sc.lddt_pli["F"][mol.ResNum(1)], 0.915929203539823, 6)
         # lddt_pli_details
-        self.assertAlmostEqual(sc.lddt_pli_details["J"][mol.ResNum(1)]["rmsd"], 0.8016608357429504, 4)
-        self.assertEqual(sc.lddt_pli_details["J"][mol.ResNum(1)]["lddt_pli_n_contacts"], 5224)
-        self.assertEqual(sc.lddt_pli_details["J"][mol.ResNum(1)]["chain_mapping"], {'F': 'D', 'C': 'C'})
+        self.assertEqual(sc.lddt_pli_details["J"][mol.ResNum(1)]["lddt_pli_n_contacts"], 653)
         self.assertEqual(len(sc.lddt_pli_details["J"][mol.ResNum(1)]["bs_ref_res"]), 15)
-        self.assertEqual(len(sc.lddt_pli_details["J"][mol.ResNum(1)]["bs_ref_res_mapped"]), 15)
-        self.assertEqual(len(sc.lddt_pli_details["J"][mol.ResNum(1)]["bs_mdl_res_mapped"]), 15)
         self.assertEqual(sc.lddt_pli_details["J"][mol.ResNum(1)]["target_ligand"].qualified_name, 'I.G3D1')
         self.assertEqual(sc.lddt_pli_details["J"][mol.ResNum(1)]["model_ligand"].qualified_name, 'J.G3D1')
-        self.assertAlmostEqual(sc.lddt_pli_details["F"][mol.ResNum(1)]["rmsd"], 0.9286373257637024, 4)
-        self.assertEqual(sc.lddt_pli_details["F"][mol.ResNum(1)]["lddt_pli_n_contacts"], 5424)
-        self.assertEqual(sc.lddt_pli_details["F"][mol.ResNum(1)]["chain_mapping"], {'B': 'B', 'G': 'A'})
+        self.assertEqual(sc.lddt_pli_details["F"][mol.ResNum(1)]["lddt_pli_n_contacts"], 678)
         self.assertEqual(len(sc.lddt_pli_details["F"][mol.ResNum(1)]["bs_ref_res"]), 15)
-        self.assertEqual(len(sc.lddt_pli_details["F"][mol.ResNum(1)]["bs_ref_res_mapped"]), 15)
-        self.assertEqual(len(sc.lddt_pli_details["F"][mol.ResNum(1)]["bs_mdl_res_mapped"]), 15)
         self.assertEqual(sc.lddt_pli_details["F"][mol.ResNum(1)]["target_ligand"].qualified_name, 'K.G3D1')
         self.assertEqual(sc.lddt_pli_details["F"][mol.ResNum(1)]["model_ligand"].qualified_name, 'F.G3D1')
 
-    def test_global_chain_mapping(self):
-        """Test that the global and local chain mappings works.
-
-        For RMSD, A: A results in a better chain mapping. However, C: A is a
-        better global chain mapping from an lDDT perspective (and lDDT-PLI).
-        """
-        trg = _LoadMMCIF("1r8q.cif.gz")
-        mdl = _LoadMMCIF("P84080_model_02.cif.gz")
-
-        # Local by default
-        sc = LigandScorer(mdl, trg, None, None)
-        self.assertEqual(sc.rmsd_details["L_2"][1]["chain_mapping"], {'A': 'A'})
-        self.assertEqual(sc.lddt_pli_details["L_2"][1]["chain_mapping"], {'C': 'A'})
-
-        # Global
-        sc = LigandScorer(mdl, trg, None, None, global_chain_mapping=True)
-        self.assertEqual(sc.rmsd_details["L_2"][1]["chain_mapping"], {'C': 'A'})
-        self.assertEqual(sc.lddt_pli_details["L_2"][1]["chain_mapping"], {'C': 'A'})
-
-        # Custom
-        sc = LigandScorer(mdl, trg, None, None, global_chain_mapping=True, custom_mapping={'A': 'A'})
-        self.assertEqual(sc.rmsd_details["L_2"][1]["chain_mapping"], {'A': 'A'})
-        self.assertEqual(sc.lddt_pli_details["L_2"][1]["chain_mapping"], {'A': 'A'})
-
-        # Custom only active with global chain mapping
-        sc = LigandScorer(mdl, trg, None, None, global_chain_mapping=False, custom_mapping={'A': 'A'})
-        self.assertEqual(sc.rmsd_details["L_2"][1]["chain_mapping"], {'A': 'A'})
-        self.assertEqual(sc.lddt_pli_details["L_2"][1]["chain_mapping"], {'C': 'A'})
 
     def test_rmsd_assignment(self):
         """Test that the RMSD-based assignment works.
@@ -528,7 +493,8 @@ class TestLigandScoring(unittest.TestCase):
         trg_ed.UpdateICS()
 
         sc = LigandScorer(mdl, trg, None, None, unassigned=True,
-                          full_bs_search=True)
+                          full_bs_search=True,
+                          add_mdl_contacts=False)
 
         # Check unassigned targets
         # NA: not in contact with target
@@ -586,7 +552,9 @@ class TestLigandScoring(unittest.TestCase):
 
         # Should work with rmsd_assignment too
         sc = LigandScorer(mdl, trg, None, None, unassigned=True,
-                          rmsd_assignment=True, full_bs_search=True)
+                          rmsd_assignment=True, full_bs_search=True,
+                          add_mdl_contacts=False,
+                          lddt_pli_rmsd_binding_site=True)
         self.assertEqual(sc.unassigned_model_ligands, {
             'L_ZN': {1: 'model_representation'},
             'L_NA': {1: 'binding_site'},
@@ -785,7 +753,8 @@ class TestLigandScoring(unittest.TestCase):
 
         # Ensure it's unassigned in lDDT
         sc = LigandScorer(mdl, trg, [mdl_lig, mdl_lig], [trg_lig, trg_lig],
-                          radius=5, lddt_pli_radius=4, rename_ligand_chain=True)
+                          radius=5, lddt_pli_radius=4, rename_ligand_chain=True,
+                          add_mdl_contacts=False)
         self.assertEqual(sc.lddt_pli,  {})
         self.assertEqual(sc.unassigned_target_ligands['00001_C'][1], "no_contact")
         self.assertEqual(sc.unassigned_target_ligands['00001_C_2'][1], "no_contact")
