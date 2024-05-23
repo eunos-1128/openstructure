@@ -856,16 +856,18 @@ class LigandScorer:
                     if mdl_a_hash_code in bs_atom_mapping:
                         trg_bs_indices.append(bs_atom_mapping[mdl_a_hash_code])
                     elif mdl_a_hash_code not in mdl_lig_hashes:
-                        at_key = (a.GetResidue().GetNumber(), a.name)
-                        cname = a.GetChain().name
-                        cname_key = (flat_mapping[cname], cname)
-                        if at_key in self.mappable_atoms[cname_key]:
-                            # Its a contact in the model but not part of trg_bs.
-                            # It can still be mapped using the global
-                            # mdl_ch/ref_ch alignment
-                            # dist in ref > self.lddt_pli_radius + max_thresh
-                            # => guaranteed to be non-fulfilled contact
-                            n_penalty += 1
+                        if a.GetChain().GetName() in flat_mapping:
+                            # Its in a mapped chain
+                            at_key = (a.GetResidue().GetNumber(), a.name)
+                            cname = a.GetChain().name
+                            cname_key = (flat_mapping[cname], cname)
+                            if at_key in self.mappable_atoms[cname_key]:
+                                # Its a contact in the model but not part of
+                                # trg_bs. It can still be mapped using the
+                                # global mdl_ch/ref_ch alignment
+                                # d in ref > self.lddt_pli_radius + max_thresh
+                                # => guaranteed to be non-fulfilled contact
+                                n_penalty += 1
 
                 n_penalties.append(n_penalty)
 
@@ -964,20 +966,20 @@ class LigandScorer:
                 if mdl_ch not in lddt_chain_mapping:
                     # check which chain in trg is closest
                     chem_group_idx = None
-                    for i, m in self.chem_mapping:
+                    for i, m in enumerate(self.chem_mapping):
                         if mdl_ch in m:
                             chem_group_idx = i
                             break
                     if chem_group_idx is None:
                         raise RuntimeError("This should never happen... "
                                            "ask Gabriel...")
-                    mdl_ch = self.chain_mapping_mdl.FindChain(mdl_ch)
-                    mdl_center = mdl_ch.geometric_center
+                    mdl_ch_view = self.chain_mapping_mdl.FindChain(mdl_ch)
+                    mdl_center = mdl_ch_view.geometric_center
                     closest_ch = None
                     closest_dist = None
-                    for trg_ch in self.chem_groups[chem_group_idx]:
-                        if trg_ch not in lddt_mapping.values():
-                            c = self.target.FindChain(trg_ch).geometric_center
+                    for trg_ch in self.chain_mapper.chem_groups[chem_group_idx]:
+                        if trg_ch not in lddt_chain_mapping.values():
+                            c = self.chain_mapper.target.FindChain(trg_ch).geometric_center
                             d = geom.Distance(mdl_center, c)
                             if closest_dist is None or d < closest_dist:
                                 closest_dist = d

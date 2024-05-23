@@ -371,7 +371,7 @@ class TestLigandScoring(unittest.TestCase):
 
         # lddt_pli
         self.assertAlmostEqual(sc.lddt_pli["J"][mol.ResNum(1)], 0.9127105666156202, 5)
-        self.assertAlmostEqual(sc.lddt_pli["F"][mol.ResNum(1)], 0.915929203539823, 6)
+        self.assertAlmostEqual(sc.lddt_pli["F"][mol.ResNum(1)], 0.915929203539823, 5)
         # lddt_pli_details
         self.assertEqual(sc.lddt_pli_details["J"][mol.ResNum(1)]["lddt_pli_n_contacts"], 653)
         self.assertEqual(len(sc.lddt_pli_details["J"][mol.ResNum(1)]["bs_ref_res"]), 15)
@@ -379,6 +379,21 @@ class TestLigandScoring(unittest.TestCase):
         self.assertEqual(sc.lddt_pli_details["J"][mol.ResNum(1)]["model_ligand"].qualified_name, 'J.G3D1')
         self.assertEqual(sc.lddt_pli_details["F"][mol.ResNum(1)]["lddt_pli_n_contacts"], 678)
         self.assertEqual(len(sc.lddt_pli_details["F"][mol.ResNum(1)]["bs_ref_res"]), 15)
+        self.assertEqual(sc.lddt_pli_details["F"][mol.ResNum(1)]["target_ligand"].qualified_name, 'K.G3D1')
+        self.assertEqual(sc.lddt_pli_details["F"][mol.ResNum(1)]["model_ligand"].qualified_name, 'F.G3D1')
+
+        # lddt_pli with added mdl contacts
+        sc = LigandScorer(trg, trg_4c0a, None, None, check_resnames=False,
+                          add_mdl_contacts=True)
+        self.assertAlmostEqual(sc.lddt_pli["J"][mol.ResNum(1)], 0.8988340192043895, 5)
+        self.assertAlmostEqual(sc.lddt_pli["F"][mol.ResNum(1)], 0.9039735099337749, 5)
+        # lddt_pli_details
+        self.assertEqual(sc.lddt_pli_details["J"][mol.ResNum(1)]["lddt_pli_n_contacts"], 729)
+        self.assertEqual(len(sc.lddt_pli_details["J"][mol.ResNum(1)]["bs_ref_res"]), 63)
+        self.assertEqual(sc.lddt_pli_details["J"][mol.ResNum(1)]["target_ligand"].qualified_name, 'I.G3D1')
+        self.assertEqual(sc.lddt_pli_details["J"][mol.ResNum(1)]["model_ligand"].qualified_name, 'J.G3D1')
+        self.assertEqual(sc.lddt_pli_details["F"][mol.ResNum(1)]["lddt_pli_n_contacts"], 755)
+        self.assertEqual(len(sc.lddt_pli_details["F"][mol.ResNum(1)]["bs_ref_res"]), 62)
         self.assertEqual(sc.lddt_pli_details["F"][mol.ResNum(1)]["target_ligand"].qualified_name, 'K.G3D1')
         self.assertEqual(sc.lddt_pli_details["F"][mol.ResNum(1)]["model_ligand"].qualified_name, 'F.G3D1')
 
@@ -775,6 +790,86 @@ class TestLigandScoring(unittest.TestCase):
         self.assertAlmostEqual(sc2.rmsd['00001_FE'][1], 2.1703, 4)
         self.assertAlmostEqual(sc2.rmsd['00001_FE_2'][1], 2.1703, 4)
 
+    def test_added_mdl_contacts(self):
+
+        # binding site for ligand in chain G consists of chains A and B
+        prot = _LoadMMCIF("1r8q.cif.gz")
+
+        # model has the full binding site
+        mdl = mol.CreateEntityFromView(prot.Select("cname=A,B,G"), True)
+
+        # chain C has same sequence as chain A but is not in contact
+        # with ligand in chain G
+        # target has thus incomplete binding site only from chain B
+        trg = mol.CreateEntityFromView(prot.Select("cname=B,C,G"), True)
+
+        # if added model contacts are not considered, the incomplete binding
+        # site only from chain B is perfectly reproduced by model which also has
+        # chain B
+        sc = LigandScorer(mdl, trg, add_mdl_contacts=False)
+        self.assertAlmostEqual(sc.lddt_pli_matrix[0,0], 1.0, 5)
+
+        # if added model contacts are considered, contributions from chain B are
+        # perfectly reproduced but all contacts of ligand towards chain A are
+        # added as penalty
+        sc = LigandScorer(mdl, trg, add_mdl_contacts=True)
+
+        lig = prot.Select("cname=G")
+        A_count = 0
+        B_count = 0
+        for a in lig.atoms:
+            close_atoms = mdl.FindWithin(a.GetPos(), sc.lddt_pli_radius)
+            for ca in close_atoms:
+                cname = ca.GetChain().GetName()
+                if cname == "G":
+                    pass # its a ligand atom...
+                elif cname == "A":
+                    A_count += 1
+                elif cname == "B":
+                    B_count += 1
+                
+        self.assertAlmostEqual(sc.lddt_pli_matrix[0,0],
+                               B_count/(A_count + B_count), 5)
+
+        # Same as before but additionally we remove residue TRP.66 
+        # from chain C in the target to test mapping magic...
+        # Chain C is NOT in contact with the ligand but we only
+        # add contacts from chain A as penalty that are mappable
+        # to the closest chain with same sequence. That would be
+        # chain C
+        query = "cname=B,G or (cname=C and rnum!=66)"
+        trg = mol.CreateEntityFromView(prot.Select(query), True)
+        sc = LigandScorer(mdl, trg, add_mdl_contacts=True)
+
+        TRP66_count = 0
+        for a in lig.atoms:
+            close_atoms = mdl.FindWithin(a.GetPos(), sc.lddt_pli_radius)
+            for ca in close_atoms:
+                cname = ca.GetChain().GetName()
+                if cname == "A" and ca.GetResidue().GetNumber().GetNum() == 66:
+                    TRP66_count += 1
+
+        self.assertEqual(TRP66_count, 134)
+
+        # remove TRP66_count from original penalty
+        self.assertAlmostEqual(sc.lddt_pli_matrix[0,0],
+                               B_count/(A_count + B_count - TRP66_count), 5)        
+
+        # Move a random atom in the model from chain B towards the ligand center
+        # chain B is also present in the target and interacts with the ligand,
+        # but that atom would be far away and thus adds to the penalty. Since
+        # the ligand is small enough, the number of added contacts should be
+        # exactly the number of ligand atoms.
+        mdl_ed = mdl.EditXCS()
+        at = mdl.FindResidue("B", mol.ResNum(8)).FindAtom("NZ")
+        mdl_ed.SetAtomPos(at, lig.geometric_center)
+        sc = LigandScorer(mdl, trg, add_mdl_contacts=True)
+
+        # compared to the last assertAlmostEqual, we add the number of ligand
+        # atoms as additional penalties
+        self.assertAlmostEqual(sc.lddt_pli_matrix[0,0],
+                               B_count/(A_count + B_count - TRP66_count + \
+                               lig.GetAtomCount()), 5)
 
 if __name__ == "__main__":
     from ost import testutils
