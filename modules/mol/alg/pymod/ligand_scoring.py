@@ -254,7 +254,7 @@ class LigandScorer:
                  resnum_alignments=False, check_resnames=True,
                  rename_ligand_chain=False,
                  substructure_match=False, coverage_delta=0.2, radius=4.0,
-                 lddt_pli_radius=6.0, lddt_lp_radius=10.0, model_bs_radius=20,
+                 lddt_pli_radius=6.0, lddt_lp_radius=15.0, model_bs_radius=25,
                  binding_sites_topn=100000,
                  rmsd_assignment=False, n_max_naive=12, max_symmetries=1e5,
                  unassigned=False, full_bs_search=False,
