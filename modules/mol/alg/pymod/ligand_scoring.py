@@ -194,10 +194,6 @@ class LigandScorer:
                                 will be logged to the console with SCRIPT
                                 level.
     :type rename_ligand_chain: :class:`bool`
-    :param chain_mapper: a chain mapper initialized for the target structure.
-                         If None (default), a chain mapper will be initialized
-                         lazily as required.
-    :type chain_mapper:  :class:`ost.mol.alg.chain_mapping.ChainMapper`
     :param substructure_match: Set this to True to allow incomplete (ie
                                partially resolved) target ligands.
     :type substructure_match: :class:`bool`
@@ -256,7 +252,7 @@ class LigandScorer:
     """
     def __init__(self, model, target, model_ligands=None, target_ligands=None,
                  resnum_alignments=False, check_resnames=True,
-                 rename_ligand_chain=False, chain_mapper=None,
+                 rename_ligand_chain=False,
                  substructure_match=False, coverage_delta=0.2, radius=4.0,
                  lddt_pli_radius=6.0, lddt_lp_radius=10.0, model_bs_radius=20,
                  binding_sites_topn=100000,
@@ -302,7 +298,6 @@ class LigandScorer:
             if len(self.target_ligands) == 0:
                 raise ValueError("No ligand in the model and in the target")
 
-        self._chain_mapper = chain_mapper
         self.resnum_alignments = resnum_alignments
         self.check_resnames = check_resnames
         self.rename_ligand_chain = rename_ligand_chain
@@ -321,6 +316,7 @@ class LigandScorer:
         self.add_mdl_contacts = add_mdl_contacts
         self.lddt_pli_thresholds = lddt_pli_thresholds
         self.lddt_pli_rmsd_binding_site = lddt_pli_rmsd_binding_site
+        self.__chain_mapper = None
 
         # scoring matrices
         self._rmsd_matrix = None
@@ -342,10 +338,10 @@ class LigandScorer:
 
         # lazily precomputed variables to speedup GetRepr chain mapping calls
         # for localized GetRepr searches
-        self._chem_mapping = None
-        self._chem_group_alns = None
-        self._ref_mdl_alns = None
-        self._chain_mapping_mdl = None
+        self.__chem_mapping = None
+        self.__chem_group_alns = None
+        self.__ref_mdl_alns = None
+        self.__chain_mapping_mdl = None
         self._get_repr_input = dict()
 
         # the actual representations as returned by ChainMapper.GetRepr
@@ -356,15 +352,7 @@ class LigandScorer:
         # lazily precomputed variables to speedup lddt-pli computation
         self._lddt_pli_target_data = dict()
         self._lddt_pli_model_data = dict()
-        self._mappable_atoms = None
-
-        # cache for rmsd values
-        # rmsd is used as tie breaker in lddt-pli, we therefore need access to
-        # the rmsd for each target_ligand/model_ligand/repr combination
-        # key: (target_ligand.handle.hash_code, model_ligand.handle.hash_code,
-        #       repr_id)
-        # value: rmsd
-        self._rmsd_cache = dict()
+        self.__mappable_atoms = None
 
         # Bookkeeping of unassigned ligands
         self._unassigned_target_ligands = None
@@ -383,19 +371,371 @@ class LigandScorer:
         self._assignment_match_coverage = None
 
     @property
-    def chain_mapper(self):
+    def rmsd_matrix(self):
+        """ Get the matrix of RMSD values.
+
+        Target ligands are in rows, model ligands in columns.
+
+        NaN values indicate that no RMSD could be computed (i.e. different
+        ligands).
+
+        :rtype: :class:`~numpy.ndarray`
+        """
+        if self._rmsd_full_matrix is None:
+            self._compute_scores()
+        if self._rmsd_matrix is None:
+            # convert
+            shape = self._rmsd_full_matrix.shape
+            self._rmsd_matrix = np.full(shape, np.nan)
+            for i, j in np.ndindex(shape):
+                if self._rmsd_full_matrix[i, j] is not None:
+                    self._rmsd_matrix[i, j] = self._rmsd_full_matrix[
+                        i, j]["rmsd"]
+        return self._rmsd_matrix
+
+    @property
+    def lddt_pli_matrix(self):
+        """ Get the matrix of lDDT-PLI values.
+
+        Target ligands are in rows, model ligands in columns.
+
+        NaN values indicate that no lDDT-PLI could be computed (i.e. different
+        ligands).
+
+        :rtype: :class:`~numpy.ndarray`
+        """
+        if self._lddt_pli_full_matrix is None:
+            self._compute_scores()
+        if self._lddt_pli_matrix is None:
+            # convert
+            shape = self._lddt_pli_full_matrix.shape
+            self._lddt_pli_matrix = np.full(shape, np.nan)
+            for i, j in np.ndindex(shape):
+                if self._lddt_pli_full_matrix[i, j] is not None:
+                    self._lddt_pli_matrix[i, j] = self._lddt_pli_full_matrix[
+                        i, j]["lddt_pli"]
+        return self._lddt_pli_matrix
+
+    @property
+    def coverage_matrix(self):
+        """ Get the matrix of model ligand atom coverage in the target.
+
+        Target ligands are in rows, model ligands in columns.
+
+        A value of 0 indicates that there was no isomorphism between the model
+        and target ligands. If `substructure_match=False`, only full match
+        isomorphisms are considered, and therefore only values of 1.0 and 0.0
+        are reported.
+
+        :rtype: :class:`~numpy.ndarray`
+        """
+        if self._assignment_match_coverage is None:
+            self._compute_scores()
+        return self._assignment_match_coverage
+
+    @property
+    def rmsd(self):
+        """Get a dictionary of RMSD score values, keyed by model ligand
+        (chain name, :class:`~ost.mol.ResNum`).
+
+        If the scoring object was instantiated with `unassigned=True`, some
+        scores may be `None`.
+
+        :rtype: :class:`dict`
+        """
+        if self._rmsd is None:
+            if self.rmsd_assignment:
+                self._assign_ligands_rmsd_only()
+            else:
+                self._assign_ligands_rmsd()
+        return self._rmsd
+
+    @property
+    def rmsd_details(self):
+        """Get a dictionary of RMSD score details (dictionaries), keyed by
+        model ligand (chain name, :class:`~ost.mol.ResNum`).
+
+        The value is a dictionary. For ligands that were assigned (mapped) to
+        the target, the dictionary contain the following information:
+
+        * `rmsd`: the RMSD score value.
+        * `lddt_lp`: the lDDT score of the ligand pocket (lDDT-LP).
+        * `bs_ref_res`: a list of residues (:class:`~ost.mol.ResidueHandle`)
+          that define the binding site in the reference.
+        * `bs_ref_res_mapped`: a list of residues
+          (:class:`~ost.mol.ResidueHandle`) in the reference binding site
+          that could be mapped to the model.
+        * `bs_mdl_res_mapped`: a list of residues
+          (:class:`~ost.mol.ResidueHandle`) in the model that were mapped to
+          the reference binding site. The residues are in the same order as
+          `bs_ref_res_mapped`.
+        * `bb_rmsd`: the RMSD of the binding site backbone after superposition
+        * `target_ligand`: residue handle of the target ligand.
+        * `model_ligand`: residue handle of the model ligand.
+        * `chain_mapping`: local chain mapping as a dictionary, with target
+          chain name as key and model chain name as value.
+        * `transform`: transformation to superpose the model onto the target.
+        * `substructure_match`: whether the score is the result of a partial
+          (substructure) match. A value of `True` indicates that the target
+          ligand covers only part of the model, while `False` indicates a
+          perfect match.
+        * `coverage`: the fraction of model atoms covered by the assigned
+          target ligand, in the interval (0, 1]. If `substructure_match`
+          is `False`, this will always be 1.
+        * `inconsistent_residues`: a list of tuples of mapped residues views
+          (:class:`~ost.mol.ResidueView`) with residue names that differ
+          between the reference and the model, respectively.
+          The list is empty if all residue names match, which is guaranteed
+          if `check_resnames=True`.
+          Note: more binding site mappings may be explored during scoring,
+          but only inconsistencies in the selected mapping are reported.
+        * `unassigned`: only if the scorer was instantiated with
+          `unassigned=True`: `False`
+
+        If the scoring object was instantiated with `unassigned=True`, in
+        addition the unassigned ligands will be reported with a score of `None`
+        and the following information:
+
+        * `unassigned`: `True`,
+        * `reason_short`: a short token of the reason, see
+          :attr:`unassigned_model_ligands` for details and meaning.
+        * `reason_long`: a human-readable text of the reason, see
+          :attr:`unassigned_model_ligands` for details and meaning.
+        * `rmsd`: `None`
+
+        :rtype: :class:`dict`
+        """
+        if self._rmsd_details is None:
+            if self.rmsd_assignment:
+                self._assign_ligands_rmsd_only()
+            else:
+                self._assign_ligands_rmsd()
+        return self._rmsd_details
+
+    @property
+    def lddt_pli(self):
+        """Get a dictionary of lDDT-PLI score values, keyed by model ligand
+        (chain name, :class:`~ost.mol.ResNum`).
+
+        If the scoring object was instantiated with `unassigned=True`, some
+        scores may be `None`.
+
+        :rtype: :class:`dict`
+        """
+        if self._lddt_pli is None:
+            if self.rmsd_assignment:
+                self._assign_ligands_rmsd_only()
+            else:
+                self._assign_ligands_lddt_pli()
+        return self._lddt_pli
+
+    @property
+    def lddt_pli_details(self):
+        """Get a dictionary of lDDT-PLI score details (dictionaries), keyed by
+        model ligand (chain name, :class:`~ost.mol.ResNum`).
+
+        Each sub-dictionary contains the following information:
+
+        * `lddt_pli`: the lDDT-PLI score value.
+        * `rmsd`: the RMSD score value corresponding to the lDDT-PLI
+          chain mapping and assignment. This may differ from the RMSD-based
+          assignment. Note that a different isomorphism than `lddt_pli` may
+          be used.
+        * `lddt_lp`: the lDDT score of the ligand pocket (lDDT-LP).
+        * `lddt_pli_n_contacts`: number of contacts considered in lDDT-PLI.
+        * `bs_ref_res`: a list of residues (:class:`~ost.mol.ResidueHandle`)
+          that define the binding site in the reference.
+        * `bs_ref_res_mapped`: a list of residues
+          (:class:`~ost.mol.ResidueHandle`) in the reference binding site
+          that could be mapped to the model.
+        * `bs_mdl_res_mapped`: a list of residues
+          (:class:`~ost.mol.ResidueHandle`) in the model that were mapped to
+          the reference binding site. The residues are in the same order as
+          `bs_ref_res_mapped`.
+        * `bb_rmsd`: the RMSD of the binding site backbone after superposition.
+          Note: not used for lDDT-PLI computation.
+        * `target_ligand`: residue handle of the target ligand.
+        * `model_ligand`: residue handle of the model ligand.
+        * `chain_mapping`: local chain mapping as a dictionary, with target
+          chain name as key and model chain name as value.
+        * `transform`: transformation to superpose the model onto the target
+          (for RMSD only).
+        * `substructure_match`: whether the score is the result of a partial
+          (substructure) match. A value of `True` indicates that the target
+          ligand covers only part of the model, while `False` indicates a
+          perfect match.
+        * `inconsistent_residues`: a list of tuples of mapped residues views
+          (:class:`~ost.mol.ResidueView`) with residue names that differ
+          between the reference and the model, respectively.
+          The list is empty if all residue names match, which is guaranteed
+          if `check_resnames=True`.
+          Note: more binding site mappings may be explored during scoring,
+          but only inconsistencies in the selected mapping are reported.
+        * `unassigned`: only if the scorer was instantiated with
+          `unassigned=True`: `False`
+
+        If the scoring object was instantiated with `unassigned=True`, in
+        addition the unmapped ligands will be reported with a score of `None`
+        and the following information:
+
+        * `unassigned`: `True`,
+        * `reason_short`: a short token of the reason, see
+          :attr:`unassigned_model_ligands` for details and meaning.
+        * `reason_long`: a human-readable text of the reason, see
+          :attr:`unassigned_model_ligands` for details and meaning.
+        * `lddt_pli`: `None`
+
+        :rtype: :class:`dict`
+        """
+        if self._lddt_pli_details is None:
+            if self.rmsd_assignment:
+                self._assign_ligands_rmsd_only()
+            else:
+                self._assign_ligands_lddt_pli()
+        return self._lddt_pli_details
+
+    @property
+    def unassigned_target_ligands(self):
+        """Get a dictionary of target ligands not assigned to any model ligand,
+        keyed by target ligand (chain name, :class:`~ost.mol.ResNum`).
+
+        The assignment for the lDDT-PLI score is used (and is controlled
+        by the `rmsd_assignment` argument).
+
+        Each item contains a string from a controlled dictionary
+        about the reason for the absence of assignment.
+        A human-readable description can be obtained from the
+        :attr:`unassigned_target_ligand_descriptions` property.
+
+        Currently, the following reasons are reported:
+
+        * `no_ligand`: there was no ligand in the model.
+        * `disconnected`: the ligand graph was disconnected.
+        * `binding_site`: no residues were in proximity of the ligand.
+        * `model_representation`: no representation of the reference binding
+          site was found in the model. (I.e. the binding site was not modeled,
+          or the model ligand was positioned too far in combination with
+          `full_bs_search=False`)
+        * `identity`: the ligand was not found in the model (by graph
+          isomorphism). Check your ligand connectivity, and enable the
+          `substructure_match` option if the target ligand is incomplete.
+        * `stoichiometry`: there was a possible assignment in the model, but
+          the model ligand was already assigned to a different target ligand.
+          This indicates different stoichiometries.
+        * `symmetries`: too many symmetries were found (by graph isomorphisms).
+          Increase `max_symmetries`.
+        * `no_contact`: there were no lDDT contacts between the binding site
+          and the ligand, and lDDT-PLI is undefined. Increase the value of
+          `lddt_pli_radius` to at least the value of the binding site `radius`.
+
+        Some of these reasons can be overlapping, but a single reason will be
+        reported.
+
+        :rtype: :class:`dict`
+        """
+        if self._unassigned_target_ligand_short is None:
+            if self.rmsd_assignment:
+                self._assign_ligands_rmsd_only()
+            else:
+                self._assign_ligands_lddt_pli()
+            self._unassigned_target_ligand_short = {}
+            self._unassigned_target_ligand_descriptions = {}
+            for cname, res in self._unassigned_target_ligands.items():
+                self._unassigned_target_ligand_short[cname] = {}
+                for resnum, val in res.items():
+                    self._unassigned_target_ligand_short[cname][resnum] = val[0]
+                    self._unassigned_target_ligand_descriptions[val[0]] = val[1]
+        return self._unassigned_target_ligand_short
+
+    @property
+    def unassigned_target_ligand_descriptions(self):
+        """Get a human-readable description of why target ligands were
+        unassigned, as a dictionary keyed by the controlled dictionary
+        from :attr:`unassigned_target_ligands`.
+        """
+        if self._unassigned_target_ligand_descriptions is None:
+            _ = self.unassigned_target_ligands  # assigned there
+        return self._unassigned_target_ligand_descriptions
+
+    @property
+    def unassigned_model_ligands(self):
+        """Get a dictionary of model ligands not assigned to any target ligand,
+        keyed by model ligand (chain name, :class:`~ost.mol.ResNum`).
+
+        The assignment for the lDDT-PLI score is used (and is controlled
+        by the `rmsd_assignment` argument).
+
+        Each item contains a string from a controlled dictionary
+        about the reason for the absence of assignment.
+        A human-readable description can be obtained from the
+        :attr:`unassigned_model_ligand_descriptions` property.
+        Currently, the following reasons are reported:
+
+        * `no_ligand`: there was no ligand in the target.
+        * `disconnected`: the ligand graph is disconnected.
+        * `binding_site`: a potential assignment was found in the target, but
+          there were no polymer residues in proximity of the ligand in the
+          target.
+        * `model_representation`: a potential assignment was found in the target,
+          but no representation of the binding site was found in the model.
+          (I.e. the binding site was not modeled, or the model ligand was
+          positioned too far in combination with `full_bs_search=False`)
+        * `identity`: the ligand was not found in the target (by graph
+          isomorphism). Check your ligand connectivity, and enable the
+          `substructure_match` option if the target ligand is incomplete.
+        * `stoichiometry`: there was a possible assignment in the target, but
+          the model target was already assigned to a different model ligand.
+          This indicates different stoichiometries.
+        * `symmetries`: too many symmetries were found (by graph isomorphisms).
+          Increase `max_symmetries`.
+        * `no_contact`: there were no lDDT contacts between the binding site
+          and the ligand in the target structure, and lDDT-PLI is undefined.
+          Increase the value of `lddt_pli_radius` to at least the value of the
+          binding site `radius`.
+
+        Some of these reasons can be overlapping, but a single reason will be
+        reported.
+
+        :rtype: :class:`dict`
+        """
+        if self._unassigned_model_ligand_short is None:
+            if self.rmsd_assignment:
+                self._assign_ligands_rmsd_only()
+            else:
+                self._assign_ligands_lddt_pli()
+            self._unassigned_model_ligand_short = {}
+            self._unassigned_model_ligand_descriptions = {}
+            for cname, res in self._unassigned_model_ligands.items():
+                self._unassigned_model_ligand_short[cname] = {}
+                for resnum, val in res.items():
+                    self._unassigned_model_ligand_short[cname][resnum] = val[0]
+                    self._unassigned_model_ligand_descriptions[val[0]] = val[1]
+        return self._unassigned_model_ligand_short
+
+    @property
+    def unassigned_model_ligand_descriptions(self):
+        """Get a human-readable description of why model ligands were
+        unassigned, as a dictionary keyed by the controlled dictionary
+        from :attr:`unassigned_model_ligands`.
+        """
+        if self._unassigned_model_ligand_descriptions is None:
+            _ = self.unassigned_model_ligands  # assigned there
+        return self._unassigned_model_ligand_descriptions
+
+    @property
+    def _chain_mapper(self):
         """ Chain mapper object for the given :attr:`target`.
 
         :type: :class:`ost.mol.alg.chain_mapping.ChainMapper`
         """
-        if self._chain_mapper is None:
-            self._chain_mapper = chain_mapping.ChainMapper(self.target,
-                                                           n_max_naive=1e9,
-                                                           resnum_alignments=self.resnum_alignments)
-        return self._chain_mapper
+        if self.__chain_mapper is None:
+            self.__chain_mapper = chain_mapping.ChainMapper(self.target,
+                                                            n_max_naive=1e9,
+                                                            resnum_alignments=self.resnum_alignments)
+        return self.__chain_mapper
 
 
-    def get_target_binding_site(self, target_ligand):
+    def _get_target_binding_site(self, target_ligand):
 
         if target_ligand.handle.hash_code not in self._binding_sites:
 
@@ -410,7 +750,7 @@ class LigandScorer:
                     h = ref_res.handle.GetHashCode()
                     if h not in ref_residues_hashes and \
                             h not in ignored_residue_hashes:
-                        if self.chain_mapper.target.ViewForHandle(ref_res).IsValid():
+                        if self._chain_mapper.target.ViewForHandle(ref_res).IsValid():
                             h = ref_res.handle.GetHashCode()
                             ref_residues_hashes.add(h)
                         elif ref_res.is_ligand:
@@ -626,8 +966,6 @@ class LigandScorer:
                 ################################################################
                 # Compute best rmsd/lddt-pli by naively enumerating symmetries #
                 ################################################################
-                # rmsds MUST be computed first, as lDDT uses them as tiebreaker
-                # and expects the values to be in self._rmsd_cache
                 rmsd_result = self._compute_rmsd(symmetries, target_ligand,
                                                  model_ligand)
                 lddt_pli_result = self._compute_lddtpli(symmetries, target_ligand,
@@ -667,13 +1005,9 @@ class LigandScorer:
                            "transform": geom.Mat4(),
                            "inconsistent_residues": list()}
         
-        for r_i, r in enumerate(self.get_repr(target_ligand, model_ligand)):
+        for r_i, r in enumerate(self._get_repr(target_ligand, model_ligand)):
             rmsd = _SCRMSD_symmetries(symmetries, model_ligand, 
                                       target_ligand, transformation=r.transform)
-
-            cache_key = (target_ligand.handle.hash_code,
-                         model_ligand.handle.hash_code, r_i)
-            self._rmsd_cache[cache_key] = rmsd
 
             if best_rmsd_result["rmsd"] is None or rmsd < best_rmsd_result["rmsd"]:
                 best_rmsd_result = {"rmsd": rmsd,
@@ -810,6 +1144,19 @@ class LigandScorer:
         # In principle we're caching for each trg/mdl ligand atom pair all
         # information to update ref_indices/ref_distances and resolving the
         # symmetries of the binding site.
+        # in detail: each list entry in *scoring_cache* is a dict with
+        # key: (mdl_lig_at_idx, trg_lig_at_idx)
+        # value: tuple with 4 elements - 1: indices of atoms representing added
+        # contacts relative to overall inexing scheme in scorer 2: the
+        # respective distances 3: the same but only containing indices towards
+        # atoms of the binding site that are considered symmetric 4: the
+        # respective indices.
+        # each list entry in *penalty_cache* is a list of len N mdl lig atoms.
+        # For each mdl lig at it contains a penalty for this mdl lig at. That
+        # means the number of contacts in the mdl binding site that can
+        # directly be mapped to the target given the local chain mapping but
+        # are not present in the target binding site, i.e. interacting atoms are
+        # too far away.
         scoring_cache = list()
         penalty_cache = list()
 
@@ -861,7 +1208,7 @@ class LigandScorer:
                             at_key = (a.GetResidue().GetNumber(), a.name)
                             cname = a.GetChain().name
                             cname_key = (flat_mapping[cname], cname)
-                            if at_key in self.mappable_atoms[cname_key]:
+                            if at_key in self._mappable_atoms[cname_key]:
                                 # Its a contact in the model but not part of
                                 # trg_bs. It can still be mapped using the
                                 # global mdl_ch/ref_ch alignment
@@ -902,7 +1249,8 @@ class LigandScorer:
             scoring_cache.append(cache)
             penalty_cache.append(n_penalties)
 
-        # cache for model contacts towards non mapped trg chains
+        # cache for model contacts towards non mapped trg chains - this is
+        # relevant for self._lddt_pli_unmapped_chain_penalty
         # key: tuple in form (trg_ch, mdl_ch)
         # value: yet another dict with
         #   key: ligand_atom_hash
@@ -966,20 +1314,20 @@ class LigandScorer:
                 if mdl_ch not in lddt_chain_mapping:
                     # check which chain in trg is closest
                     chem_group_idx = None
-                    for i, m in enumerate(self.chem_mapping):
+                    for i, m in enumerate(self._chem_mapping):
                         if mdl_ch in m:
                             chem_group_idx = i
                             break
                     if chem_group_idx is None:
                         raise RuntimeError("This should never happen... "
                                            "ask Gabriel...")
-                    mdl_ch_view = self.chain_mapping_mdl.FindChain(mdl_ch)
+                    mdl_ch_view = self._chain_mapping_mdl.FindChain(mdl_ch)
                     mdl_center = mdl_ch_view.geometric_center
                     closest_ch = None
                     closest_dist = None
-                    for trg_ch in self.chain_mapper.chem_groups[chem_group_idx]:
+                    for trg_ch in self._chain_mapper.chem_groups[chem_group_idx]:
                         if trg_ch not in lddt_chain_mapping.values():
-                            c = self.chain_mapper.target.FindChain(trg_ch).geometric_center
+                            c = self._chain_mapper.target.FindChain(trg_ch).geometric_center
                             d = geom.Distance(mdl_center, c)
                             if closest_dist is None or d < closest_dist:
                                 closest_dist = d
@@ -1227,7 +1575,7 @@ class LigandScorer:
                     for close_a in close_atoms:
                         at_key = (close_a.GetResidue().GetNumber(),
                                   close_a.GetName())
-                        if at_key in self.mappable_atoms[ch_tuple]:
+                        if at_key in self._mappable_atoms[ch_tuple]:
                             N += 1
                     counts[a.hash_code] = N
 
@@ -1247,7 +1595,7 @@ class LigandScorer:
     def _lddt_pli_get_mdl_data(self, model_ligand):
         if model_ligand not in self._lddt_pli_model_data:
 
-            mdl = self.chain_mapping_mdl
+            mdl = self._chain_mapping_mdl
 
             mdl_residues = set()
             for at in model_ligand.atoms:
@@ -1284,7 +1632,7 @@ class LigandScorer:
             mdl_editor.SetResidueNumber(mdl_ligand_res, mol.ResNum(1))
 
             chem_mapping = list()
-            for m in self.chem_mapping:
+            for m in self._chem_mapping:
                 chem_mapping.append([x for x in m if x in mdl_chains])
 
             self._lddt_pli_model_data[model_ligand] = (mdl_residues,
@@ -1300,7 +1648,7 @@ class LigandScorer:
     def _lddt_pli_get_trg_data(self, target_ligand, max_r = None):
         if target_ligand not in self._lddt_pli_target_data:
 
-            trg = self.chain_mapper.target
+            trg = self._chain_mapper.target
 
             if max_r is None:
                 max_r = self.lddt_pli_radius + max(self.lddt_pli_thresholds)
@@ -1347,7 +1695,7 @@ class LigandScorer:
                                      inclusion_radius = self.lddt_pli_radius)
 
             chem_groups = list()
-            for g in self.chain_mapper.chem_groups:
+            for g in self._chain_mapper.chem_groups:
                 chem_groups.append([x for x in g if x in trg_chains])
 
             self._lddt_pli_target_data[target_ligand] = (trg_residues,
@@ -1369,16 +1717,16 @@ class LigandScorer:
 
                 ref_bs_chain = ref_bs.FindChain(ref_ch)
                 query = "cname=" + mol.QueryQuoteName(ref_ch)
-                ref_view = self.chain_mapper.target.Select(query)
+                ref_view = self._chain_mapper.target.Select(query)
 
                 for mdl_ch in mdl_chem_group:
-                    aln = self.ref_mdl_alns[(ref_ch, mdl_ch)]
+                    aln = self._ref_mdl_alns[(ref_ch, mdl_ch)]
 
                     aln.AttachView(0, ref_view)
 
                     mdl_bs_chain = mdl_bs.FindChain(mdl_ch)
                     query = "cname=" + mol.QueryQuoteName(mdl_ch)
-                    aln.AttachView(1, self.chain_mapping_mdl.Select(query))
+                    aln.AttachView(1, self._chain_mapping_mdl.Select(query))
 
                     cut_mdl_seq = ['-'] * aln.GetLength()
                     cut_ref_seq = ['-'] * aln.GetLength()
@@ -1734,359 +2082,7 @@ class LigandScorer:
         self._unassigned_model_ligands = mat_tuple[5]
 
     @property
-    def rmsd_matrix(self):
-        """ Get the matrix of RMSD values.
-
-        Target ligands are in rows, model ligands in columns.
-
-        NaN values indicate that no RMSD could be computed (i.e. different
-        ligands).
-
-        :rtype: :class:`~numpy.ndarray`
-        """
-        if self._rmsd_full_matrix is None:
-            self._compute_scores()
-        if self._rmsd_matrix is None:
-            # convert
-            shape = self._rmsd_full_matrix.shape
-            self._rmsd_matrix = np.full(shape, np.nan)
-            for i, j in np.ndindex(shape):
-                if self._rmsd_full_matrix[i, j] is not None:
-                    self._rmsd_matrix[i, j] = self._rmsd_full_matrix[
-                        i, j]["rmsd"]
-        return self._rmsd_matrix
-
-    @property
-    def lddt_pli_matrix(self):
-        """ Get the matrix of lDDT-PLI values.
-
-        Target ligands are in rows, model ligands in columns.
-
-        NaN values indicate that no lDDT-PLI could be computed (i.e. different
-        ligands).
-
-        :rtype: :class:`~numpy.ndarray`
-        """
-        if self._lddt_pli_full_matrix is None:
-            self._compute_scores()
-        if self._lddt_pli_matrix is None:
-            # convert
-            shape = self._lddt_pli_full_matrix.shape
-            self._lddt_pli_matrix = np.full(shape, np.nan)
-            for i, j in np.ndindex(shape):
-                if self._lddt_pli_full_matrix[i, j] is not None:
-                    self._lddt_pli_matrix[i, j] = self._lddt_pli_full_matrix[
-                        i, j]["lddt_pli"]
-        return self._lddt_pli_matrix
-
-    @property
-    def coverage_matrix(self):
-        """ Get the matrix of model ligand atom coverage in the target.
-
-        Target ligands are in rows, model ligands in columns.
-
-        A value of 0 indicates that there was no isomorphism between the model
-        and target ligands. If `substructure_match=False`, only full match
-        isomorphisms are considered, and therefore only values of 1.0 and 0.0
-        are reported.
-
-        :rtype: :class:`~numpy.ndarray`
-        """
-        if self._assignment_match_coverage is None:
-            self._compute_scores()
-        return self._assignment_match_coverage
-
-    @property
-    def rmsd(self):
-        """Get a dictionary of RMSD score values, keyed by model ligand
-        (chain name, :class:`~ost.mol.ResNum`).
-
-        If the scoring object was instantiated with `unassigned=True`, some
-        scores may be `None`.
-
-        :rtype: :class:`dict`
-        """
-        if self._rmsd is None:
-            if self.rmsd_assignment:
-                self._assign_ligands_rmsd_only()
-            else:
-                self._assign_ligands_rmsd()
-        return self._rmsd
-
-    @property
-    def rmsd_details(self):
-        """Get a dictionary of RMSD score details (dictionaries), keyed by
-        model ligand (chain name, :class:`~ost.mol.ResNum`).
-
-        The value is a dictionary. For ligands that were assigned (mapped) to
-        the target, the dictionary contain the following information:
-
-        * `rmsd`: the RMSD score value.
-        * `lddt_lp`: the lDDT score of the ligand pocket (lDDT-LP).
-        * `bs_ref_res`: a list of residues (:class:`~ost.mol.ResidueHandle`)
-          that define the binding site in the reference.
-        * `bs_ref_res_mapped`: a list of residues
-          (:class:`~ost.mol.ResidueHandle`) in the reference binding site
-          that could be mapped to the model.
-        * `bs_mdl_res_mapped`: a list of residues
-          (:class:`~ost.mol.ResidueHandle`) in the model that were mapped to
-          the reference binding site. The residues are in the same order as
-          `bs_ref_res_mapped`.
-        * `bb_rmsd`: the RMSD of the binding site backbone after superposition
-        * `target_ligand`: residue handle of the target ligand.
-        * `model_ligand`: residue handle of the model ligand.
-        * `chain_mapping`: local chain mapping as a dictionary, with target
-          chain name as key and model chain name as value.
-        * `transform`: transformation to superpose the model onto the target.
-        * `substructure_match`: whether the score is the result of a partial
-          (substructure) match. A value of `True` indicates that the target
-          ligand covers only part of the model, while `False` indicates a
-          perfect match.
-        * `coverage`: the fraction of model atoms covered by the assigned
-          target ligand, in the interval (0, 1]. If `substructure_match`
-          is `False`, this will always be 1.
-        * `inconsistent_residues`: a list of tuples of mapped residues views
-          (:class:`~ost.mol.ResidueView`) with residue names that differ
-          between the reference and the model, respectively.
-          The list is empty if all residue names match, which is guaranteed
-          if `check_resnames=True`.
-          Note: more binding site mappings may be explored during scoring,
-          but only inconsistencies in the selected mapping are reported.
-        * `unassigned`: only if the scorer was instantiated with
-          `unassigned=True`: `False`
-
-        If the scoring object was instantiated with `unassigned=True`, in
-        addition the unassigned ligands will be reported with a score of `None`
-        and the following information:
-
-        * `unassigned`: `True`,
-        * `reason_short`: a short token of the reason, see
-          :attr:`unassigned_model_ligands` for details and meaning.
-        * `reason_long`: a human-readable text of the reason, see
-          :attr:`unassigned_model_ligands` for details and meaning.
-        * `rmsd`: `None`
-
-        :rtype: :class:`dict`
-        """
-        if self._rmsd_details is None:
-            if self.rmsd_assignment:
-                self._assign_ligands_rmsd_only()
-            else:
-                self._assign_ligands_rmsd()
-        return self._rmsd_details
-
-    @property
-    def lddt_pli(self):
-        """Get a dictionary of lDDT-PLI score values, keyed by model ligand
-        (chain name, :class:`~ost.mol.ResNum`).
-
-        If the scoring object was instantiated with `unassigned=True`, some
-        scores may be `None`.
-
-        :rtype: :class:`dict`
-        """
-        if self._lddt_pli is None:
-            if self.rmsd_assignment:
-                self._assign_ligands_rmsd_only()
-            else:
-                self._assign_ligands_lddt_pli()
-        return self._lddt_pli
-
-    @property
-    def lddt_pli_details(self):
-        """Get a dictionary of lDDT-PLI score details (dictionaries), keyed by
-        model ligand (chain name, :class:`~ost.mol.ResNum`).
-
-        Each sub-dictionary contains the following information:
-
-        * `lddt_pli`: the lDDT-PLI score value.
-        * `rmsd`: the RMSD score value corresponding to the lDDT-PLI
-          chain mapping and assignment. This may differ from the RMSD-based
-          assignment. Note that a different isomorphism than `lddt_pli` may
-          be used.
-        * `lddt_lp`: the lDDT score of the ligand pocket (lDDT-LP).
-        * `lddt_pli_n_contacts`: number of contacts considered in lDDT-PLI.
-        * `bs_ref_res`: a list of residues (:class:`~ost.mol.ResidueHandle`)
-          that define the binding site in the reference.
-        * `bs_ref_res_mapped`: a list of residues
-          (:class:`~ost.mol.ResidueHandle`) in the reference binding site
-          that could be mapped to the model.
-        * `bs_mdl_res_mapped`: a list of residues
-          (:class:`~ost.mol.ResidueHandle`) in the model that were mapped to
-          the reference binding site. The residues are in the same order as
-          `bs_ref_res_mapped`.
-        * `bb_rmsd`: the RMSD of the binding site backbone after superposition.
-          Note: not used for lDDT-PLI computation.
-        * `target_ligand`: residue handle of the target ligand.
-        * `model_ligand`: residue handle of the model ligand.
-        * `chain_mapping`: local chain mapping as a dictionary, with target
-          chain name as key and model chain name as value.
-        * `transform`: transformation to superpose the model onto the target
-          (for RMSD only).
-        * `substructure_match`: whether the score is the result of a partial
-          (substructure) match. A value of `True` indicates that the target
-          ligand covers only part of the model, while `False` indicates a
-          perfect match.
-        * `inconsistent_residues`: a list of tuples of mapped residues views
-          (:class:`~ost.mol.ResidueView`) with residue names that differ
-          between the reference and the model, respectively.
-          The list is empty if all residue names match, which is guaranteed
-          if `check_resnames=True`.
-          Note: more binding site mappings may be explored during scoring,
-          but only inconsistencies in the selected mapping are reported.
-        * `unassigned`: only if the scorer was instantiated with
-          `unassigned=True`: `False`
-
-        If the scoring object was instantiated with `unassigned=True`, in
-        addition the unmapped ligands will be reported with a score of `None`
-        and the following information:
-
-        * `unassigned`: `True`,
-        * `reason_short`: a short token of the reason, see
-          :attr:`unassigned_model_ligands` for details and meaning.
-        * `reason_long`: a human-readable text of the reason, see
-          :attr:`unassigned_model_ligands` for details and meaning.
-        * `lddt_pli`: `None`
-
-        :rtype: :class:`dict`
-        """
-        if self._lddt_pli_details is None:
-            if self.rmsd_assignment:
-                self._assign_ligands_rmsd_only()
-            else:
-                self._assign_ligands_lddt_pli()
-        return self._lddt_pli_details
-
-    @property
-    def unassigned_target_ligands(self):
-        """Get a dictionary of target ligands not assigned to any model ligand,
-        keyed by target ligand (chain name, :class:`~ost.mol.ResNum`).
-
-        The assignment for the lDDT-PLI score is used (and is controlled
-        by the `rmsd_assignment` argument).
-
-        Each item contains a string from a controlled dictionary
-        about the reason for the absence of assignment.
-        A human-readable description can be obtained from the
-        :attr:`unassigned_target_ligand_descriptions` property.
-
-        Currently, the following reasons are reported:
-
-        * `no_ligand`: there was no ligand in the model.
-        * `disconnected`: the ligand graph was disconnected.
-        * `binding_site`: no residues were in proximity of the ligand.
-        * `model_representation`: no representation of the reference binding
-          site was found in the model. (I.e. the binding site was not modeled,
-          or the model ligand was positioned too far in combination with
-          `full_bs_search=False`)
-        * `identity`: the ligand was not found in the model (by graph
-          isomorphism). Check your ligand connectivity, and enable the
-          `substructure_match` option if the target ligand is incomplete.
-        * `stoichiometry`: there was a possible assignment in the model, but
-          the model ligand was already assigned to a different target ligand.
-          This indicates different stoichiometries.
-        * `symmetries`: too many symmetries were found (by graph isomorphisms).
-          Increase `max_symmetries`.
-        * `no_contact`: there were no lDDT contacts between the binding site
-          and the ligand, and lDDT-PLI is undefined. Increase the value of
-          `lddt_pli_radius` to at least the value of the binding site `radius`.
-
-        Some of these reasons can be overlapping, but a single reason will be
-        reported.
-
-        :rtype: :class:`dict`
-        """
-        if self._unassigned_target_ligand_short is None:
-            if self.rmsd_assignment:
-                self._assign_ligands_rmsd_only()
-            else:
-                self._assign_ligands_lddt_pli()
-            self._unassigned_target_ligand_short = {}
-            self._unassigned_target_ligand_descriptions = {}
-            for cname, res in self._unassigned_target_ligands.items():
-                self._unassigned_target_ligand_short[cname] = {}
-                for resnum, val in res.items():
-                    self._unassigned_target_ligand_short[cname][resnum] = val[0]
-                    self._unassigned_target_ligand_descriptions[val[0]] = val[1]
-        return self._unassigned_target_ligand_short
-
-    @property
-    def unassigned_target_ligand_descriptions(self):
-        """Get a human-readable description of why target ligands were
-        unassigned, as a dictionary keyed by the controlled dictionary
-        from :attr:`unassigned_target_ligands`.
-        """
-        if self._unassigned_target_ligand_descriptions is None:
-            _ = self.unassigned_target_ligands  # assigned there
-        return self._unassigned_target_ligand_descriptions
-
-    @property
-    def unassigned_model_ligands(self):
-        """Get a dictionary of model ligands not assigned to any target ligand,
-        keyed by model ligand (chain name, :class:`~ost.mol.ResNum`).
-
-        The assignment for the lDDT-PLI score is used (and is controlled
-        by the `rmsd_assignment` argument).
-
-        Each item contains a string from a controlled dictionary
-        about the reason for the absence of assignment.
-        A human-readable description can be obtained from the
-        :attr:`unassigned_model_ligand_descriptions` property.
-        Currently, the following reasons are reported:
-
-        * `no_ligand`: there was no ligand in the target.
-        * `disconnected`: the ligand graph is disconnected.
-        * `binding_site`: a potential assignment was found in the target, but
-          there were no polymer residues in proximity of the ligand in the
-          target.
-        * `model_representation`: a potential assignment was found in the target,
-          but no representation of the binding site was found in the model.
-          (I.e. the binding site was not modeled, or the model ligand was
-          positioned too far in combination with `full_bs_search=False`)
-        * `identity`: the ligand was not found in the target (by graph
-          isomorphism). Check your ligand connectivity, and enable the
-          `substructure_match` option if the target ligand is incomplete.
-        * `stoichiometry`: there was a possible assignment in the target, but
-          the model target was already assigned to a different model ligand.
-          This indicates different stoichiometries.
-        * `symmetries`: too many symmetries were found (by graph isomorphisms).
-          Increase `max_symmetries`.
-        * `no_contact`: there were no lDDT contacts between the binding site
-          and the ligand in the target structure, and lDDT-PLI is undefined.
-          Increase the value of `lddt_pli_radius` to at least the value of the
-          binding site `radius`.
-
-        Some of these reasons can be overlapping, but a single reason will be
-        reported.
-
-        :rtype: :class:`dict`
-        """
-        if self._unassigned_model_ligand_short is None:
-            if self.rmsd_assignment:
-                self._assign_ligands_rmsd_only()
-            else:
-                self._assign_ligands_lddt_pli()
-            self._unassigned_model_ligand_short = {}
-            self._unassigned_model_ligand_descriptions = {}
-            for cname, res in self._unassigned_model_ligands.items():
-                self._unassigned_model_ligand_short[cname] = {}
-                for resnum, val in res.items():
-                    self._unassigned_model_ligand_short[cname][resnum] = val[0]
-                    self._unassigned_model_ligand_descriptions[val[0]] = val[1]
-        return self._unassigned_model_ligand_short
-
-    @property
-    def unassigned_model_ligand_descriptions(self):
-        """Get a human-readable description of why model ligands were
-        unassigned, as a dictionary keyed by the controlled dictionary
-        from :attr:`unassigned_model_ligands`.
-        """
-        if self._unassigned_model_ligand_descriptions is None:
-            _ = self.unassigned_model_ligands  # assigned there
-        return self._unassigned_model_ligand_descriptions
-
-    @property
-    def mappable_atoms(self):
+    def _mappable_atoms(self):
         """ Stores mappable atoms given a chain mapping
 
         Store for each ref_ch,mdl_ch pair all mdl atoms that can be
@@ -2095,14 +2091,14 @@ class LigandScorer:
         operate on Copied EntityHandle objects without corresponding hashes.
         Given a tuple defining c_pair: (ref_cname, mdl_cname), one
         can check if a certain atom is mappable by evaluating:
-        if (mdl_r.GetNumber(), mdl_a.GetName()) in self.mappable_atoms(c_pair)
+        if (mdl_r.GetNumber(), mdl_a.GetName()) in self._mappable_atoms(c_pair)
         """
-        if self._mappable_atoms is None:
-            self._mappable_atoms = dict()
-            for (ref_cname, mdl_cname), aln in self.ref_mdl_alns.items():
+        if self.__mappable_atoms is None:
+            self.__mappable_atoms = dict()
+            for (ref_cname, mdl_cname), aln in self._ref_mdl_alns.items():
                 self._mappable_atoms[(ref_cname, mdl_cname)] = set()
-                ref_ch = self.chain_mapper.target.Select(f"cname={mol.QueryQuoteName(ref_cname)}")
-                mdl_ch = self.chain_mapping_mdl.Select(f"cname={mol.QueryQuoteName(mdl_cname)}")
+                ref_ch = self._chain_mapper.target.Select(f"cname={mol.QueryQuoteName(ref_cname)}")
+                mdl_ch = self._chain_mapping_mdl.Select(f"cname={mol.QueryQuoteName(mdl_cname)}")
                 aln.AttachView(0, ref_ch)
                 aln.AttachView(1, mdl_ch)
                 for col in aln:
@@ -2113,9 +2109,9 @@ class LigandScorer:
                             if ref_r.FindAtom(mdl_a.name).IsValid():
                                 c_key = (ref_cname, mdl_cname)
                                 at_key = (mdl_r.GetNumber(), mdl_a.name)
-                                self._mappable_atoms[c_key].add(at_key)
+                                self.__mappable_atoms[c_key].add(at_key)
 
-        return self._mappable_atoms
+        return self.__mappable_atoms
 
     def _find_unassigned_model_ligand_reason(self, ligand, assignment="lddt_pli", check=True):
         # Is this a model ligand?
@@ -2253,40 +2249,40 @@ class LigandScorer:
         return ("identity", "Ligand was not found in the model (by %s)" % iso)
 
     @property
-    def chem_mapping(self):
-        if self._chem_mapping is None:
-            self._chem_mapping, self._chem_group_alns, \
-            self._chain_mapping_mdl = \
-            self.chain_mapper.GetChemMapping(self.model)
-        return self._chem_mapping
+    def _chem_mapping(self):
+        if self.__chem_mapping is None:
+            self.__chem_mapping, self.__chem_group_alns, \
+            self.__chain_mapping_mdl = \
+            self._chain_mapper.GetChemMapping(self.model)
+        return self.__chem_mapping
 
     @property
-    def chem_group_alns(self):
-        if self._chem_group_alns is None:   
-            self._chem_mapping, self._chem_group_alns, \
-            self._chain_mapping_mdl = \
-            self.chain_mapper.GetChemMapping(self.model)
-        return self._chem_group_alns
+    def _chem_group_alns(self):
+        if self.__chem_group_alns is None:   
+            self.__chem_mapping, self.__chem_group_alns, \
+            self.__chain_mapping_mdl = \
+            self._chain_mapper.GetChemMapping(self.model)
+        return self.__chem_group_alns
 
     @property
-    def ref_mdl_alns(self):
-        if self._ref_mdl_alns is None:
-            self._ref_mdl_alns = \
-            chain_mapping._GetRefMdlAlns(self.chain_mapper.chem_groups,
-                                         self.chain_mapper.chem_group_alignments,
-                                         self.chem_mapping,
-                                         self.chem_group_alns)
-        return self._ref_mdl_alns
+    def _ref_mdl_alns(self):
+        if self.__ref_mdl_alns is None:
+            self.__ref_mdl_alns = \
+            chain_mapping._GetRefMdlAlns(self._chain_mapper.chem_groups,
+                                         self._chain_mapper.chem_group_alignments,
+                                         self._chem_mapping,
+                                         self._chem_group_alns)
+        return self.__ref_mdl_alns
   
     @property
-    def chain_mapping_mdl(self):
-        if self._chain_mapping_mdl is None:   
-            self._chem_mapping, self._chem_group_alns, \
-            self._chain_mapping_mdl = \
-            self.chain_mapper.GetChemMapping(self.model)
-        return self._chain_mapping_mdl
+    def _chain_mapping_mdl(self):
+        if self.__chain_mapping_mdl is None:   
+            self.__chem_mapping, self.__chem_group_alns, \
+            self.__chain_mapping_mdl = \
+            self._chain_mapper.GetChemMapping(self.model)
+        return self.__chain_mapping_mdl
 
-    def get_get_repr_input(self, mdl_ligand):
+    def _get_get_repr_input(self, mdl_ligand):
         if mdl_ligand.handle.hash_code not in self._get_repr_input:
 
             # figure out what chains in the model are in contact with the ligand
@@ -2295,8 +2291,8 @@ class LigandScorer:
             radius = self.model_bs_radius
             chains = set()
             for at in mdl_ligand.atoms:
-                close_atoms = self.chain_mapping_mdl.FindWithin(at.GetPos(),
-                                                                radius)
+                close_atoms = self._chain_mapping_mdl.FindWithin(at.GetPos(),
+                                                                 radius)
                 for close_at in close_atoms:
                     chains.add(close_at.GetChain().GetName())
 
@@ -2305,11 +2301,11 @@ class LigandScorer:
                 # the chain mapping model which only contains close chains
                 query = "cname="
                 query += ','.join([mol.QueryQuoteName(x) for x in chains])
-                mdl = self.chain_mapping_mdl.Select(query)
+                mdl = self._chain_mapping_mdl.Select(query)
 
                 # chem mapping which is reduced to the respective chains
                 chem_mapping = list()
-                for m in self.chem_mapping:
+                for m in self._chem_mapping:
                     chem_mapping.append([x for x in m if x in chains]) 
 
                 self._get_repr_input[mdl_ligand.handle.hash_code] = \
@@ -2317,15 +2313,15 @@ class LigandScorer:
 
             else:
                 self._get_repr_input[mdl_ligand.handle.hash_code] = \
-                (self.chain_mapping_mdl.CreateEmptyView(),
-                 [list() for _ in self.chem_mapping])
+                (self._chain_mapping_mdl.CreateEmptyView(),
+                 [list() for _ in self._chem_mapping])
 
         return (self._get_repr_input[mdl_ligand.hash_code][1],
-                self.chem_group_alns,
+                self._chem_group_alns,
                 self._get_repr_input[mdl_ligand.hash_code][0])
 
 
-    def get_repr(self, target_ligand, model_ligand):
+    def _get_repr(self, target_ligand, model_ligand):
 
         key = None
         if self.full_bs_search:
@@ -2335,16 +2331,16 @@ class LigandScorer:
             key = (target_ligand.handle.hash_code, model_ligand.handle.hash_code)
 
         if key not in self._repr:
-            ref_bs = self.get_target_binding_site(target_ligand)
+            ref_bs = self._get_target_binding_site(target_ligand)
             if self.full_bs_search:
-                reprs = self.chain_mapper.GetRepr(
+                reprs = self._chain_mapper.GetRepr(
                     ref_bs, self.model, inclusion_radius=self.lddt_lp_radius,
                     topn=self.binding_sites_topn)
             else:
-                reprs = self.chain_mapper.GetRepr(ref_bs, self.model,
-                                                  inclusion_radius=self.lddt_lp_radius,
-                                                  topn=self.binding_sites_topn,
-                                                  chem_mapping_result = self.get_get_repr_input(model_ligand))
+                reprs = self._chain_mapper.GetRepr(ref_bs, self.model,
+                                                   inclusion_radius=self.lddt_lp_radius,
+                                                   topn=self.binding_sites_topn,
+                                                   chem_mapping_result = self._get_get_repr_input(model_ligand))
             self._repr[key] = reprs
             if len(reprs) == 0:
                 # whatever is in there already has precedence
