@@ -739,6 +739,7 @@ class TestLigandScoring(unittest.TestCase):
 
         sc = LigandScorer(mdl, trg, target_ligands=[trg_zn, trg_g3d],
                           coverage_delta=0, substructure_match=True)
+
         self.assertTrue(np.isnan(sc.rmsd_matrix[0, 3]))
         self.assertEqual(sc.unassigned_target_ligands["H"][1], "binding_site")
 
@@ -793,7 +794,7 @@ class TestLigandScoring(unittest.TestCase):
     def test_added_mdl_contacts(self):
 
         # binding site for ligand in chain G consists of chains A and B
-        prot = _LoadMMCIF("1r8q.cif.gz")
+        prot = _LoadMMCIF("1r8q.cif.gz").Copy()
 
         # model has the full binding site
         mdl = mol.CreateEntityFromView(prot.Select("cname=A,B,G"), True)
