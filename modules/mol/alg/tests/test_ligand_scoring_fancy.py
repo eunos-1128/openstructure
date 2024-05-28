@@ -424,6 +424,19 @@ class TestLigandScoringFancy(unittest.TestCase):
                                B_count/(A_count + B_count - TRP66_count + \
                                lig.GetAtomCount()), 5)
 
+    def test_assignment(self):
+        trg = _LoadMMCIF("1r8q.cif.gz")
+        mdl = _LoadMMCIF("P84080_model_02.cif.gz")
+        sc = ligand_scoring_scrmsd.SCRMSDScorer(mdl, trg)
+        self.assertEqual(sc.assignment, [(1, 0)])
+
+        sc = ligand_scoring_lddtpli.LDDTPLIScorer(mdl, trg)
+        self.assertEqual(sc.assignment, [(5, 0)])
+
+
+
+
+
 
 if __name__ == "__main__":
     from ost import testutils

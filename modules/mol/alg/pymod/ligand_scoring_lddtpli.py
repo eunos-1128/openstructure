@@ -68,6 +68,9 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
 
         return (score, state, result)
 
+    def _score_dir(self):
+        return '+'
+
     def _compute_lddt_pli_add_mdl_contacts(self, symmetries, target_ligand,
                                            model_ligand):
 

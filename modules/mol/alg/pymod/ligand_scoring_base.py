@@ -67,6 +67,8 @@ class LigandScorer:
         self._coverage_matrix = None
         self._aux_data = None
 
+        self._assignment = None
+
     @property
     def states(self):
         """ Encodes states of ligand pairs
@@ -144,6 +146,60 @@ class LigandScorer:
         if self._aux_matrix is None:
             self._compute_scores()
         return self._aux_matrix
+
+    @property
+    def assignment(self):
+        """ Ligand assignment based on computed scores
+
+        Implements a greedy algorithm to assign target and model ligands
+        with each other. Starts from each valid ligand pair as indicated
+        by a state of 0 in :attr:`states`. Each iteration first selects
+        high coverage pairs. Given max_coverage defined as the highest
+        coverage observed in the available pairs, all pairs with coverage
+        in [max_coverage-*coverage_delta*, max_coverage] are selected.
+        The best scoring pair among those is added to the assignment
+        and the whole process is repeated until there are no ligands to
+        assign anymore.
+
+        :rtype: :class:`list`: of :class:`tuple` (trg_lig_idx, mdl_lig_idx)
+        """
+        if self._assignment is None:
+            self._assignment = list()
+            # Build working array that contains tuples for all mdl/trg ligand
+            # pairs with valid score as indicated by a state of 0:
+            # (score, coverage, trg_ligand_idx, mdl_ligand_idx)
+            tmp = list()
+            for trg_idx in range(self.score_matrix.shape[0]):
+                for mdl_idx in range(self.score_matrix.shape[1]):
+                    if self.states[trg_idx, mdl_idx] == 0:
+                        tmp.append((self.score_matrix[trg_idx, mdl_idx],
+                                    self.coverage_matrix[trg_idx, mdl_idx],
+                                    trg_idx, mdl_idx))
+
+            # sort by score, such that best scoring item is in front
+            if self._score_dir() == '+':
+                tmp.sort(reverse=True)
+            elif self._score_dir() == '-':
+                tmp.sort()
+            else:
+                raise RuntimeError("LigandScorer._score_dir must return on in "
+                                   "['+', '-']")
+
+            while len(tmp) > 0:
+                # select high coverage ligand pairs in working array
+                coverage_thresh = max([x[1] for x in tmp]) - self.coverage_delta
+                top_coverage = [x for x in tmp if x[1] >= coverage_thresh]
+
+                # working array is sorted by score => just pick first one
+                a = top_coverage[0][2] # selected trg_ligand_idx
+                b = top_coverage[0][3] # selected mdl_ligand_idx
+                self._assignment.append((a, b))
+
+                # kick out remaining pairs involving these ligands
+                tmp = [x for x in tmp if (x[2] != a and x[3] != b)]
+
+        return self._assignment
+
 
     @property
     def chain_mapper(self):
@@ -397,6 +453,15 @@ class LigandScorer:
                   Child specific non-zero states must be >= 10.
         """
         raise NotImplementedError("_compute must be implemented by child class")
+
+    def _score_dir(self):
+        """ Return direction of score - defined by child class
+
+        Relevant for ligand assignment. Must return a string in ['+', '-'].
+        '+' for ascending scores, i.e. higher is better (lddt etc.)
+        '-' for descending scores, i.e. lower is better (rmsd etc.)
+        """
+        raise NotImplementedError("_score_dir must be implemented by child class")
 
 
 def _ResidueToGraph(residue, by_atom_index=False):

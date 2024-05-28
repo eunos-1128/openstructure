@@ -90,6 +90,9 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
 
         return (best_rmsd, error_state, best_rmsd_result)
 
+    def _score_dir(self):
+        return '-'
+
     def _get_repr(self, target_ligand, model_ligand):
 
         key = None
