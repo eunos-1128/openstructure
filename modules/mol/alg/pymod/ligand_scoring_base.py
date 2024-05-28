@@ -6,6 +6,167 @@ from ost import LogWarning, LogScript, LogVerbose, LogDebug
 from ost.mol.alg import chain_mapping
 
 class LigandScorer:
+    """ Scorer class to compute various small molecule ligand (non polymer) scores.
+
+    .. note ::
+      Extra requirements:
+
+      - Python modules `numpy` and `networkx` must be available
+        (e.g. use ``pip install numpy networkx``)
+
+    :class:`LigandScorer` is an abstract base class dealing with all the setup,
+    data storage, enumerating ligand symmetries and target/model ligand
+    matching/assignment. But actual score computation is delegated to child classes.
+
+    At the moment, two such classes are available:
+
+    * :class:`LDDTPLIScorer` that assesses the conservation of protein-ligand
+      contacts
+    * :class:`SCRMSDScorer` that computes a binding-site superposed,
+      symmetry-corrected RMSD.
+
+    By default, only exact matches between target and model ligands are
+    considered. This is a problem when the target only contains a subset
+    of the expected atoms (for instance if atoms are missing in an
+    experimental structure, which often happens in the PDB). With
+    `substructure_match=True`, complete model ligands can be scored against
+    partial target ligands. One problem with this approach is that it is
+    very easy to find good matches to small, irrelevant ligands like EDO, CO2
+    or GOL. To counter that, the assignment algorithm considers the coverage,
+    expressed as the fraction of atoms of the model ligand atoms covered in the
+    target. Higher coverage matches are prioritized, but a match with a better
+    score will be preferred if it falls within a window of `coverage_delta`
+    (by default 0.2) of a worse-scoring match. As a result, for instance,
+    with a delta of 0.2, a low-score match with coverage 0.96 would be
+    preferred over a high-score match with coverage 0.70.
+
+    Assumptions:
+
+    :class:`LigandScorer` generally assumes that the
+    :attr:`~ost.mol.ResidueHandle.is_ligand` property is properly set on all
+    the ligand atoms, and only ligand atoms. This is typically the case for
+    entities loaded from mmCIF (tested with mmCIF files from the PDB and
+    SWISS-MODEL). Legacy PDB files must contain `HET` headers (which is usually
+    the case for files downloaded from the PDB but not elsewhere).
+
+    The class doesn't perform any cleanup of the provided structures.
+    It is up to the caller to ensure that the data is clean and suitable for
+    scoring. :ref:`Molck <molck>` should be used with extra
+    care, as many of the options (such as `rm_non_std` or `map_nonstd_res`) can
+    cause ligands to be removed from the structure. If cleanup with Molck is
+    needed, ligands should be kept aside and passed separately. Non-ligand residues
+    should be valid compounds with atom names following the naming conventions
+    of the component dictionary. Non-standard residues are acceptable, and if
+    the model contains a standard residue at that position, only atoms with
+    matching names will be considered.
+
+    Unlike most of OpenStructure, this class does not assume that the ligands
+    (either in the model or the target) are part of the PDB component
+    dictionary. They may have arbitrary residue names. Residue names do not
+    have to match between the model and the target. Matching is based on
+    the calculation of isomorphisms which depend on the atom element name and
+    atom connectivity (bond order is ignored).
+    It is up to the caller to ensure that the connectivity of atoms is properly
+    set before passing any ligands to this class. Ligands with improper
+    connectivity will lead to bogus results.
+
+    Note, however, that atom names should be unique within a residue (ie two
+    distinct atoms cannot have the same atom name).
+
+    This only applies to the ligand. The rest of the model and target
+    structures (protein, nucleic acids) must still follow the usual rules and
+    contain only residues from the compound library.
+
+    Although it isn't a requirement, hydrogen atoms should be removed from the
+    structures. Here is an example code snippet that will perform a reasonable
+    cleanup. Keep in mind that this is most likely not going to work as
+    expected with entities loaded from PDB files, as the `is_ligand` flag is
+    probably not set properly.
+
+    Here is a snippet example of how to use this code::
+
+        from ost.mol.alg.ligand_scoring_scrmsd import SCRMSDScorer
+        from ost.mol.alg import Molck, MolckSettings
+
+        # Load data
+        # Structure model in PDB format, containing the receptor only
+        model = io.LoadPDB("path_to_model.pdb")
+        # Ligand model as SDF file
+        model_ligand = io.LoadEntity("path_to_ligand.sdf", format="sdf")
+        # Target loaded from mmCIF, containing the ligand
+        target = io.LoadMMCIF("path_to_target.cif")
+
+        # Cleanup a copy of the structures
+        cleaned_model = model.Copy()
+        cleaned_target = target.Copy()
+        molck_settings = MolckSettings(rm_unk_atoms=True,
+                                       rm_non_std=False,
+                                       rm_hyd_atoms=True,
+                                       rm_oxt_atoms=False,
+                                       rm_zero_occ_atoms=False,
+                                       colored=False,
+                                       map_nonstd_res=False,
+                                       assign_elem=True)
+        Molck(cleaned_model, conop.GetDefaultLib(), molck_settings)
+        Molck(cleaned_target, conop.GetDefaultLib(), molck_settings)
+
+        # Setup scorer object and compute lDDT-PLI
+        model_ligands = [model_ligand.Select("ele != H")]
+        ls = SCRMSDScorer(cleaned_model, cleaned_target, model_ligands)
+
+    :param model: Model structure - a deep copy is available as :attr:`model`.
+                  No additional processing (ie. Molck), checks,
+                  stereochemistry checks or sanitization is performed on the
+                  input. Hydrogen atoms are kept.
+    :type model: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
+    :param target: Target structure - a deep copy is available as :attr:`target`.
+                  No additional processing (ie. Molck), checks or sanitization
+                  is performed on the input. Hydrogen atoms are kept.
+    :type target: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
+    :param model_ligands: Model ligands, as a list of
+                  :class:`~ost.mol.ResidueHandle` belonging to the model
+                  entity. Can be instantiated with either a :class:list of
+                  :class:`~ost.mol.ResidueHandle`/:class:`ost.mol.ResidueView`
+                  or of :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`.
+                  If `None`, ligands will be extracted based on the
+                  :attr:`~ost.mol.ResidueHandle.is_ligand` flag (this is
+                  normally set properly in entities loaded from mmCIF).
+    :type model_ligands: :class:`list`
+    :param target_ligands: Target ligands, as a list of
+                  :class:`~ost.mol.ResidueHandle` belonging to the target
+                  entity. Can be instantiated either a :class:list of
+                  :class:`~ost.mol.ResidueHandle`/:class:`ost.mol.ResidueView`
+                  or of :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
+                  containing a single residue each.
+                  If `None`, ligands will be extracted based on the
+                  :attr:`~ost.mol.ResidueHandle.is_ligand` flag (this is
+                  normally set properly in entities loaded from mmCIF).
+    :type target_ligands: :class:`list`
+    :param resnum_alignments: Whether alignments between chemically equivalent
+                              chains in *model* and *target* can be computed
+                              based on residue numbers. This can be assumed in
+                              benchmarking setups such as CAMEO/CASP.
+    :type resnum_alignments: :class:`bool`
+    :param rename_ligand_chain: If a residue with the same chain name and
+                                residue number than an explicitly passed model
+                                or target ligand exits in the structure,
+                                and `rename_ligand_chain` is False, a
+                                RuntimeError will be raised. If
+                                `rename_ligand_chain` is True, the ligand will
+                                be moved to a new chain instead, and the move
+                                will be logged to the console with SCRIPT
+                                level.
+    :type rename_ligand_chain: :class:`bool`
+    :param substructure_match: Set this to True to allow incomplete (ie
+                               partially resolved) target ligands.
+    :type substructure_match: :class:`bool`
+    :param coverage_delta: the coverage delta for partial ligand assignment.
+    :type coverage_delta: :class:`float`
+    :param max_symmetries: If more than that many isomorphisms exist for
+                       a target-ligand pair, it will be ignored and reported
+                       as unassigned.
+    :type max_symmetries: :class:`int`
+    """
 
     def __init__(self, model, target, model_ligands=None, target_ligands=None,
                  resnum_alignments=False, rename_ligand_chain=False,
@@ -84,7 +245,7 @@ class LigandScorer:
              You might be able to get a match by increasing *max_symmetries*.
         * 3: Ligand pair has no isomorphic symmetries - cannot be matched.
              Target ligand is subgraph of model ligand. This error only occurs
-             if *substructure_match* is False. These cases will likely become
+             if *substructure_match* is False. These cases may become
              0 if this flag is enabled.
         * 4: Disconnected graph error - cannot be matched.
              Either target ligand or model ligand has disconnected graph.
@@ -137,9 +298,10 @@ class LigandScorer:
 
         Auxiliary data consists of arbitrary data dicts which allow a child
         class to provide additional information for a scored ligand pair.
-        empty dictionaries indicate that no value could be computed
-        (i.e. different ligands). In other words: values are only valid if
-        respective location :attr:`~states` is 0.
+        empty dictionaries indicate that the child class simply didn't return
+        anything or that no value could be computed (e.g. different ligands).
+        In other words: values are only valid if respective location
+        :attr:`~states` is 0.
 
         :rtype: :class:`~numpy.ndarray`
         """
@@ -182,7 +344,7 @@ class LigandScorer:
             elif self._score_dir() == '-':
                 tmp.sort()
             else:
-                raise RuntimeError("LigandScorer._score_dir must return on in "
+                raise RuntimeError("LigandScorer._score_dir must return one in "
                                    "['+', '-']")
 
             while len(tmp) > 0:
