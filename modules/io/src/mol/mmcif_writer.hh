@@ -30,6 +30,18 @@
 
 namespace ost { namespace io {
 
+// generates as many chain names as you want (potentially multiple characters)
+struct ChainNameGenerator{
+  ChainNameGenerator();
+
+  String Get();
+
+  void Reset();
+
+  String chain_names;
+  int n_chain_names;
+  std::vector<int> indices;
+};
 
 struct MMCifWriterEntity {
 

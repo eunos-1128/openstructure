@@ -152,6 +152,11 @@ void export_mmcif_io()
     .def("Write", &WrapStarWriterWrite, (arg("data_name"), arg("filename")))
   ;
 
+  class_<ChainNameGenerator>("ChainNameGenerator", init<>())
+    .def("Get", &ChainNameGenerator::Get)
+    .def("Reset", &ChainNameGenerator::Reset)
+    ;
+
   class_<MMCifWriterEntity>("MMCifWriterEntity", no_init)
     .def("FromPolymer", &MMCifWriterEntity::FromPolymer).staticmethod("FromPolymer")
     .def("AddHet", &MMCifWriterEntity::AddHet, (arg("rnum"), arg("mon_id")))

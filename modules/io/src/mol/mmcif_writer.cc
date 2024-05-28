@@ -24,52 +24,6 @@
 
 namespace {
 
-  // generates as many chain names as you want (potentially multiple characters)
-  struct ChainNameGenerator{
-    ChainNameGenerator() { 
-      chain_names = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz";
-      n_chain_names = chain_names.size();
-      indices.push_back(-1);
-    }
-
-    String Get() {
-      int idx = indices.size() - 1;
-      indices[idx] += 1;
-      bool more_digits = false;
-      while(idx >= 0) {
-        if(indices[idx] >= n_chain_names) {
-          indices[idx] = 0;
-          if(idx>0) {
-            indices[idx-1] += 1;
-            --idx;
-          } else {
-            more_digits = true;
-            break;
-          }
-        } else {
-          break;
-        }
-      }
-      if(more_digits) {
-        indices.insert(indices.begin(), 0);
-      }
-      String ch_name(indices.size(), 'X');
-      for(uint i = 0; i < indices.size(); ++i) {
-        ch_name[i] = chain_names[indices[i]];
-      }
-      return ch_name;
-    }
-
-    void Reset() {
-      indices.clear();
-      indices.push_back(-1);
-    }
-
-    String chain_names;
-    int n_chain_names;
-    std::vector<int> indices;
-  };
-
   void CheckValidEntityPolyType(const String& entity_poly_type) {
     std::unordered_set<std::string> s = {"cyclic-pseudo-peptide",
                                          "other",
@@ -1066,7 +1020,7 @@ namespace {
                                  "is not mmcif_conform");
     }
 
-    ChainNameGenerator chain_name_gen;
+    ost::io::ChainNameGenerator chain_name_gen;
 
     std::set<String> unique_compounds;
     for(auto res_list: res_lists) {
@@ -1464,6 +1418,45 @@ namespace {
 } // ns
 
 namespace ost { namespace io {
+
+ChainNameGenerator::ChainNameGenerator() {
+  chain_names = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz";
+  n_chain_names = chain_names.size();
+  indices.push_back(-1);
+}
+
+String ChainNameGenerator::Get() {
+  int idx = indices.size() - 1;
+  indices[idx] += 1;
+  bool more_digits = false;
+  while(idx >= 0) {
+    if(indices[idx] >= n_chain_names) {
+      indices[idx] = 0;
+      if(idx>0) {
+        indices[idx-1] += 1;
+        --idx;
+      } else {
+        more_digits = true;
+        break;
+      }
+    } else {
+      break;
+    }
+  }
+  if(more_digits) {
+    indices.insert(indices.begin(), 0);
+  }
+  String ch_name(indices.size(), 'X');
+  for(uint i = 0; i < indices.size(); ++i) {
+    ch_name[i] = chain_names[indices[i]];
+  }
+  return ch_name;
+}
+
+void ChainNameGenerator::Reset() {
+  indices.clear();
+  indices.push_back(-1);
+}
 
 MMCifWriterEntity MMCifWriterEntity::FromPolymer(const String& entity_poly_type,
                                                  const std::vector<String>& mon_ids,
