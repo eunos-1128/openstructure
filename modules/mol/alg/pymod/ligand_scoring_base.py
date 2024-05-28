@@ -57,10 +57,10 @@ class LigandScorer:
         # lazily computed attributes
         self._chain_mapper = None
 
-        # keep track of error states
+        # keep track of states
         # simple integers instead of enums - documentation of property describes
         # encoding
-        self._error_states = None
+        self._states = None
 
         # score matrices
         self._score_matrix = None
@@ -68,16 +68,15 @@ class LigandScorer:
         self._aux_data = None
 
     @property
-    def error_states(self):
-        """ Encodes error states of ligand pairs
+    def states(self):
+        """ Encodes states of ligand pairs
 
-        Not only critical things, but also things like: a pair of ligands
-        simply doesn't match. Target ligands are in rows, model ligands in
-        columns. States are encoded as integers <= 9. Larger numbers encode
-        errors for child classes.
+        Expect a valid score if respective location in this matrix is 0.
+        Target ligands are in rows, model ligands in columns. States are encoded
+        as integers <= 9. Larger numbers encode errors for child classes.
         
         * -1: Unknown Error - cannot be matched
-        * 0: Ligand pair has valid symmetries - can be matched.
+        * 0: Ligand pair can be matched and valid score is computed.
         * 1: Ligand pair has no valid symmetry - cannot be matched.
         * 2: Ligand pair has too many symmetries - cannot be matched. 
              You might be able to get a match by increasing *max_symmetries*.
@@ -90,9 +89,9 @@ class LigandScorer:
 
         :rtype: :class:`~numpy.ndarray`
         """
-        if self._error_states is None:
+        if self._states is None:
             self._compute_scores()
-        return self._error_states
+        return self._states
 
     @property
     def score_matrix(self):
@@ -102,7 +101,7 @@ class LigandScorer:
 
         NaN values indicate that no value could be computed (i.e. different
         ligands). In other words: values are only valid if respective location
-        :attr:`~error_states` is 0. 
+        :attr:`~states` is 0. 
 
         :rtype: :class:`~numpy.ndarray`
         """
@@ -118,7 +117,7 @@ class LigandScorer:
 
         NaN values indicate that no value could be computed (i.e. different
         ligands). In other words: values are only valid if respective location
-        :attr:`~error_states` is 0. If `substructure_match=False`, only full
+        :attr:`~states` is 0. If `substructure_match=False`, only full
         match isomorphisms are considered, and therefore only values of 1.0
         can be observed.
 
@@ -138,7 +137,7 @@ class LigandScorer:
         class to provide additional information for a scored ligand pair.
         empty dictionaries indicate that no value could be computed
         (i.e. different ligands). In other words: values are only valid if
-        respective location :attr:`~error_states` is 0.
+        respective location :attr:`~states` is 0.
 
         :rtype: :class:`~numpy.ndarray`
         """
@@ -301,7 +300,7 @@ class LigandScorer:
         shape = (len(self.target_ligands), len(self.model_ligands))
         self._score_matrix = np.full(shape, np.nan, dtype=np.float32)
         self._coverage_matrix = np.full(shape, np.nan, dtype=np.float32)
-        self._error_states = np.full(shape, -1, dtype=np.int32)
+        self._states = np.full(shape, -1, dtype=np.int32)
         self._aux_data = np.empty(shape, dtype=dict)
 
         for target_id, target_ligand in enumerate(self.target_ligands):
@@ -324,42 +323,45 @@ class LigandScorer:
                     # Ligands are different - skip
                     LogVerbose("No symmetry between %s and %s" % (
                         str(model_ligand), str(target_ligand)))
-                    self._error_states[target_id, model_id] = 1
+                    self._states[target_id, model_id] = 1
                     continue
                 except TooManySymmetriesError:
                     # Ligands are too symmetrical - skip
                     LogVerbose("Too many symmetries between %s and %s" % (
                         str(model_ligand), str(target_ligand)))
-                    self._error_states[target_id, model_id] = 2
+                    self._states[target_id, model_id] = 2
                     continue
                 except NoIsomorphicSymmetryError:
                     # Ligands are different - skip
                     LogVerbose("No isomorphic symmetry between %s and %s" % (
                         str(model_ligand), str(target_ligand)))
-                    self._error_states[target_id, model_id] = 3
+                    self._states[target_id, model_id] = 3
                     continue
                 except DisconnectedGraphError:
                     LogVerbose("Disconnected graph observed for %s and %s" % (
                         str(model_ligand), str(target_ligand)))
-                    self._error_states[target_id, model_id] = 4
+                    self._states[target_id, model_id] = 4
                     continue
 
                 #####################################################
                 # Compute score by calling the child class _compute #
                 #####################################################
-                score, error_state, aux = self._compute(symmetries, target_ligand,
-                                                        model_ligand)
+                score, state, aux = self._compute(symmetries, target_ligand,
+                                                  model_ligand)
 
                 ############
                 # Finalize #
                 ############
-                if error_state != 0:
+                if state != 0:
                     # non-zero error states up to 4 are reserved for base class
-                    if error_state <= 9:
+                    if state <= 9:
                         raise RuntimeError("Child returned reserved err. state")
 
-                self._error_states[target_id, model_id] = error_state
-                if error_state == 0:
+                self._states[target_id, model_id] = state
+                if state == 0:
+                    if score is None or np.isnan(score):
+                        raise RuntimeError("LigandScorer returned invalid "
+                                           "score despite 0 error state")
                     # it's a valid score!
                     self._score_matrix[target_id, model_id] = score
                     cvg = len(symmetries[0][0]) / len(model_ligand.atoms)
@@ -386,12 +388,13 @@ class LigandScorer:
                             :class:`ost.mol.ResidueView`
 
         :returns: A :class:`tuple` with three elements: 1) a score
-                  (:class:`float`) 2) error state (:class:`int`).
+                  (:class:`float`) 2) state (:class:`int`).
                   3) auxiliary data for this ligand pair (:class:`dict`).
-                  If error state is 0, the score and auxiliary data will be
+                  If state is 0, the score and auxiliary data will be
                   added to :attr:`~score_matrix` and :attr:`~aux_data` as well
                   as the respective value in :attr:`~coverage_matrix`.
-                  Child specific non-zero states MUST be >= 10.
+                  Returned score must be valid in this case (not None/NaN).
+                  Child specific non-zero states must be >= 10.
         """
         raise NotImplementedError("_compute must be implemented by child class")
 

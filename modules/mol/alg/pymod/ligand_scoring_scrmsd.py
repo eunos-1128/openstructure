@@ -9,11 +9,11 @@ from ost.mol.alg import ligand_scoring_base
 class SCRMSDScorer(ligand_scoring_base.LigandScorer):
 
     def __init__(self, model, target, model_ligands=None, target_ligands=None,
-        resnum_alignments=False, rename_ligand_chain=False,
-        substructure_match=False, coverage_delta=0.2,
-        max_symmetries=1e5, bs_radius=4.0, lddt_lp_radius=15.0,
-        model_bs_radius=25, binding_sites_topn=100000,
-        full_bs_search=False):
+                 resnum_alignments=False, rename_ligand_chain=False,
+                 substructure_match=False, coverage_delta=0.2,
+                 max_symmetries=1e5, bs_radius=4.0, lddt_lp_radius=15.0,
+                 model_bs_radius=25, binding_sites_topn=100000,
+                 full_bs_search=False):
 
 	    
         super().__init__(model, target, model_ligands = model_ligands,

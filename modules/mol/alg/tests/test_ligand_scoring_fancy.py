@@ -10,6 +10,7 @@ try:
     from ost.mol.alg.ligand_scoring_base import *
     from ost.mol.alg import ligand_scoring_base
     from ost.mol.alg import ligand_scoring_scrmsd
+    from ost.mol.alg import ligand_scoring_lddtpli
 except ImportError:
     print("Failed to import ligand_scoring.py. Happens when numpy, scipy or "
           "networkx is missing. Ignoring test_ligand_scoring.py tests.")
@@ -281,6 +282,7 @@ class TestLigandScoringFancy(unittest.TestCase):
         with self.assertRaises(NoSymmetryError):
             ligand_scoring_scrmsd.SCRMSD(trg_g3d1_sub, mdl_g3d)  # no full match
 
+
     def test_compute_rmsd_scores(self):
         """Test that _compute_scores works.
         """
@@ -299,6 +301,128 @@ class TestLigandScoringFancy(unittest.TestCase):
             [np.nan],
             [0.29399303],
             [np.nan]]), decimal=5)
+
+    def test_compute_lddtpli_scores(self):
+        trg = _LoadMMCIF("1r8q.cif.gz")
+        mdl = _LoadMMCIF("P84080_model_02.cif.gz")
+        mdl_lig = io.LoadEntity(os.path.join('testfiles', "P84080_model_02_ligand_0.sdf"))
+        sc = ligand_scoring_lddtpli.LDDTPLIScorer(mdl, trg, [mdl_lig], None,
+                                                  add_mdl_contacts = False,
+                                                  lddt_pli_binding_site_radius = 4.0)
+        self.assertEqual(sc.score_matrix.shape, (7, 1))
+        self.assertTrue(np.isnan(sc.score_matrix[0, 0]))
+        self.assertAlmostEqual(sc.score_matrix[1, 0], 0.99843, 5)
+        self.assertTrue(np.isnan(sc.score_matrix[2, 0]))
+        self.assertTrue(np.isnan(sc.score_matrix[3, 0]))
+        self.assertTrue(np.isnan(sc.score_matrix[4, 0]))
+        self.assertAlmostEqual(sc.score_matrix[5, 0], 1.0)
+        self.assertTrue(np.isnan(sc.score_matrix[6, 0]))
+
+    def test_check_resnames(self):
+        """Test that the check_resname argument works.
+
+        When set to True, it should raise an error if any residue in the
+        representation of the binding site in the model has a different
+        name than in the reference. Here we manually modify a residue
+        name to achieve that effect. This is only relevant for the LDDTPLIScorer
+        """
+        trg_4c0a = _LoadMMCIF("4c0a.cif.gz")
+        trg = trg_4c0a.Select("cname=C or cname=I")
+
+        # Here we modify the name of a residue in 4C0A (THR => TPO in C.15)
+        # This residue is in the binding site and should trigger the error
+        mdl = ost.mol.CreateEntityFromView(trg, include_exlusive_atoms=False)
+        ed = mdl.EditICS()
+        ed.RenameResidue(mdl.FindResidue("C", 15), "TPO")
+        ed.UpdateXCS()
+
+        with self.assertRaises(RuntimeError):
+            sc = ligand_scoring_lddtpli.LDDTPLIScorer(mdl, trg, [mdl.FindResidue("I", 1)], [trg.FindResidue("I", 1)], check_resnames=True)
+            sc._compute_scores()
+
+        sc = ligand_scoring_lddtpli.LDDTPLIScorer(mdl, trg, [mdl.FindResidue("I", 1)], [trg.FindResidue("I", 1)], check_resnames=False)
+        sc._compute_scores()
+
+    def test_added_mdl_contacts(self):
+
+        # binding site for ligand in chain G consists of chains A and B
+        prot = _LoadMMCIF("1r8q.cif.gz").Copy()
+
+        # model has the full binding site
+        mdl = mol.CreateEntityFromView(prot.Select("cname=A,B,G"), True)
+
+        # chain C has same sequence as chain A but is not in contact
+        # with ligand in chain G
+        # target has thus incomplete binding site only from chain B
+        trg = mol.CreateEntityFromView(prot.Select("cname=B,C,G"), True)
+
+        # if added model contacts are not considered, the incomplete binding
+        # site only from chain B is perfectly reproduced by model which also has
+        # chain B
+        sc = ligand_scoring_lddtpli.LDDTPLIScorer(mdl, trg, add_mdl_contacts=False)
+        self.assertAlmostEqual(sc.score_matrix[0,0], 1.0, 5)
+
+        # if added model contacts are considered, contributions from chain B are
+        # perfectly reproduced but all contacts of ligand towards chain A are
+        # added as penalty
+        sc = ligand_scoring_lddtpli.LDDTPLIScorer(mdl, trg, add_mdl_contacts=True)
+
+        lig = prot.Select("cname=G")
+        A_count = 0
+        B_count = 0
+        for a in lig.atoms:
+            close_atoms = mdl.FindWithin(a.GetPos(), sc.lddt_pli_radius)
+            for ca in close_atoms:
+                cname = ca.GetChain().GetName()
+                if cname == "G":
+                    pass # its a ligand atom...
+                elif cname == "A":
+                    A_count += 1
+                elif cname == "B":
+                    B_count += 1
+                
+        self.assertAlmostEqual(sc.score_matrix[0,0],
+                               B_count/(A_count + B_count), 5)
+
+        # Same as before but additionally we remove residue TRP.66 
+        # from chain C in the target to test mapping magic...
+        # Chain C is NOT in contact with the ligand but we only
+        # add contacts from chain A as penalty that are mappable
+        # to the closest chain with same sequence. That would be
+        # chain C
+        query = "cname=B,G or (cname=C and rnum!=66)"
+        trg = mol.CreateEntityFromView(prot.Select(query), True)
+        sc = ligand_scoring_lddtpli.LDDTPLIScorer(mdl, trg, add_mdl_contacts=True)
+
+        TRP66_count = 0
+        for a in lig.atoms:
+            close_atoms = mdl.FindWithin(a.GetPos(), sc.lddt_pli_radius)
+            for ca in close_atoms:
+                cname = ca.GetChain().GetName()
+                if cname == "A" and ca.GetResidue().GetNumber().GetNum() == 66:
+                    TRP66_count += 1
+
+        self.assertEqual(TRP66_count, 134)
+
+        # remove TRP66_count from original penalty
+        self.assertAlmostEqual(sc.score_matrix[0,0],
+                               B_count/(A_count + B_count - TRP66_count), 5)        
+
+        # Move a random atom in the model from chain B towards the ligand center
+        # chain B is also present in the target and interacts with the ligand,
+        # but that atom would be far away and thus adds to the penalty. Since
+        # the ligand is small enough, the number of added contacts should be
+        # exactly the number of ligand atoms.
+        mdl_ed = mdl.EditXCS()
+        at = mdl.FindResidue("B", mol.ResNum(8)).FindAtom("NZ")
+        mdl_ed.SetAtomPos(at, lig.geometric_center)
+        sc = ligand_scoring_lddtpli.LDDTPLIScorer(mdl, trg, add_mdl_contacts=True)
+
+        # compared to the last assertAlmostEqual, we add the number of ligand
+        # atoms as additional penalties
+        self.assertAlmostEqual(sc.score_matrix[0,0],
+                               B_count/(A_count + B_count - TRP66_count + \
+                               lig.GetAtomCount()), 5)
 
 
 if __name__ == "__main__":
