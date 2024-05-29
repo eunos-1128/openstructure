@@ -274,10 +274,6 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
                 if len(ref_bs.residues) == 0:
                     raise RuntimeError("Failed to add proximity residues to "
                                        "the reference binding site entity")
-            else:
-                # Flag missing binding site
-                self._unassigned_target_ligands_reason[target_ligand] = ("binding_site",
-                    "No residue in proximity of the target ligand")
 
             self._binding_sites[target_ligand.handle.hash_code] = ref_bs
 
