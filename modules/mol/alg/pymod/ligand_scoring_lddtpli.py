@@ -157,6 +157,8 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
         trg_ligand_res, scorer, chem_groups = \
         self._lddt_pli_get_trg_data(target_ligand)
 
+        trg_bs_center = trg_bs.geometric_center
+
         # Copy to make sure that we don't change anything on underlying
         # references
         # This is not strictly necessary in the current implementation but
@@ -395,12 +397,13 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
             # estimate a penalty for unsatisfied model contacts from chains
             # that are not in the local trg binding site, but can be mapped in
             # the target.
-            # We're using the trg chain with the closest geometric center that
-            # can be mapped to the mdl chain according the chem mapping.
-            # An alternative would be to search for the target chain with
-            # the minimal number of additional contacts.
+            # We're using the trg chain with the closest geometric center to
+            # the trg binding site that can be mapped to the mdl chain
+            # according the chem mapping. An alternative would be to search for
+            # the target chain with the minimal number of additional contacts.
             # There is not good solution for this problem...
             unmapped_chains = list()
+            already_mapped = set()
             for mdl_ch in mdl_chains:
                 if mdl_ch not in lddt_chain_mapping:
                     # check which chain in trg is closest
@@ -412,19 +415,20 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
                     if chem_group_idx is None:
                         raise RuntimeError("This should never happen... "
                                            "ask Gabriel...")
-                    mdl_ch_view = self._chain_mapping_mdl.FindChain(mdl_ch)
-                    mdl_center = mdl_ch_view.geometric_center
                     closest_ch = None
                     closest_dist = None
                     for trg_ch in self._chain_mapper.chem_groups[chem_group_idx]:
                         if trg_ch not in lddt_chain_mapping.values():
-                            c = self._chain_mapper.target.FindChain(trg_ch).geometric_center
-                            d = geom.Distance(mdl_center, c)
-                            if closest_dist is None or d < closest_dist:
-                                closest_dist = d
-                                closest_ch = trg_ch
+                            if trg_ch not in already_mapped:
+                                ch = self._chain_mapper.target.FindChain(trg_ch) 
+                                c = ch.geometric_center
+                                d = geom.Distance(trg_bs_center, c)
+                                if closest_dist is None or d < closest_dist:
+                                    closest_dist = d
+                                    closest_ch = trg_ch
                     if closest_ch is not None:
                         unmapped_chains.append((closest_ch, mdl_ch))
+                        already_mapped.add(closest_ch)
 
             for (trg_sym, mdl_sym) in symmetries:
 
