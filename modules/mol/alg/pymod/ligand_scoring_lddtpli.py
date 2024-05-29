@@ -10,12 +10,87 @@ from ost.mol.alg import chain_mapping
 from ost.mol.alg import ligand_scoring_base
 
 class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
+    """ :class:`LigandScorer` implementing lDDT-PLI.
+
+    lDDT-PLI is an lDDT score considering contacts between ligand and
+    receptor. Where receptor consists of protein and nucleic acid chains that
+    pass the criteria for :class:`chain mapping <ost.mol.alg.chain_mapping>`.
+    This means ignoring other ligands, waters, short polymers as well as any
+    incorrectly connected chains that may be in proximity.
+
+    Given a target/model ligand pair, all possible mappings of model chains
+    onto their chemically equivalent target chains are enumerated in order
+    to compute the best possible lDDT-PLI.
+
+    By default, classic lDDT is computed. That means, contacts within
+    *lddt_pli_radius* are identified in the target and checked if they're
+    conserved in the model. Added contacts are not penalized. That means if
+    the ligand is nicely placed in the correct pocket, but that pocket now
+    suddenly interacts with MORE residues in the model, you still get a high
+    score. You can penalize for these added contacts with the
+    *add_mdl_contacts* flag. This additionally considers contacts within
+    *lddt_pli_radius* in the model but only if the involved atoms can
+    be mapped to the target. This is a requirement to 1) extract the respective
+    reference distance from the target 2) avoid usage of contacts for which
+    we have no experimental evidence. One special case are
+    contacts from chains that are NOT mapped to the target binding site. It is
+    very well possible that we have experimental evidence for this chain though
+    its just too far away from the target binding site.
+    We therefore try to map these contacts to the chain in the target with
+    equivalent sequence that is closest to the target binding site. If the
+    respective atoms can be mapped there, the contact is considered not
+    fulfilled and added as penalty. 
+
+    :param model: Passed to parent constructor - see :class:`LigandScorer`.
+    :type model: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
+    :param target: Passed to parent constructor - see :class:`LigandScorer`.
+    :type target: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
+    :param model_ligands: Passed to parent constructor - see
+                          :class:`LigandScorer`.
+    :type model_ligands: :class:`list`
+    :param target_ligands: Passed to parent constructor - see
+                           :class:`LigandScorer`.
+    :type target_ligands: :class:`list`
+    :param resnum_alignments: Passed to parent constructor - see
+                              :class:`LigandScorer`.
+    :type resnum_alignments: :class:`bool`
+    :param rename_ligand_chain: Passed to parent constructor - see
+                                :class:`LigandScorer`.
+    :type rename_ligand_chain: :class:`bool`
+    :param substructure_match: Passed to parent constructor - see
+                               :class:`LigandScorer`.
+    :type substructure_match: :class:`bool`
+    :param coverage_delta: Passed to parent constructor - see
+                           :class:`LigandScorer`.
+    :type coverage_delta: :class:`float`
+    :param max_symmetries: Passed to parent constructor - see
+                           :class:`LigandScorer`.
+    :type max_symmetries: :class:`int`
+    :param check_resnames: On by default. Enforces residue name matches
+                           between mapped model and target residues.
+    :type check_resnames: :class:`bool`
+    :param lddt_pli_radius: lDDT inclusion radius for lDDT-PLI.
+    :type lddt_pli_radius: :class:`float`
+    :param add_mdl_contacts: Whether to add mdl contacts.
+    :type add_mdl_contacts: :class:`bool`
+    :param lddt_pli_thresholds: Distance difference thresholds for lDDT.
+    :type lddt_pli_thresholds: :class:`list` of :class:`float`
+    :param lddt_pli_binding_site_radius: Pro param - dont use. Providing a value
+                                         Restores behaviour from previous
+                                         implementation that first extracted a
+                                         binding site with strict distance
+                                         threshold and computed lDDT-PLI only on
+                                         those target residues whereas the
+                                         current implementation includes every
+                                         atom within *lddt_pli_radius*.
+    :type lddt_pli_binding_site_radius: :class:`float`
+    """
 
     def __init__(self, model, target, model_ligands=None, target_ligands=None,
                  resnum_alignments=False, rename_ligand_chain=False,
                  substructure_match=False, coverage_delta=0.2,
                  max_symmetries=1e5, check_resnames=True, lddt_pli_radius=6.0,
-                 add_mdl_contacts=True,
+                 add_mdl_contacts=False,
                  lddt_pli_thresholds = [0.5, 1.0, 2.0, 4.0],
                  lddt_pli_binding_site_radius=None):
 
@@ -341,9 +416,9 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
                     mdl_center = mdl_ch_view.geometric_center
                     closest_ch = None
                     closest_dist = None
-                    for trg_ch in self.chain_mapper.chem_groups[chem_group_idx]:
+                    for trg_ch in self._chain_mapper.chem_groups[chem_group_idx]:
                         if trg_ch not in lddt_chain_mapping.values():
-                            c = self.chain_mapper.target.FindChain(trg_ch).geometric_center
+                            c = self._chain_mapper.target.FindChain(trg_ch).geometric_center
                             d = geom.Distance(mdl_center, c)
                             if closest_dist is None or d < closest_dist:
                                 closest_dist = d
@@ -664,7 +739,7 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
     def _lddt_pli_get_trg_data(self, target_ligand, max_r = None):
         if target_ligand not in self._lddt_pli_target_data:
 
-            trg = self.chain_mapper.target
+            trg = self._chain_mapper.target
 
             if max_r is None:
                 max_r = self.lddt_pli_radius + max(self.lddt_pli_thresholds)
@@ -711,7 +786,7 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
                                      inclusion_radius = self.lddt_pli_radius)
 
             chem_groups = list()
-            for g in self.chain_mapper.chem_groups:
+            for g in self._chain_mapper.chem_groups:
                 chem_groups.append([x for x in g if x in trg_chains])
 
             self._lddt_pli_target_data[target_ligand] = (trg_residues,
@@ -733,7 +808,7 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
 
                 ref_bs_chain = ref_bs.FindChain(ref_ch)
                 query = "cname=" + mol.QueryQuoteName(ref_ch)
-                ref_view = self.chain_mapper.target.Select(query)
+                ref_view = self._chain_mapper.target.Select(query)
 
                 for mdl_ch in mdl_chem_group:
                     aln = self._ref_mdl_alns[(ref_ch, mdl_ch)]
@@ -786,7 +861,7 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
             self.__mappable_atoms = dict()
             for (ref_cname, mdl_cname), aln in self._ref_mdl_alns.items():
                 self._mappable_atoms[(ref_cname, mdl_cname)] = set()
-                ref_ch = self.chain_mapper.target.Select(f"cname={mol.QueryQuoteName(ref_cname)}")
+                ref_ch = self._chain_mapper.target.Select(f"cname={mol.QueryQuoteName(ref_cname)}")
                 mdl_ch = self._chain_mapping_mdl.Select(f"cname={mol.QueryQuoteName(mdl_cname)}")
                 aln.AttachView(0, ref_ch)
                 aln.AttachView(1, mdl_ch)
@@ -807,7 +882,7 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
         if self.__chem_mapping is None:
             self.__chem_mapping, self.__chem_group_alns, \
             self.__chain_mapping_mdl = \
-            self.chain_mapper.GetChemMapping(self.model)
+            self._chain_mapper.GetChemMapping(self.model)
         return self.__chem_mapping
 
     @property
@@ -815,15 +890,15 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
         if self.__chem_group_alns is None:   
             self.__chem_mapping, self.__chem_group_alns, \
             self.__chain_mapping_mdl = \
-            self.chain_mapper.GetChemMapping(self.model)
+            self._chain_mapper.GetChemMapping(self.model)
         return self.__chem_group_alns
 
     @property
     def _ref_mdl_alns(self):
         if self.__ref_mdl_alns is None:
             self.__ref_mdl_alns = \
-            chain_mapping._GetRefMdlAlns(self.chain_mapper.chem_groups,
-                                         self.chain_mapper.chem_group_alignments,
+            chain_mapping._GetRefMdlAlns(self._chain_mapper.chem_groups,
+                                         self._chain_mapper.chem_group_alignments,
                                          self._chem_mapping,
                                          self._chem_group_alns)
         return self.__ref_mdl_alns
@@ -833,5 +908,5 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
         if self.__chain_mapping_mdl is None:   
             self.__chem_mapping, self.__chem_group_alns, \
             self.__chain_mapping_mdl = \
-            self.chain_mapper.GetChemMapping(self.model)
+            self._chain_mapper.GetChemMapping(self.model)
         return self.__chain_mapping_mdl

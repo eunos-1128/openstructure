@@ -216,7 +216,7 @@ class LigandScorer:
         self.max_symmetries = max_symmetries
 
         # lazily computed attributes
-        self._chain_mapper = None
+        self.__chain_mapper = None
 
         # keep track of states
         # simple integers instead of enums - documentation of property describes
@@ -364,7 +364,7 @@ class LigandScorer:
 
 
     @property
-    def chain_mapper(self):
+    def _chain_mapper(self):
         """ Chain mapper object for the given :attr:`target`.
 
         Can be used by child classes if needed, constructed with
@@ -372,12 +372,12 @@ class LigandScorer:
 
         :type: :class:`ost.mol.alg.chain_mapping.ChainMapper`
         """
-        if self._chain_mapper is None:
-            self._chain_mapper = \
+        if self.__chain_mapper is None:
+            self.__chain_mapper = \
             chain_mapping.ChainMapper(self.target,
                                       n_max_naive=1e9,
                                       resnum_alignments=self.resnum_alignments)
-        return self._chain_mapper
+        return self.__chain_mapper
 
     @staticmethod
     def _extract_ligands(entity):

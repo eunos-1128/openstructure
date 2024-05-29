@@ -7,7 +7,79 @@ from ost import mol
 from ost.mol.alg import ligand_scoring_base
 
 class SCRMSDScorer(ligand_scoring_base.LigandScorer):
+    """ :class:`LigandScorer` implementing symmetry corrected RMSD.
 
+    The symmetry corrected RMSD is computed based on a binding site
+    superposition.
+    The binding site is defined as all residues with at least one atom within
+    *bs_radius* around the target ligand in the target structure.
+    It only contains protein and nucleic acid residues from chains that
+    pass the criteria for the
+    :class:`chain mapping <ost.mol.alg.chain_mapping>`. This means ignoring
+    other ligands, waters, short polymers as well as any incorrectly connected
+    chains that may be in proximity.
+
+    The respective model binding site for superposition is identified by
+    naively enumerating all possible mappings of model chains onto their
+    chemically equivalent target counterparts from the target binding site.
+    The *binding_sites_topn* with respect to lDDT score
+    are evaluated and the best resulting SCRMSD is returned. You can either
+    try to map ALL model chains onto the target binding site by enabling
+    *full_bs_search* or restrict the model chains for a specific target/model
+    ligand pair to the chains with at least one atom within *model_bs_radius*
+    around the model ligand. The latter can be significantly faster in case
+    of large complexes.
+
+    :param model: Passed to parent constructor - see :class:`LigandScorer`.
+    :type model: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
+    :param target: Passed to parent constructor - see :class:`LigandScorer`.
+    :type target: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
+    :param model_ligands: Passed to parent constructor - see
+                          :class:`LigandScorer`.
+    :type model_ligands: :class:`list`
+    :param target_ligands: Passed to parent constructor - see
+                           :class:`LigandScorer`.
+    :type target_ligands: :class:`list`
+    :param resnum_alignments: Passed to parent constructor - see
+                              :class:`LigandScorer`.
+    :type resnum_alignments: :class:`bool`
+    :param rename_ligand_chain: Passed to parent constructor - see
+                                :class:`LigandScorer`.
+    :type rename_ligand_chain: :class:`bool`
+    :param substructure_match: Passed to parent constructor - see
+                               :class:`LigandScorer`.
+    :type substructure_match: :class:`bool`
+    :param coverage_delta: Passed to parent constructor - see
+                           :class:`LigandScorer`.
+    :type coverage_delta: :class:`float`
+    :param max_symmetries: Passed to parent constructor - see
+                           :class:`LigandScorer`.
+    :type max_symmetries: :class:`int`
+    :param bs_radius: Inclusion radius for the binding site. Residues with
+                   atoms within this distance of the ligand will be considered
+                   for inclusion in the binding site.
+    :type bs_radius: :class:`float`
+    :param lddt_lp_radius: lDDT inclusion radius for lDDT-LP.
+    :type lddt_lp_radius: :class:`float`
+    :param model_bs_radius: inclusion radius for model binding sites.
+                            Only used when full_bs_search=False, otherwise the
+                            radius is effectively infinite. Only chains with
+                            atoms within this distance of a model ligand will
+                            be considered in the chain mapping.
+    :type model_bs_radius: :class:`float`
+    :param binding_sites_topn: maximum number of model binding site
+                               representations to assess per target binding
+                               site.
+    :type binding_sites_topn: :class:`int`
+    :param full_bs_search: If True, all potential binding sites in the model
+                           are searched for each target binding site. If False,
+                           the search space in the model is reduced to chains
+                           around (`model_bs_radius` Å) model ligands.
+                           This speeds up computations, but may result in
+                           ligands not being scored if the predicted ligand
+                           pose is too far from the actual binding site.
+    :type full_bs_search: :class:`bool`
+    """
     def __init__(self, model, target, model_ligands=None, target_ligands=None,
                  resnum_alignments=False, rename_ligand_chain=False,
                  substructure_match=False, coverage_delta=0.2,
@@ -105,11 +177,11 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
         if key not in self._repr:
             ref_bs = self._get_target_binding_site(target_ligand)
             if self.full_bs_search:
-                reprs = self.chain_mapper.GetRepr(
+                reprs = self._chain_mapper.GetRepr(
                     ref_bs, self.model, inclusion_radius=self.lddt_lp_radius,
                     topn=self.binding_sites_topn)
             else:
-                reprs = self.chain_mapper.GetRepr(ref_bs, self.model,
+                reprs = self._chain_mapper.GetRepr(ref_bs, self.model,
                                                   inclusion_radius=self.lddt_lp_radius,
                                                   topn=self.binding_sites_topn,
                                                   chem_mapping_result = self._get_get_repr_input(model_ligand))
@@ -139,7 +211,7 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
                     h = ref_res.handle.GetHashCode()
                     if h not in ref_residues_hashes and \
                             h not in ignored_residue_hashes:
-                        if self.chain_mapper.target.ViewForHandle(ref_res).IsValid():
+                        if self._chain_mapper.target.ViewForHandle(ref_res).IsValid():
                             h = ref_res.handle.GetHashCode()
                             ref_residues_hashes.add(h)
                         elif ref_res.is_ligand:
@@ -179,7 +251,7 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
         if self.__chem_mapping is None:
             self.__chem_mapping, self.__chem_group_alns, \
             self.__chain_mapping_mdl = \
-            self.chain_mapper.GetChemMapping(self.model)
+            self._chain_mapper.GetChemMapping(self.model)
         return self.__chem_mapping
 
     @property
@@ -187,15 +259,15 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
         if self.__chem_group_alns is None:   
             self.__chem_mapping, self.__chem_group_alns, \
             self.__chain_mapping_mdl = \
-            self.chain_mapper.GetChemMapping(self.model)
+            self._chain_mapper.GetChemMapping(self.model)
         return self.__chem_group_alns
 
     @property
     def _ref_mdl_alns(self):
         if self.__ref_mdl_alns is None:
             self.__ref_mdl_alns = \
-            chain_mapping._GetRefMdlAlns(self.chain_mapper.chem_groups,
-                                         self.chain_mapper.chem_group_alignments,
+            chain_mapping._GetRefMdlAlns(self._chain_mapper.chem_groups,
+                                         self._chain_mapper.chem_group_alignments,
                                          self._chem_mapping,
                                          self._chem_group_alns)
         return self.__ref_mdl_alns
@@ -205,7 +277,7 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
         if self.__chain_mapping_mdl is None:   
             self.__chem_mapping, self.__chem_group_alns, \
             self.__chain_mapping_mdl = \
-            self.chain_mapper.GetChemMapping(self.model)
+            self._chain_mapper.GetChemMapping(self.model)
         return self.__chain_mapping_mdl
 
     def _get_get_repr_input(self, mdl_ligand):
