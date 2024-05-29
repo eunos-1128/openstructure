@@ -18,9 +18,13 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
     This means ignoring other ligands, waters, short polymers as well as any
     incorrectly connected chains that may be in proximity.
 
-    Given a target/model ligand pair, all possible mappings of model chains
-    onto their chemically equivalent target chains are enumerated in order
-    to compute the best possible lDDT-PLI.
+    :class:`LDDTPLIScorer` computes a score for a specific pair of target/model
+    ligands. Given a target/model ligand pair, all possible mappings of
+    model chains onto their chemically equivalent target chains are enumerated.
+    For each of these enumerations, all possible symmetries, i.e. atom-atom
+    assignments of the ligand as given by :class:`LigandScorer`, are evaluated
+    and an lDDT-PLI score is computed. The best possible lDDT-PLI score is
+    returned.
 
     By default, classic lDDT is computed. That means, contacts within
     *lddt_pli_radius* are identified in the target and checked if they're
@@ -39,7 +43,25 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
     We therefore try to map these contacts to the chain in the target with
     equivalent sequence that is closest to the target binding site. If the
     respective atoms can be mapped there, the contact is considered not
-    fulfilled and added as penalty. 
+    fulfilled and added as penalty.
+
+    Populates :attr:`LigandScorer.states` matrix with the following additional
+    error states:
+
+    * 10: No contact observed
+    * 20: Unknown error
+
+    Populates :attr:`LigandScorer.aux_data` with following :class:`dict` keys:
+
+    * lddt_pli: The score
+    * lddt_pli_n_contacts: Number of contacts considered in lDDT computation
+    * target_ligand: The actual target ligand for which the score was computed
+    * model_ligand: The actual model ligand for which the score was computed
+    * bs_ref_res: :class:`set` of residues with potentially non-zero
+                  contribution to score. That is every residue with at least one
+                  atom within *lddt_pli_radius* + max(*lddt_pli_thresholds*) of
+                  the ligand.
+    * bs_mdl_res: Same for model
 
     :param model: Passed to parent constructor - see :class:`LigandScorer`.
     :type model: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
@@ -119,8 +141,8 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
 
 
     def _compute(self, symmetries, target_ligand, model_ligand):
-
-
+        """ Implements interface from parent
+        """
         if self.add_mdl_contacts:
             result = self._compute_lddt_pli_add_mdl_contacts(symmetries,
                                                              target_ligand,
@@ -133,17 +155,19 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
         state = 0
         score = result["lddt_pli"]
 
-        if score is None:
+        if score is None or np.isnan(score):
             if result["lddt_pli_n_contacts"] == 0:
             	# it's a space ship!
-            	state = 10
+                state = 10
             else:
             	# unknwon error state
-            	state = 11
+                state = 20
 
         return (score, state, result)
 
     def _score_dir(self):
+        """ Implements interface from parent
+        """
         return '+'
 
     def _compute_lddt_pli_add_mdl_contacts(self, symmetries, target_ligand,

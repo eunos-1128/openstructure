@@ -9,26 +9,63 @@ from ost.mol.alg import ligand_scoring_base
 class SCRMSDScorer(ligand_scoring_base.LigandScorer):
     """ :class:`LigandScorer` implementing symmetry corrected RMSD.
 
-    The symmetry corrected RMSD is computed based on a binding site
-    superposition.
-    The binding site is defined as all residues with at least one atom within
-    *bs_radius* around the target ligand in the target structure.
+    :class:`SCRMSDScorer` computes a score for a specific pair of target/model
+    ligands.
+
+    The returned RMSD is based on a binding site superposition.
+    The binding site of the target structure is defined as all residues with at
+    least one atom within *bs_radius* around the target ligand.
     It only contains protein and nucleic acid residues from chains that
     pass the criteria for the
     :class:`chain mapping <ost.mol.alg.chain_mapping>`. This means ignoring
     other ligands, waters, short polymers as well as any incorrectly connected
     chains that may be in proximity.
-
     The respective model binding site for superposition is identified by
     naively enumerating all possible mappings of model chains onto their
     chemically equivalent target counterparts from the target binding site.
-    The *binding_sites_topn* with respect to lDDT score
-    are evaluated and the best resulting SCRMSD is returned. You can either
-    try to map ALL model chains onto the target binding site by enabling
-    *full_bs_search* or restrict the model chains for a specific target/model
-    ligand pair to the chains with at least one atom within *model_bs_radius*
-    around the model ligand. The latter can be significantly faster in case
-    of large complexes.
+    The *binding_sites_topn* with respect to lDDT score are evaluated and 
+    an RMSD is computed.
+    You can either try to map ALL model chains onto the target binding site by
+    enabling *full_bs_search* or restrict the model chains for a specific
+    target/model ligand pair to the chains with at least one atom within
+    *model_bs_radius* around the model ligand. The latter can be significantly
+    faster in case of large complexes.
+    Symmetry correction is achieved by simply computing an RMSD value for
+    each symmetry, i.e. atom-atom assignments of the ligand as given by
+    :class:`LigandScorer`. The lowest RMSD value is returned
+
+    Populates :attr:`LigandScorer.states` matrix with the following additional
+    error states:
+
+    * 10: binding_site - no residues were in proximity of the target ligand
+    * 11: model_representation - no representation of the reference binding site
+      was found in the model, i.e. the binding site was not modeled, or the
+      model ligand was positioned too far in combination with
+      *full_bs_search*=False
+    * 20: Unknown error
+
+    Populates :attr:`LigandScorer.aux_data` with following :class:`dict` keys:
+
+    * rmsd: The score
+    * lddt_lp: lDDT of the binding site used for superposition
+    * bs_ref_res: :class:`list` of binding site residues in target
+    * bs_ref_res_mapped: :class:`list` of target binding site residues that
+                         are mapped to model
+    * bs_mdl_res_mapped: :class:`list` of same length with respective model
+                         residues
+    * bb_rmsd: Backbone RMSD (CA, C3' for nucleotides) for mapped residues
+               given transform
+    * target_ligand: The actual target ligand for which the score was computed
+    * model_ligand: The actual model ligand for which the score was computed
+    * chain_mapping: :class:`dict` with a chain mapping of chains involved in
+                      binding site - key: trg chain name, value: mdl chain name
+    * transform: :class:`geom.Mat4` to transform model binding site onto target
+                 binding site
+    * inconsistent_residues: :class:`list` of :class:`tuple` representing
+                             residues with inconsistent residue names upon
+                             mapping (which is given by bs_ref_res_mapped
+                             and bs_mdl_res_mapped). Tuples have two elements:
+                             1) trg residue 2) mdl residue
 
     :param model: Passed to parent constructor - see :class:`LigandScorer`.
     :type model: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
@@ -87,7 +124,6 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
                  model_bs_radius=25, binding_sites_topn=100000,
                  full_bs_search=False):
 
-	    
         super().__init__(model, target, model_ligands = model_ligands,
                          target_ligands = target_ligands,
                          resnum_alignments = resnum_alignments,
@@ -120,7 +156,8 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
         self._get_repr_input = dict()
 
     def _compute(self, symmetries, target_ligand, model_ligand):
-
+        """ Implements interface from parent
+        """
         # set default to invalid scores
         best_rmsd_result = {"rmsd": None,
                            "lddt_lp": None,
@@ -134,7 +171,9 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
                            "transform": geom.Mat4(),
                            "inconsistent_residues": list()}
 
-        for r in self._get_repr(target_ligand, model_ligand):
+        representations = self._get_repr(target_ligand, model_ligand)
+
+        for r in representations:
             rmsd = _SCRMSD_symmetries(symmetries, model_ligand, 
                                       target_ligand, transformation=r.transform)
 
@@ -151,18 +190,23 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
                                     "transform": r.transform,
                                     "inconsistent_residues": r.inconsistent_residues}
 
-        # set default to error
-        best_rmsd = np.nan
-        error_state = 10
-
         if best_rmsd_result["rmsd"] is not None:
-        	# but here we save the day
         	best_rmsd = best_rmsd_result["rmsd"]
         	error_state = 0
+        else:
+            # try to identify error states
+            best_rmsd = np.nan
+            error_state = 20 # unknown error
+            if _get_target_binding_sitce(target_ligand).GetResidueCount() == 0:
+                error_state = 10 # binding_site
+            elif len(representations) == 0:
+                error_state = 11 # model_representation
 
         return (best_rmsd, error_state, best_rmsd_result)
 
     def _score_dir(self):
+        """ Implements interface from parent
+        """
         return '-'
 
     def _get_repr(self, target_ligand, model_ligand):
@@ -186,13 +230,6 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
                                                   topn=self.binding_sites_topn,
                                                   chem_mapping_result = self._get_get_repr_input(model_ligand))
             self._repr[key] = reprs
-            if len(reprs) == 0:
-                # whatever is in there already has precedence
-                if target_ligand not in self._unassigned_target_ligands_reason:
-                    self._unassigned_target_ligands_reason[target_ligand] = (
-                        "model_representation",
-                        "No representation of the reference binding site was "
-                        "found in the model")
 
         return self._repr[key]
 
