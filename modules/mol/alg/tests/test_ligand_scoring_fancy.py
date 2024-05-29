@@ -516,7 +516,91 @@ class TestLigandScoringFancy(unittest.TestCase):
         self.assertEqual([str(r) for r in sc.aux["D"][1]["bs_ref_res"]], expected_bs_ref_res)
         ost.PopVerbosityLevel()
 
+    def test_substructure_match(self):
+        """Test that substructure_match=True works."""
+        trg = _LoadMMCIF("1r8q.cif.gz")
+        mdl = _LoadMMCIF("P84080_model_02.cif.gz")
 
+        trg_g3d1 = trg.FindResidue("F", 1)
+        mdl_g3d = mdl.FindResidue("L_2", 1)
+
+        # Skip PA, PB and O[1-3]A and O[1-3]B in target and model
+        # ie 8 / 32 atoms => coverage 0.75
+        # We assume atom index are fixed and won't change
+        trg_g3d1_sub_ent = trg_g3d1.Select("aindex>6019")
+        trg_g3d1_sub = trg_g3d1_sub_ent.residues[0]
+
+        # without enabling substructure matches
+        sc = ligand_scoring_scrmsd.SCRMSDScorer(mdl.Select("protein=True"), trg.Select("protein=True"),
+                                                model_ligands=[mdl_g3d], target_ligands=[trg_g3d1_sub],
+                                                substructure_match=False)
+        self.assertEqual(sc.coverage_matrix.shape, (1,1))
+        self.assertTrue(np.isnan(sc.coverage_matrix[0,0]))
+        self.assertEqual(sc.states_matrix[0,0], 3) # error encoding for that particular issue
+
+        # Substructure matches
+        sc = ligand_scoring_scrmsd.SCRMSDScorer(mdl.Select("protein=True"), trg.Select("protein=True"),
+                                                model_ligands=[mdl_g3d], target_ligands=[trg_g3d1_sub],
+                                                substructure_match=True)
+        self.assertEqual(sc.coverage_matrix.shape, (1,1))
+        self.assertEqual(sc.coverage_matrix[0,0], 0.75)
+        self.assertEqual(sc.states_matrix[0,0], 0) # no error encoded in state
+
+    def test_6jyf(self):
+        """6JYF initially caused issues in the CASP15-CAMEO/LIGATE paper where
+         the ligand RET was wrongly assigned to short copies of OLA that float
+          around and yielded higher scores.
+          Here we test that this is resolved correctly."""
+        mdl = _LoadPDB("6jyf_mdl.pdb")
+        trg = _LoadMMCIF("6jyf_trg.cif")
+        mdl_lig = _LoadEntity("6jyf_RET_pred.sdf")
+        mdl_lig_full = _LoadEntity("6jyf_RET_pred_complete.sdf")
+
+        # Problem is easily fixed by just prioritizing full coverage
+        sc = ligand_scoring_scrmsd.SCRMSDScorer(mdl, trg, model_ligands=[mdl_lig],
+                                                substructure_match=True)
+        self.assertEqual(len(sc.assignment), 1) # only one mdl ligand => 1 assignment
+        trg_lig_idx, mdl_lig_idx = sc.assignment[0]
+        self.assertEqual(sc.coverage_matrix[trg_lig_idx, mdl_lig_idx], 1.0)
+        self.assertEqual(sc.aux['00001_'][1]["target_ligand"].name, "RET")
+        self.assertAlmostEqual(sc.score['00001_'][1], 15.56022, 4)
+        self.assertAlmostEqual(sc.coverage_matrix[0,0], 1.)
+        self.assertTrue(np.isnan(sc.coverage_matrix[1,0]))
+        self.assertTrue(np.isnan(sc.coverage_matrix[2,0]))
+        self.assertTrue(np.isnan(sc.coverage_matrix[3,0]))
+        self.assertTrue(np.isnan(sc.coverage_matrix[4,0]))
+        self.assertTrue(np.isnan(sc.coverage_matrix[5,0]))
+        self.assertTrue(np.isnan(sc.coverage_matrix[6,0]))
+        self.assertTrue(np.isnan(sc.coverage_matrix[7,0]))
+        self.assertAlmostEqual(sc.coverage_matrix[8,0], 0.5)
+        self.assertAlmostEqual(sc.coverage_matrix[9,0], 0.3)
+        self.assertAlmostEqual(sc.coverage_matrix[10,0], 0.45)
+        self.assertTrue(np.isnan(sc.coverage_matrix[11,0]))
+        self.assertTrue(np.isnan(sc.coverage_matrix[12,0]))
+        self.assertAlmostEqual(sc.coverage_matrix[13,0], 0.55)
+
+        # We need to make sure that it also works if the match is partial.
+        # For that we load the complete ligand incl. the O missing in target
+        # with a coverage of around 95% only.
+        sc = ligand_scoring_scrmsd.SCRMSDScorer(mdl, trg, model_ligands=[mdl_lig_full],
+                                                substructure_match=True)
+        self.assertEqual(len(sc.assignment), 1) # only one mdl ligand => 1 assignment
+        trg_lig_idx, mdl_lig_idx = sc.assignment[0]
+        self.assertAlmostEqual(sc.coverage_matrix[trg_lig_idx, mdl_lig_idx],0.95238096)
+        self.assertEqual(sc.aux['00001_'][1]["target_ligand"].name, "RET")
+        self.assertAlmostEqual(sc.score['00001_'][1], 15.56022, 4)
+
+        # Next, we check that coverage_delta has an effect. With a large
+        # delta of 0.5 we will assign to OLA which has a higher RMSD
+        # but a coverage of 0.52 only.
+        sc = ligand_scoring_scrmsd.SCRMSDScorer(mdl, trg, model_ligands=[mdl_lig_full],
+                                                substructure_match=True,
+                                                coverage_delta=0.5)
+        self.assertEqual(len(sc.assignment), 1) # only one mdl ligand => 1 assignment
+        trg_lig_idx, mdl_lig_idx = sc.assignment[0]
+        self.assertAlmostEqual(sc.coverage_matrix[trg_lig_idx, mdl_lig_idx],  0.52380955)
+        self.assertEqual(sc.aux['00001_'][1]["target_ligand"].name, "OLA")
+        self.assertAlmostEqual(sc.score['00001_'][1], 6.13006878, 4)
 
 
 if __name__ == "__main__":
