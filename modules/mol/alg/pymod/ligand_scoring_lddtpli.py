@@ -45,12 +45,6 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
     respective atoms can be mapped there, the contact is considered not
     fulfilled and added as penalty.
 
-    Populates :attr:`LigandScorer.states` matrix with the following additional
-    error states:
-
-    * 10: No contact observed
-    * 20: Unknown error
-
     Populates :attr:`LigandScorer.aux_data` with following :class:`dict` keys:
 
     * lddt_pli: The score
@@ -139,6 +133,13 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
         self.__ref_mdl_alns = None
         self.__chain_mapping_mdl = None
 
+        # update state decoding from parent with subclass specific stuff
+        self.state_decoding[10] = ("no_contact",
+                                   "There were no lDDT contacts between the "
+                                   "binding site and the ligand, and lDDT-PLI "
+                                   "is undefined.")
+        self.state_decoding[20] = ("unknown",
+                                   "Unknown error occured in LDDTPLIScorer")
 
     def _compute(self, symmetries, target_ligand, model_ligand):
         """ Implements interface from parent

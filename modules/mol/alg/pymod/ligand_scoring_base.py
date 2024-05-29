@@ -221,7 +221,7 @@ class LigandScorer:
         # keep track of states
         # simple integers instead of enums - documentation of property describes
         # encoding
-        self._states_matrix = None
+        self._state_matrix = None
 
         # score matrices
         self._score_matrix = None
@@ -233,31 +233,42 @@ class LigandScorer:
         self._score_dict = None
         self._aux_dict = None
 
+        # human readable description of states - child class must extend with
+        # with child class specific states
+        # each state code comes with a tuple of two elements:
+        # 1) short description 2) human readable description
+        # The actual states are set in _compute_scores in :class:`LigandScorer`
+        # or _compute_score of the child class.
+        if self.substructure_match:
+            iso = "subgraph isomorphism"
+        else:
+            iso = "full graph isomorphism"
+        self.state_decoding = \
+        {0: ("OK", "OK"),
+         1: ("identity", f"Ligands could not be matched (by {iso})"),
+         2: ("symmetries", "Too many symmetries between ligand atoms were "
+             "found - increasing max_symmetries might help"),
+         3: ("no_iso", "No fully isomorphic match could be found - enabling "
+             "substructure_match might allow a match"),
+         4: ("disconnected", "Ligand graph is disconnected"),
+         9: ("unknown", "An unknown error occured in LigandScorer")}
+
     @property
-    def states_matrix(self):
+    def state_matrix(self):
         """ Encodes states of ligand pairs
 
-        Expect a valid score if respective location in this matrix is 0.
+        Ligand pairs can be matched and a valid score can be expected if
+        respective location in this matrix is 0.
         Target ligands are in rows, model ligands in columns. States are encoded
         as integers <= 9. Larger numbers encode errors for child classes.
-        
-        * 0: Ligand pair can be matched and valid score is computed.
-        * 1: Ligand pair has no valid symmetry - cannot be matched.
-        * 2: Ligand pair has too many symmetries - cannot be matched. 
-             You might be able to get a match by increasing *max_symmetries*.
-        * 3: Ligand pair has no isomorphic symmetries - cannot be matched.
-             Target ligand is subgraph of model ligand. This error only occurs
-             if *substructure_match* is False. These cases may become
-             0 if this flag is enabled.
-        * 4: Disconnected graph error - cannot be matched.
-             Either target ligand or model ligand has disconnected graph.
-        * 9: Unknown Error - cannot be matched
+
+        Human readable description is accessible as `scorer.state_decoding[2]`        
 
         :rtype: :class:`~numpy.ndarray`
         """
-        if self._states_matrix is None:
+        if self._state_matrix is None:
             self._compute_scores()
-        return self._states_matrix
+        return self._state_matrix
 
     @property
     def score_matrix(self):
@@ -267,7 +278,7 @@ class LigandScorer:
 
         NaN values indicate that no value could be computed (i.e. different
         ligands). In other words: values are only valid if respective location
-        :attr:`~states` is 0. 
+        :attr:`~state_matrix` is 0. 
 
         :rtype: :class:`~numpy.ndarray`
         """
@@ -283,7 +294,7 @@ class LigandScorer:
 
         NaN values indicate that no value could be computed (i.e. different
         ligands). In other words: values are only valid if respective location
-        :attr:`~states` is 0. If `substructure_match=False`, only full
+        :attr:`~state_matrix` is 0. If `substructure_match=False`, only full
         match isomorphisms are considered, and therefore only values of 1.0
         can be observed.
 
@@ -304,7 +315,7 @@ class LigandScorer:
         empty dictionaries indicate that the child class simply didn't return
         anything or that no value could be computed (e.g. different ligands).
         In other words: values are only valid if respective location
-        :attr:`~states` is 0.
+        :attr:`~state_matrix` is 0.
 
         :rtype: :class:`~numpy.ndarray`
         """
@@ -318,7 +329,7 @@ class LigandScorer:
 
         Implements a greedy algorithm to assign target and model ligands
         with each other. Starts from each valid ligand pair as indicated
-        by a state of 0 in :attr:`states_matrix`. Each iteration first selects
+        by a state of 0 in :attr:`state_matrix`. Each iteration first selects
         high coverage pairs. Given max_coverage defined as the highest
         coverage observed in the available pairs, all pairs with coverage
         in [max_coverage-*coverage_delta*, max_coverage] are selected.
@@ -336,7 +347,7 @@ class LigandScorer:
             tmp = list()
             for trg_idx in range(self.score_matrix.shape[0]):
                 for mdl_idx in range(self.score_matrix.shape[1]):
-                    if self.states_matrix[trg_idx, mdl_idx] == 0:
+                    if self.state_matrix[trg_idx, mdl_idx] == 0:
                         tmp.append((self.score_matrix[trg_idx, mdl_idx],
                                     self.coverage_matrix[trg_idx, mdl_idx],
                                     trg_idx, mdl_idx))
@@ -565,7 +576,7 @@ class LigandScorer:
         shape = (len(self.target_ligands), len(self.model_ligands))
         self._score_matrix = np.full(shape, np.nan, dtype=np.float32)
         self._coverage_matrix = np.full(shape, np.nan, dtype=np.float32)
-        self._states_matrix = np.full(shape, -1, dtype=np.int32)
+        self._state_matrix = np.full(shape, -1, dtype=np.int32)
         self._aux_matrix = np.empty(shape, dtype=dict)
 
         for target_id, target_ligand in enumerate(self.target_ligands):
@@ -588,24 +599,24 @@ class LigandScorer:
                     # Ligands are different - skip
                     LogVerbose("No symmetry between %s and %s" % (
                         str(model_ligand), str(target_ligand)))
-                    self._states_matrix[target_id, model_id] = 1
+                    self._state_matrix[target_id, model_id] = 1
                     continue
                 except TooManySymmetriesError:
                     # Ligands are too symmetrical - skip
                     LogVerbose("Too many symmetries between %s and %s" % (
                         str(model_ligand), str(target_ligand)))
-                    self._states_matrix[target_id, model_id] = 2
+                    self._state_matrix[target_id, model_id] = 2
                     continue
                 except NoIsomorphicSymmetryError:
                     # Ligands are different - skip
                     LogVerbose("No isomorphic symmetry between %s and %s" % (
                         str(model_ligand), str(target_ligand)))
-                    self._states_matrix[target_id, model_id] = 3
+                    self._state_matrix[target_id, model_id] = 3
                     continue
                 except DisconnectedGraphError:
                     LogVerbose("Disconnected graph observed for %s and %s" % (
                         str(model_ligand), str(target_ligand)))
-                    self._states_matrix[target_id, model_id] = 4
+                    self._state_matrix[target_id, model_id] = 4
                     continue
 
                 #####################################################
@@ -622,7 +633,18 @@ class LigandScorer:
                     if state <= 9:
                         raise RuntimeError("Child returned reserved err. state")
 
-                self._states_matrix[target_id, model_id] = state
+                    # Ensure that returned state is associated with a
+                    # description. This is a requirement when subclassing
+                    # LigandScorer => state_decoding dict from base class must
+                    # be modified in subclass constructor
+                    if state not in self.state_decoding:
+                        raise RuntimeError(f"Subclass returned state "
+                                           f"\"{state}\" for which no "
+                                           f"description is available. Point "
+                                           f"the developer of the used scorer "
+                                           f"to this error message.")
+
+                self._state_matrix[target_id, model_id] = state
                 if state == 0:
                     if score is None or np.isnan(score):
                         raise RuntimeError("LigandScorer returned invalid "

@@ -34,16 +34,6 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
     each symmetry, i.e. atom-atom assignments of the ligand as given by
     :class:`LigandScorer`. The lowest RMSD value is returned
 
-    Populates :attr:`LigandScorer.states` matrix with the following additional
-    error states:
-
-    * 10: binding_site - no residues were in proximity of the target ligand
-    * 11: model_representation - no representation of the reference binding site
-      was found in the model, i.e. the binding site was not modeled, or the
-      model ligand was positioned too far in combination with
-      *full_bs_search*=False
-    * 20: Unknown error
-
     Populates :attr:`LigandScorer.aux_data` with following :class:`dict` keys:
 
     * rmsd: The score
@@ -154,6 +144,19 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
         self.__ref_mdl_alns = None
         self.__chain_mapping_mdl = None
         self._get_repr_input = dict()
+
+        # update state decoding from parent with subclass specific stuff
+        self.state_decoding[10] = ("binding_site",
+                                   "No residues were in proximity of the "
+                                   "target ligand.")
+        self.state_decoding[11] = ("model_representation", "No representation "
+                                   "of the reference binding site was found in "
+                                   "the model, i.e. the binding site was not "
+                                   "modeled or the model ligand was positioned "
+                                   "too far in combination with "
+                                   "full_bs_search=False.")
+        self.state_decoding[20] = ("unknown",
+                                   "Unknown error occured in SCRMSDScorer")
 
     def _compute(self, symmetries, target_ligand, model_ligand):
         """ Implements interface from parent

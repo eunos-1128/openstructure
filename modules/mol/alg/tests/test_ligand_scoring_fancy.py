@@ -536,7 +536,7 @@ class TestLigandScoringFancy(unittest.TestCase):
                                                 substructure_match=False)
         self.assertEqual(sc.coverage_matrix.shape, (1,1))
         self.assertTrue(np.isnan(sc.coverage_matrix[0,0]))
-        self.assertEqual(sc.states_matrix[0,0], 3) # error encoding for that particular issue
+        self.assertEqual(sc.state_matrix[0,0], 3) # error encoding for that particular issue
 
         # Substructure matches
         sc = ligand_scoring_scrmsd.SCRMSDScorer(mdl.Select("protein=True"), trg.Select("protein=True"),
@@ -544,7 +544,7 @@ class TestLigandScoringFancy(unittest.TestCase):
                                                 substructure_match=True)
         self.assertEqual(sc.coverage_matrix.shape, (1,1))
         self.assertEqual(sc.coverage_matrix[0,0], 0.75)
-        self.assertEqual(sc.states_matrix[0,0], 0) # no error encoded in state
+        self.assertEqual(sc.state_matrix[0,0], 0) # no error encoded in state
 
     def test_6jyf(self):
         """6JYF initially caused issues in the CASP15-CAMEO/LIGATE paper where
