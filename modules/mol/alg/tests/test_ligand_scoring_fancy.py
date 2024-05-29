@@ -192,7 +192,7 @@ class TestLigandScoringFancy(unittest.TestCase):
         # Check an arbitrary node
         self.assertEqual([a for a in graph.adj[13].keys()], [12, 28])
 
-    def test__ComputeSymmetries(self):
+    def test_ComputeSymmetries(self):
         """Test that _ComputeSymmetries works.
         """
         trg = _LoadMMCIF("1r8q.cif.gz")
@@ -433,7 +433,88 @@ class TestLigandScoringFancy(unittest.TestCase):
         sc = ligand_scoring_lddtpli.LDDTPLIScorer(mdl, trg)
         self.assertEqual(sc.assignment, [(5, 0)])
 
+    def test_dict_results_rmsd(self):
+        """Test that the scores are computed correctly
+        """
+        # 4C0A has more ligands
+        trg = _LoadMMCIF("1r8q.cif.gz")
+        trg_4c0a = _LoadMMCIF("4c0a.cif.gz")
+        sc = ligand_scoring_scrmsd.SCRMSDScorer(trg, trg_4c0a, None, None)
+        expected_keys = {"J", "F"}
+        self.assertFalse(expected_keys.symmetric_difference(sc.score.keys()))
+        self.assertFalse(expected_keys.symmetric_difference(sc.aux.keys()))
+        # rmsd
+        self.assertAlmostEqual(sc.score["J"][mol.ResNum(1)], 0.8016608357429504, 5)
+        self.assertAlmostEqual(sc.score["F"][mol.ResNum(1)], 0.9286373257637024, 5)
+        # rmsd_details
+        self.assertEqual(sc.aux["J"][mol.ResNum(1)]["chain_mapping"], {'F': 'D', 'C': 'C'})
+        self.assertEqual(len(sc.aux["J"][mol.ResNum(1)]["bs_ref_res"]), 15)
+        self.assertEqual(len(sc.aux["J"][mol.ResNum(1)]["bs_ref_res_mapped"]), 15)
+        self.assertEqual(len(sc.aux["J"][mol.ResNum(1)]["bs_mdl_res_mapped"]), 15)
+        self.assertEqual(sc.aux["J"][mol.ResNum(1)]["target_ligand"].qualified_name, 'I.G3D1')
+        self.assertEqual(sc.aux["J"][mol.ResNum(1)]["model_ligand"].qualified_name, 'J.G3D1')
+        self.assertEqual(sc.aux["F"][mol.ResNum(1)]["chain_mapping"], {'B': 'B', 'G': 'A'})
+        self.assertEqual(len(sc.aux["F"][mol.ResNum(1)]["bs_ref_res"]), 15)
+        self.assertEqual(len(sc.aux["F"][mol.ResNum(1)]["bs_ref_res_mapped"]), 15)
+        self.assertEqual(len(sc.aux["F"][mol.ResNum(1)]["bs_mdl_res_mapped"]), 15)
+        self.assertEqual(sc.aux["F"][mol.ResNum(1)]["target_ligand"].qualified_name, 'K.G3D1')
+        self.assertEqual(sc.aux["F"][mol.ResNum(1)]["model_ligand"].qualified_name, 'F.G3D1')
 
+    def test_dict_results_lddtpli(self):
+        """Test that the scores are computed correctly
+        """
+        # 4C0A has more ligands
+        trg = _LoadMMCIF("1r8q.cif.gz")
+        trg_4c0a = _LoadMMCIF("4c0a.cif.gz")
+        sc = ligand_scoring_lddtpli.LDDTPLIScorer(trg, trg_4c0a, None, None,
+                                                  check_resnames=False,
+                                                  add_mdl_contacts=False,
+                                                  lddt_pli_binding_site_radius = 4.0)
+        expected_keys = {"J", "F"}
+        self.assertFalse(expected_keys.symmetric_difference(sc.score.keys()))
+        self.assertFalse(expected_keys.symmetric_difference(sc.aux.keys()))
+
+        # lddt_pli
+        self.assertAlmostEqual(sc.score["J"][mol.ResNum(1)], 0.9127105666156202, 5)
+        self.assertAlmostEqual(sc.score["F"][mol.ResNum(1)], 0.915929203539823, 5)
+        # lddt_pli_details
+        self.assertEqual(sc.aux["J"][mol.ResNum(1)]["lddt_pli_n_contacts"], 653)
+        self.assertEqual(len(sc.aux["J"][mol.ResNum(1)]["bs_ref_res"]), 15)
+        self.assertEqual(sc.aux["J"][mol.ResNum(1)]["target_ligand"].qualified_name, 'I.G3D1')
+        self.assertEqual(sc.aux["J"][mol.ResNum(1)]["model_ligand"].qualified_name, 'J.G3D1')
+        self.assertEqual(sc.aux["F"][mol.ResNum(1)]["lddt_pli_n_contacts"], 678)
+        self.assertEqual(len(sc.aux["F"][mol.ResNum(1)]["bs_ref_res"]), 15)
+        self.assertEqual(sc.aux["F"][mol.ResNum(1)]["target_ligand"].qualified_name, 'K.G3D1')
+        self.assertEqual(sc.aux["F"][mol.ResNum(1)]["model_ligand"].qualified_name, 'F.G3D1')
+
+        # lddt_pli with added mdl contacts
+        sc = ligand_scoring_lddtpli.LDDTPLIScorer(trg, trg_4c0a, None, None,
+                                                  check_resnames=False,
+                                                  add_mdl_contacts=True)
+        self.assertAlmostEqual(sc.score["J"][mol.ResNum(1)], 0.8988340192043895, 5)
+        self.assertAlmostEqual(sc.score["F"][mol.ResNum(1)], 0.9039735099337749, 5)
+        # lddt_pli_details
+        self.assertEqual(sc.aux["J"][mol.ResNum(1)]["lddt_pli_n_contacts"], 729)
+        self.assertEqual(len(sc.aux["J"][mol.ResNum(1)]["bs_ref_res"]), 63)
+        self.assertEqual(sc.aux["J"][mol.ResNum(1)]["target_ligand"].qualified_name, 'I.G3D1')
+        self.assertEqual(sc.aux["J"][mol.ResNum(1)]["model_ligand"].qualified_name, 'J.G3D1')
+        self.assertEqual(sc.aux["F"][mol.ResNum(1)]["lddt_pli_n_contacts"], 755)
+        self.assertEqual(len(sc.aux["F"][mol.ResNum(1)]["bs_ref_res"]), 62)
+        self.assertEqual(sc.aux["F"][mol.ResNum(1)]["target_ligand"].qualified_name, 'K.G3D1')
+        self.assertEqual(sc.aux["F"][mol.ResNum(1)]["model_ligand"].qualified_name, 'F.G3D1')
+
+    def test_ignore_binding_site(self):
+        """Test that we ignore non polymer stuff in the binding site.
+         NOTE: we should consider changing this behavior in the future and take
+         other ligands, peptides and short oligomers into account for superposition.
+         When that's the case this test should be adapter
+         """
+        trg = _LoadMMCIF("1SSP.cif.gz")
+        sc = ligand_scoring_scrmsd.SCRMSDScorer(trg, trg, None, None)
+        expected_bs_ref_res = ['C.GLY62', 'C.GLN63', 'C.ASP64', 'C.PRO65', 'C.TYR66', 'C.CYS76', 'C.PHE77', 'C.ASN123', 'C.HIS187']
+        ost.PushVerbosityLevel(ost.LogLevel.Error)
+        self.assertEqual([str(r) for r in sc.aux["D"][1]["bs_ref_res"]], expected_bs_ref_res)
+        ost.PopVerbosityLevel()
 
 
 
