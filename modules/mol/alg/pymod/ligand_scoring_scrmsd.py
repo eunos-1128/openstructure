@@ -120,7 +120,7 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
                          rename_ligand_chain = rename_ligand_chain,
                          substructure_match = substructure_match,
                          coverage_delta = coverage_delta,
-                         max_symmetries = 1e5)
+                         max_symmetries = max_symmetries)
 
         self.bs_radius = bs_radius
         self.lddt_lp_radius = lddt_lp_radius
@@ -200,7 +200,7 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
             # try to identify error states
             best_rmsd = np.nan
             error_state = 20 # unknown error
-            if _get_target_binding_sitce(target_ligand).GetResidueCount() == 0:
+            if self._get_target_binding_site(target_ligand).GetResidueCount() == 0:
                 error_state = 10 # binding_site
             elif len(representations) == 0:
                 error_state = 11 # model_representation

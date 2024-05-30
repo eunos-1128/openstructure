@@ -602,6 +602,154 @@ class TestLigandScoringFancy(unittest.TestCase):
         self.assertEqual(sc.aux['00001_'][1]["target_ligand"].name, "OLA")
         self.assertAlmostEqual(sc.score['00001_'][1], 6.13006878, 4)
 
+    def test_skip_too_many_symmetries(self):
+        """
+        Test behaviour of max_symmetries.
+        """
+        trg = _LoadMMCIF("1r8q.cif.gz")
+        mdl = _LoadMMCIF("P84080_model_02.cif.gz")
+
+        # Pass entity views
+        trg_lig = [trg.Select("cname=F")]
+        mdl_lig = [mdl.Select("rname=G3D")]
+
+        # G3D has 72 isomorphic mappings to itself.
+        # Limit to 10 to raise
+        symmetries = ligand_scoring_base.ComputeSymmetries(mdl_lig[0], trg_lig[0], max_symmetries=100)
+        self.assertEqual(len(symmetries), 72)
+        with self.assertRaises(TooManySymmetriesError):
+            ligand_scoring_base.ComputeSymmetries(mdl_lig[0], trg_lig[0], max_symmetries=10)
+
+        # Check the unassignment
+        sc = ligand_scoring_scrmsd.SCRMSDScorer(mdl, trg, mdl_lig, trg_lig,
+                                                max_symmetries=10)
+
+        self.assertFalse("L_2" in sc.score)
+        self.assertEqual(sc.assignment, [])
+        self.assertEqual(sc.unassigned_target_ligands, [0])
+        self.assertEqual(sc.unassigned_model_ligands, [0])
+
+        trg_report = sc.get_target_ligand_state_report(0)
+        mdl_report = sc.get_model_ligand_state_report(0)
+
+        self.assertEqual(len(trg_report), 1)
+        self.assertEqual(len(mdl_report), 1)
+        self.assertEqual(trg_report[0]["short desc"], "symmetries")
+        self.assertEqual(mdl_report[0]["short desc"], "symmetries")
+
+    def test_no_binding_site(self):
+        """
+        Test the behavior when there's no binding site in proximity of
+        the ligand. This test was introduced to identify some subtle issues
+        with the ligand assignment that can cause it to enter an infinite
+        loop when the data matrices are not filled properly.
+        """
+        trg = _LoadMMCIF("1r8q.cif.gz").Copy()
+        mdl = trg.Copy()
+
+        trg_zn = trg.FindResidue("H", 1)
+        trg_g3d = trg.FindResidue("F", 1)
+
+        # Move the zinc out of the reference binding site...
+        ed = trg.EditXCS()
+        ed.SetAtomPos(trg_zn.FindAtom("ZN"),
+                      trg_zn.FindAtom("ZN").pos + geom.Vec3(6, 0, 0))
+        # Remove some atoms from G3D to decrease coverage. This messed up
+        # the assignment in the past.
+        ed.DeleteAtom(trg_g3d.FindAtom("O6"))
+        ed.UpdateICS()
+
+        sc = ligand_scoring_scrmsd.SCRMSDScorer(mdl, trg,
+                                                target_ligands=[trg_zn, trg_g3d],
+                                                coverage_delta=0, substructure_match=True)
+
+        self.assertTrue(np.isnan(sc.score_matrix[0, 3]))
+
+        trg_report = sc.get_target_ligand_state_report(0)
+
+        expected_report = [{'state': 1, 'short desc': 'identity',
+                            'desc': 'Ligands could not be matched (by subgraph isomorphism)',
+                            'indices': [0, 1, 2, 4, 5, 6]},
+                           {'state': 10, 'short desc': 'binding_site',
+                            'desc': 'No residues were in proximity of the target ligand.',
+                            'indices': [3]}]
+
+        # order of report is fix 
+        self.assertDictEqual(trg_report[0], expected_report[0])
+        self.assertDictEqual(trg_report[1], expected_report[1])
+
+    def test_no_lddt_pli_contact(self):
+        """
+        Test behaviour where a binding site has no lDDT-PLI contacts.
+
+        We give two copies of the target ligand which have binding site atoms
+        within radius=5A but no atoms at 4A. We set lddt_pli_radius=4 so that
+        there are no contacts for the lDDT-PLI computation, and lDDT is None.
+
+        We check that:
+        - We don't get an lDDT-PLI assignment
+        - Both target ligands are unassigned and have the
+        - We get an RMSD assignment
+        - The second copy of the target and model ligands ensure that the
+          disambiguation code (which checks for the best lDDT-PLI when 2 RMSDs
+          are identical) works in this case (where there is no lDDT-PLI to
+          disambiguate the RMSDs).
+        - We get lDDT-PLI = None with RMSD assignment
+        """
+        trg = _LoadPDB("T1118v1.pdb")
+        trg_lig = _LoadEntity("T1118v1_001.sdf")
+        mdl = _LoadPDB("T1118v1LG035_1.pdb")
+        mdl_lig = _LoadEntity("T1118v1LG035_1_1_1.sdf")
+
+        # Ensure it's unassigned in lDDT
+        sc = ligand_scoring_lddtpli.LDDTPLIScorer(mdl, trg, [mdl_lig, mdl_lig],
+                                                  [trg_lig, trg_lig],
+                                                  lddt_pli_radius=4,
+                                                  rename_ligand_chain=True)
+
+        # assignment should be empty
+        self.assertEqual(len(sc.assignment), 0)
+        self.assertEqual(sc.unassigned_target_ligands, [0, 1])
+        self.assertEqual(sc.unassigned_model_ligands, [0, 1])
+
+        expected_report = [{'state': 10, 'short desc': 'no_contact',
+                            'desc': 'There were no lDDT contacts between the binding site and the ligand, and lDDT-PLI is undefined.',
+                            'indices': [0, 1]}]
+
+        # both target ligands are expected to have the same report => no_contact
+        report_1 = sc.get_target_ligand_state_report(0)
+        report_2 = sc.get_target_ligand_state_report(1)
+        self.assertEqual(len(report_1), 1)
+        self.assertEqual(len(report_2), 1)
+        self.assertDictEqual(report_1[0], expected_report[0])
+        self.assertDictEqual(report_2[0], expected_report[0])
+
+
+        # However RMSD should be assigned
+        sc = ligand_scoring_scrmsd.SCRMSDScorer(mdl, trg, [mdl_lig, mdl_lig],
+                                                [trg_lig, trg_lig],
+                                                bs_radius=5, rename_ligand_chain=True)
+
+        self.assertEqual(sc.assignment, [(0,0), (1,1)])
+        self.assertEqual(sc.unassigned_target_ligands, [])
+        self.assertEqual(sc.unassigned_model_ligands, [])
+
+        self.assertAlmostEqual(sc.score['00001_FE'][1], 2.1703, 4)
+        self.assertAlmostEqual(sc.score['00001_FE_2'][1], 2.1703, 4)
+
+        expected_report = [{'state': 0, 'short desc': 'OK',
+                            'desc': 'OK',
+                            'indices': [0, 1]}]
+
+        # both target ligands are expected to have the same report => no_contact
+        report_1 = sc.get_target_ligand_state_report(0)
+        report_2 = sc.get_target_ligand_state_report(1)
+        self.assertEqual(len(report_1), 1)
+        self.assertEqual(len(report_2), 1)
+        self.assertDictEqual(report_1[0], expected_report[0])
+        self.assertDictEqual(report_2[0], expected_report[0])
+
+
 
 if __name__ == "__main__":
     from ost import testutils

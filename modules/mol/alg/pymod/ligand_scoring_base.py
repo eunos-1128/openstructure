@@ -378,7 +378,7 @@ class LigandScorer:
 
     @property
     def score(self):
-        """Get a dictionary of score values, keyed by model ligand
+        """ Get a dictionary of score values, keyed by model ligand
 
         Extract score with something like:
         `scorer.score[lig.GetChain().GetName()][lig.GetNumber()]`.
@@ -400,7 +400,7 @@ class LigandScorer:
 
     @property
     def aux(self):
-        """Get a dictionary of score details, keyed by model ligand
+        """ Get a dictionary of score details, keyed by model ligand
  
         Extract dict with something like:
         `scorer.score[lig.GetChain().GetName()][lig.GetNumber()]`.
@@ -420,6 +420,59 @@ class LigandScorer:
                 d = self.aux_matrix[trg_lig_idx, mdl_lig_idx]
                 self._aux_dict[cname][rnum] = d
         return self._aux_dict
+
+    @property
+    def unassigned_target_ligands(self):
+        """ Get indices of target ligands which are not assigned 
+
+        :rtype: :class:`list` of :class:`int`
+        """
+        assigned = set([x[0] for x in self.assignment])
+        return [x for x in range(len(self.target_ligands)) if x not in assigned]
+
+    @property
+    def unassigned_model_ligands(self):
+        """ Get indices of model ligands which are not assigned 
+
+        :rtype: :class:`list` of :class:`int`
+        """
+        assigned = set([x[1] for x in self.assignment])
+        return [x for x in range(len(self.model_ligands)) if x not in assigned]
+
+    def get_target_ligand_state_report(self, trg_lig_idx):
+        """ Get summary of states observed with respect to all model ligands
+
+        Mainly for debug purposes 
+
+        :param trg_lig_idx: Index of target ligand for which report should be
+                            generated
+        :type trg_lig_idx: :class:`int`
+        """
+        return self._get_report(self.state_matrix[trg_lig_idx,:])
+
+    def get_model_ligand_state_report(self, mdl_lig_idx):
+        """ Get summary of states observed with respect to all target ligands
+
+        Mainly for debug purposes 
+
+        :param mdl_lig_idx: Index of model ligand for which report should be
+                            generated
+        :type mdl_lig_idx: :class:`int`
+        """
+        return self._get_report(self.state_matrix[:, mdl_lig_idx])
+
+
+    def _get_report(self, states):
+        """ Helper
+        """
+        report = list()
+        for s in np.unique(states):
+            desc = self.state_decoding[s]
+            report.append({"state": s,
+                           "short desc": desc[0],
+                           "desc": desc[1],
+                           "indices": np.flatnonzero(states == s).tolist()})
+        return report
 
     @property
     def _chain_mapper(self):

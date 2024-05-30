@@ -116,7 +116,7 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
                          rename_ligand_chain = rename_ligand_chain,
                          substructure_match = substructure_match,
                          coverage_delta = coverage_delta,
-                         max_symmetries = 1e5)
+                         max_symmetries = max_symmetries)
 
         self.check_resnames = check_resnames
         self.lddt_pli_radius = lddt_pli_radius
