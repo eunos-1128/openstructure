@@ -40,6 +40,22 @@ class LigandScorer:
     with a delta of 0.2, a low-score match with coverage 0.96 would be
     preferred over a high-score match with coverage 0.70.
 
+    All versus all scores are available through the lazily computed
+    :attr:`score_matrix`. However, many things can go wrong... be it even
+    something as simple as two ligands not matching. Error states therefore
+    encode scoring issues. Issues with a particular ligand are indicated by a
+    non-zero state in :attr:`model_ligand_states`/:attr:`target_ligand_states`.
+    This invalidates pairwise scores of such a ligand with all other ligands.
+    This and other issues in pairwise score computation are reported in
+    :attr:`state_matrix` which has the same size as :attr:`score_matrix`.
+    Only if the respective location is 0, a valid pairwise score can be
+    expected. The states and their meaning can be explored with code::
+
+      for state_code, (short_desc, desc) in scorer_obj.items():
+          print(state_code)
+          print(short_desc)
+          print(desc)
+
     Assumptions:
 
     :class:`LigandScorer` generally assumes that the
@@ -267,9 +283,7 @@ class LigandScorer:
         Ligand pairs can be matched and a valid score can be expected if
         respective location in this matrix is 0.
         Target ligands are in rows, model ligands in columns. States are encoded
-        as integers <= 9. Larger numbers encode errors for child classes.
-
-        Human readable description is accessible as `scorer.state_decoding[2]`        
+        as integers <= 9. Larger numbers encode errors for child classes.       
 
         :rtype: :class:`~numpy.ndarray`
         """
