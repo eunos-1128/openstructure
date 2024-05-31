@@ -20,10 +20,11 @@ class LigandScorer:
 
     At the moment, two such classes are available:
 
-    * :class:`LDDTPLIScorer` that assesses the conservation of protein-ligand
+    * :class:`ost.mol.alg.ligand_scoring_lddtpli.LDDTPLIScorer`
+      that assesses the conservation of protein-ligand
       contacts
-    * :class:`SCRMSDScorer` that computes a binding-site superposed,
-      symmetry-corrected RMSD.
+    * :class:`ost.mol.alg.ligand_scoring_scrmsd.SCRMSDScorer`
+      that computes a binding-site superposed, symmetry-corrected RMSD.
 
     By default, only exact matches between target and model ligands are
     considered. This is a problem when the target only contains a subset
