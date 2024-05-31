@@ -507,10 +507,11 @@ class TestLigandScoring(unittest.TestCase):
         mdl_ed.UpdateICS()
         trg_ed.UpdateICS()
 
+        print("1")
         sc = LigandScorer(mdl, trg, None, None, unassigned=True,
                           full_bs_search=True,
                           add_mdl_contacts=False)
-
+        print("done")
         # Check unassigned targets
         # NA: not in contact with target
         trg_na = sc.target.FindResidue("L_NA", 1)

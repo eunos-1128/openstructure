@@ -629,13 +629,18 @@ class TestLigandScoringFancy(unittest.TestCase):
         self.assertEqual(sc.unassigned_target_ligands, [0])
         self.assertEqual(sc.unassigned_model_ligands, [0])
 
-        trg_report = sc.get_target_ligand_state_report(0)
-        mdl_report = sc.get_model_ligand_state_report(0)
+        trg_report, trg_pair_report = sc.get_target_ligand_state_report(0)
+        mdl_report, mdl_pair_report = sc.get_model_ligand_state_report(0)
 
-        self.assertEqual(len(trg_report), 1)
-        self.assertEqual(len(mdl_report), 1)
-        self.assertEqual(trg_report[0]["short desc"], "symmetries")
-        self.assertEqual(mdl_report[0]["short desc"], "symmetries")
+        # the individual ligands are OK
+        self.assertEqual(trg_report["short desc"], "OK")
+        self.assertEqual(mdl_report["short desc"], "OK")
+
+        # but there are too many symmetries
+        self.assertEqual(len(trg_pair_report), 1)
+        self.assertEqual(len(mdl_pair_report), 1)
+        self.assertEqual(trg_pair_report[0]["short desc"], "symmetries")
+        self.assertEqual(mdl_pair_report[0]["short desc"], "symmetries")
 
     def test_no_binding_site(self):
         """
@@ -665,18 +670,24 @@ class TestLigandScoringFancy(unittest.TestCase):
 
         self.assertTrue(np.isnan(sc.score_matrix[0, 3]))
 
-        trg_report = sc.get_target_ligand_state_report(0)
+        trg_report, trg_pair_report = sc.get_target_ligand_state_report(0)
 
-        expected_report = [{'state': 1, 'short desc': 'identity',
+        exp_lig_report = {'state': 10.0,
+                          'short desc': 'binding_site',
+                          'desc': 'No residues were in proximity of the target ligand.'}
+
+        exp_pair_report = [{'state': 1, 'short desc': 'identity',
                             'desc': 'Ligands could not be matched (by subgraph isomorphism)',
                             'indices': [0, 1, 2, 4, 5, 6]},
-                           {'state': 10, 'short desc': 'binding_site',
-                            'desc': 'No residues were in proximity of the target ligand.',
+                           {'state': 6, 'short desc': 'single_ligand_issue',
+                            'desc': 'Cannot compute valid pairwise score as either model or target ligand have non-zero state.',
                             'indices': [3]}]
 
-        # order of report is fix 
-        self.assertDictEqual(trg_report[0], expected_report[0])
-        self.assertDictEqual(trg_report[1], expected_report[1])
+        # order of report is fix
+        self.assertDictEqual(trg_report, exp_lig_report)
+        self.assertDictEqual(trg_pair_report[0], exp_pair_report[0])
+        self.assertDictEqual(trg_pair_report[1], exp_pair_report[1])
+
 
     def test_no_lddt_pli_contact(self):
         """
@@ -717,12 +728,12 @@ class TestLigandScoringFancy(unittest.TestCase):
                             'indices': [0, 1]}]
 
         # both target ligands are expected to have the same report => no_contact
-        report_1 = sc.get_target_ligand_state_report(0)
-        report_2 = sc.get_target_ligand_state_report(1)
-        self.assertEqual(len(report_1), 1)
-        self.assertEqual(len(report_2), 1)
-        self.assertDictEqual(report_1[0], expected_report[0])
-        self.assertDictEqual(report_2[0], expected_report[0])
+        report_1, report_pair_1 = sc.get_target_ligand_state_report(0)
+        report_2, report_pair_2 = sc.get_target_ligand_state_report(1)
+        self.assertEqual(len(report_pair_1), 1)
+        self.assertEqual(len(report_pair_2), 1)
+        self.assertDictEqual(report_pair_1[0], expected_report[0])
+        self.assertDictEqual(report_pair_2[0], expected_report[0])
 
 
         # However RMSD should be assigned
@@ -742,14 +753,190 @@ class TestLigandScoringFancy(unittest.TestCase):
                             'indices': [0, 1]}]
 
         # both target ligands are expected to have the same report => no_contact
-        report_1 = sc.get_target_ligand_state_report(0)
-        report_2 = sc.get_target_ligand_state_report(1)
-        self.assertEqual(len(report_1), 1)
-        self.assertEqual(len(report_2), 1)
-        self.assertDictEqual(report_1[0], expected_report[0])
-        self.assertDictEqual(report_2[0], expected_report[0])
+        report_1, report_pair_1 = sc.get_target_ligand_state_report(0)
+        report_2, report_pair_2 = sc.get_target_ligand_state_report(1)
+        self.assertEqual(len(report_pair_1), 1)
+        self.assertEqual(len(report_pair_2), 1)
+        self.assertDictEqual(report_pair_1[0], expected_report[0])
+        self.assertDictEqual(report_pair_2[0], expected_report[0])
+
+    def test_unassigned_reasons(self):
+        """Test reasons for being unassigned."""
+        trg = _LoadMMCIF("1r8q.cif.gz")
+        mdl = _LoadMMCIF("P84080_model_02.cif.gz")
+
+        def _AppendResidueWithBonds(ed, chain, old_res):
+            new_res = ed.AppendResidue(chain, old_res.name)
+            for old_atom in old_res.atoms:
+                ed.InsertAtom(new_res, old_atom.name, old_atom.pos, old_atom.element,
+                              old_atom.occupancy, old_atom.b_factor, old_atom.is_hetatom)
+            for old_bond in old_atom.bonds:
+                new_first = new_res.FindAtom(old_bond.first.name)
+                new_second = new_res.FindAtom(old_bond.second.name)
+                ed.Connect(new_first, new_second)
+            return new_res
+
+        # Add interesting ligands to model and target
+        mdl_ed = mdl.EditXCS()
+        trg_ed = trg.EditXCS()
+
+        # Add ZN: representation in the model (chain missing in model)
+        new_chain = mdl_ed.InsertChain("L_ZN")
+        mdl_ed.SetChainType(new_chain, mol.ChainType.CHAINTYPE_NON_POLY)
+        new_res = _AppendResidueWithBonds(mdl_ed, new_chain, trg.Select("rname=ZN").residues[0].handle)
+        new_res.is_ligand = True
+
+        # Add NA: not in contact with target
+        new_chain = trg_ed.InsertChain("L_NA")
+        trg_ed.SetChainType(new_chain, mol.ChainType.CHAINTYPE_NON_POLY)
+        new_res = trg_ed.AppendResidue(new_chain, "NA")
+        new_atom = trg_ed.InsertAtom(new_res, "NA", geom.Vec3(100, 100, 100), "NA")
+        new_res.is_ligand = True
+        new_chain = mdl_ed.InsertChain("L_NA")
+        mdl_ed.SetChainType(new_chain, mol.ChainType.CHAINTYPE_NON_POLY)
+        new_res = mdl_ed.AppendResidue(new_chain, "NA")
+        new_atom = mdl_ed.InsertAtom(new_res, "NA", geom.Vec3(100, 100, 100), "NA")
+        new_res.is_ligand = True
+
+        # Add OXY: no symmetry/ not identical -
+        new_chain = mdl_ed.InsertChain("L_OXY")
+        mdl_ed.SetChainType(new_chain, mol.ChainType.CHAINTYPE_NON_POLY)
+        new_res = mdl_ed.AppendResidue(new_chain, "OXY")
+        new_atom1 = mdl_ed.InsertAtom(new_res, "O1", geom.Vec3(0, 0, 0), "O")
+        new_atom2 = mdl_ed.InsertAtom(new_res, "O2", geom.Vec3(1, 1, 1), "O")
+        mdl_ed.Connect(new_atom1, new_atom2)
+        new_res.is_ligand = True
+
+        # Add CMO: disconnected
+        new_chain = mdl_ed.InsertChain("L_CMO")
+        mdl_ed.SetChainType(new_chain, mol.ChainType.CHAINTYPE_NON_POLY)
+        new_res = mdl_ed.AppendResidue(new_chain, "CMO")
+        new_atom1 = mdl_ed.InsertAtom(new_res, "O", geom.Vec3(0, 0, 0), "O")
+        new_atom2 = mdl_ed.InsertAtom(new_res, "C", geom.Vec3(1, 1, 1), "O")
+        new_res.is_ligand = True
+        new_chain = trg_ed.InsertChain("L_CMO")
+        trg_ed.SetChainType(new_chain, mol.ChainType.CHAINTYPE_NON_POLY)
+        new_res = trg_ed.AppendResidue(new_chain, "CMO")
+        new_atom1 = trg_ed.InsertAtom(new_res, "O", geom.Vec3(0, 0, 0), "O")
+        new_atom2 = trg_ed.InsertAtom(new_res, "C", geom.Vec3(1, 1, 1), "O")
+        new_res.is_ligand = True
+
+        # Add 3 MG in model: assignment/stoichiometry
+        mg_pos = [
+            geom.Vec3(3.871, 12.343, 44.485),
+            geom.Vec3(3.871, 12.343, 44.485) + 1,
+            geom.Vec3(3.871, 12.343, 44.485) + 100
+        ]
+        for i in range(3):
+            new_chain = mdl_ed.InsertChain("L_MG_%d" % i)
+            mdl_ed.SetChainType(new_chain, mol.ChainType.CHAINTYPE_NON_POLY)
+            new_res = mdl_ed.AppendResidue(new_chain, "MG")
+            new_atom = mdl_ed.InsertAtom(new_res, "MG", mg_pos[i], "MG")
+            new_res.is_ligand = True
+
+        mdl_ed.UpdateICS()
+        trg_ed.UpdateICS()
+
+        sc = ligand_scoring_lddtpli.LDDTPLIScorer(mdl, trg, None, None)
+
+        # Check unassigned targets
+        # NA: not in contact with target
+        trg_na = sc.target.FindResidue("L_NA", 1)
+        self.assertEqual(sc.unassigned_target_ligands_reasons["L_NA"][1], "no_contact")
+        # AFB: not identical to anything in the model
+        trg_afb = sc.target.FindResidue("G", 1)
+        self.assertEqual(sc.unassigned_target_ligands_reasons["G"][1], "identity")
+        # F.G3D1: J.G3D1 assigned instead
+        trg_fg3d1 = sc.target.FindResidue("F", 1)
+        self.assertEqual(sc.unassigned_target_ligands_reasons["F"][1], "stoichiometry")
+        # CMO: disconnected
+        trg_cmo1 = sc.target.FindResidue("L_CMO", 1)
+        self.assertEqual(sc.unassigned_target_ligands_reasons["L_CMO"][1], "disconnected")
+        # J.G3D1: assigned to L_2.G3D1 => check if it is assigned
+        self.assertTrue(5 not in sc.unassigned_target_ligands)
+        self.assertNotIn("J", sc.unassigned_target_ligands_reasons)
+
+        # Check unassigned models
+        # OXY: not identical to anything in the model
+        mdl_oxy = sc.model.FindResidue("L_OXY", 1)
+        self.assertEqual(sc.unassigned_model_ligands_reasons["L_OXY"][1], "identity")
+        self.assertTrue("L_OXY" not in sc.score)
+        # NA: not in contact with target
+        mdl_na = sc.model.FindResidue("L_NA", 1)
+        self.assertEqual(sc.unassigned_model_ligands_reasons["L_NA"][1], "no_contact")
+        self.assertTrue("L_NA" not in sc.score)
+ 
+        # MG in L_MG_2 has stupid coordinates and is not assigned
+        mdl_mg_2 = sc.model.FindResidue("L_MG_2", 1)
+        self.assertEqual(sc.unassigned_model_ligands_reasons["L_MG_2"][1], "stoichiometry")
+        self.assertTrue("L_MG_2" not in sc.score)
+
+        self.assertNotIn("L_MG_0", sc.unassigned_model_ligands_reasons)
+        # CMO: disconnected
+        mdl_cmo1 = sc.model.FindResidue("L_CMO", 1)
+        self.assertEqual(sc.unassigned_model_ligands_reasons["L_CMO"][1], "disconnected")
+
+        # Should work with rmsd_assignment too
+        sc = ligand_scoring_scrmsd.SCRMSDScorer(mdl, trg, None, None,
+                                                full_bs_search=True)
 
 
+
+        self.assertDictEqual(sc.unassigned_model_ligands_reasons, {
+            'L_ZN': {1: 'model_representation'},
+            'L_NA': {1: 'binding_site'},
+            'L_OXY': {1: 'identity'},
+            'L_MG_2': {1: 'stoichiometry'},
+            "L_CMO": {1: 'disconnected'}
+        })
+        self.assertDictEqual(sc.unassigned_target_ligands_reasons, {
+            'G': {1: 'identity'},
+            'H': {1: 'model_representation'},
+            'J': {1: 'stoichiometry'},
+            'K': {1: 'identity'},
+            'L_NA': {1: 'binding_site'},
+            "L_CMO": {1: 'disconnected'}
+        })
+        self.assertTrue("L_OXY" not in sc.score)
+
+        # With missing ligands
+        sc = ligand_scoring_lddtpli.LDDTPLIScorer(mdl.Select("cname=A"), trg, None, None)
+        self.assertEqual(sc.unassigned_target_ligands_reasons["E"][1], 'no_ligand')
+
+        sc = ligand_scoring_lddtpli.LDDTPLIScorer(mdl, trg.Select("cname=A"), None, None)
+        self.assertEqual(sc.unassigned_model_ligands_reasons["L_2"][1], 'no_ligand')
+
+        sc = ligand_scoring_scrmsd.SCRMSDScorer(mdl.Select("cname=A"), trg, None, None)
+        self.assertEqual(sc.unassigned_target_ligands_reasons["E"][1], 'no_ligand')
+
+        sc = ligand_scoring_scrmsd.SCRMSDScorer(mdl, trg.Select("cname=A"), None, None)
+        self.assertEqual(sc.unassigned_model_ligands_reasons["L_2"][1], 'no_ligand')
+
+        # However not everything must be missing
+        with self.assertRaises(ValueError):
+            sc = LigandScorer(mdl.Select("cname=A"), trg.Select("cname=A"), None, None)
+
+        # Test with partial bs search (full_bs_search=True)
+        # Here we expect L_MG_2 to be unassigned because of stoichiometry
+        # rather than model_representation, as it no longer matters so far from
+        # the binding site.
+        sc = ligand_scoring_scrmsd.SCRMSDScorer(mdl, trg, None, None,
+                                               full_bs_search=True)
+        self.assertEqual(sc.unassigned_model_ligands_reasons, {
+            'L_ZN': {1: 'model_representation'},
+            'L_NA': {1: 'binding_site'},
+            'L_OXY': {1: 'identity'},
+            'L_MG_2': {1: 'stoichiometry'},
+            "L_CMO": {1: 'disconnected'}
+        })
+        self.assertEqual(sc.unassigned_target_ligands_reasons, {
+            'G': {1: 'identity'},
+            'H': {1: 'model_representation'},
+            'J': {1: 'stoichiometry'},
+            'K': {1: 'identity'},
+            'L_NA': {1: 'binding_site'},
+            "L_CMO": {1: 'disconnected'}
+        })
 
 if __name__ == "__main__":
     from ost import testutils

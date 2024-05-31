@@ -193,19 +193,23 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
                                     "transform": r.transform,
                                     "inconsistent_residues": r.inconsistent_residues}
 
+        target_ligand_state = 0
+        model_ligand_state = 0
+        pair_state = 0
+
         if best_rmsd_result["rmsd"] is not None:
         	best_rmsd = best_rmsd_result["rmsd"]
-        	error_state = 0
         else:
             # try to identify error states
             best_rmsd = np.nan
             error_state = 20 # unknown error
             if self._get_target_binding_site(target_ligand).GetResidueCount() == 0:
-                error_state = 10 # binding_site
+                pair_state = 6 # binding_site
+                target_ligand_state = 10
             elif len(representations) == 0:
-                error_state = 11 # model_representation
+                pair_state = 11
 
-        return (best_rmsd, error_state, best_rmsd_result)
+        return (best_rmsd, pair_state, target_ligand_state, model_ligand_state, best_rmsd_result)
 
     def _score_dir(self):
         """ Implements interface from parent

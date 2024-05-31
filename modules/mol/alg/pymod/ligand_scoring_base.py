@@ -222,6 +222,8 @@ class LigandScorer:
         # simple integers instead of enums - documentation of property describes
         # encoding
         self._state_matrix = None
+        self._model_ligand_states = None
+        self._target_ligand_states = None
 
         # score matrices
         self._score_matrix = None
@@ -243,6 +245,7 @@ class LigandScorer:
             iso = "subgraph isomorphism"
         else:
             iso = "full graph isomorphism"
+
         self.state_decoding = \
         {0: ("OK", "OK"),
          1: ("identity", f"Ligands could not be matched (by {iso})"),
@@ -251,6 +254,10 @@ class LigandScorer:
          3: ("no_iso", "No fully isomorphic match could be found - enabling "
              "substructure_match might allow a match"),
          4: ("disconnected", "Ligand graph is disconnected"),
+         5: ("stoichiometry", "Ligand was already assigned to another ligand "
+             "(different stoichiometry)"),
+         6: ("single_ligand_issue", "Cannot compute valid pairwise score as "
+             "either model or target ligand have non-zero state."),
          9: ("unknown", "An unknown error occured in LigandScorer")}
 
     @property
@@ -269,6 +276,32 @@ class LigandScorer:
         if self._state_matrix is None:
             self._compute_scores()
         return self._state_matrix
+
+    @property
+    def model_ligand_states(self):
+        """ Encodes states of model ligands
+
+        Non-zero state in any of the model ligands invalidates the full
+        respective column in :attr:`~state_matrix`.
+
+        :rtype: :class:`~numpy.ndarray`
+        """
+        if self._model_ligand_states is None:
+            self._compute_scores()
+        return self._model_ligand_states
+
+    @property
+    def target_ligand_states(self):
+        """ Encodes states of target ligands
+
+        Non-zero state in any of the target ligands invalidates the full
+        respective row in :attr:`~state_matrix`.
+
+        :rtype: :class:`~numpy.ndarray`
+        """
+        if self._target_ligand_states is None:
+            self._compute_scores()
+        return self._target_ligand_states
 
     @property
     def score_matrix(self):
@@ -427,6 +460,7 @@ class LigandScorer:
 
         :rtype: :class:`list` of :class:`int`
         """
+        # compute on-the-fly, no need for caching
         assigned = set([x[0] for x in self.assignment])
         return [x for x in range(len(self.target_ligands)) if x not in assigned]
 
@@ -436,6 +470,7 @@ class LigandScorer:
 
         :rtype: :class:`list` of :class:`int`
         """
+        # compute on-the-fly, no need for caching
         assigned = set([x[1] for x in self.assignment])
         return [x for x in range(len(self.model_ligands)) if x not in assigned]
 
@@ -448,7 +483,8 @@ class LigandScorer:
                             generated
         :type trg_lig_idx: :class:`int`
         """
-        return self._get_report(self.state_matrix[trg_lig_idx,:])
+        return self._get_report(self.target_ligand_states[trg_lig_idx],
+                                self.state_matrix[trg_lig_idx,:])
 
     def get_model_ligand_state_report(self, mdl_lig_idx):
         """ Get summary of states observed with respect to all target ligands
@@ -459,20 +495,180 @@ class LigandScorer:
                             generated
         :type mdl_lig_idx: :class:`int`
         """
-        return self._get_report(self.state_matrix[:, mdl_lig_idx])
+        return self._get_report(self.model_ligand_states[mdl_lig_idx],
+                                self.state_matrix[:, mdl_lig_idx])
 
-
-    def _get_report(self, states):
+    def _get_report(self, ligand_state, pair_states):
         """ Helper
         """
-        report = list()
-        for s in np.unique(states):
+        pair_report = list()
+        for s in np.unique(pair_states):
             desc = self.state_decoding[s]
-            report.append({"state": s,
-                           "short desc": desc[0],
-                           "desc": desc[1],
-                           "indices": np.flatnonzero(states == s).tolist()})
-        return report
+            indices = np.flatnonzero(pair_states == s).tolist()
+            pair_report.append({"state": s,
+                                "short desc": desc[0],
+                                "desc": desc[1],
+                                "indices": indices})
+
+        desc = self.state_decoding[ligand_state]
+        ligand_report = {"state": ligand_state,
+                         "short desc": desc[0],
+                         "desc": desc[1]}
+
+        return (ligand_report, pair_report)
+
+    def guess_target_ligand_unassigned_reason(self, trg_lig_idx):
+        """ Makes an educated guess why target ligand is not assigned
+
+        This either returns actual error states or custom states that are
+        derived from them.
+
+        :param trg_lig_idx: Index of target ligand
+        :type trg_lig_idx: :class:`int`
+        :returns: :class:`tuple` with two elements: 1) keyword 2) human readable
+                  sentence describing the issue, (\"unknown\",\"unknown\") if
+                  nothing obvious can be found.
+        :raises: :class:`RuntimeError` if specified target ligand is assigned
+        """
+        if trg_lig_idx not in self.unassigned_target_ligands:
+            raise RuntimeError("Specified target ligand is not unassigned")
+
+        # hardcoded tuple if there is simply nothing we can assign it to
+        if len(self.model_ligands) == 0:
+            return ("no_ligand", "No ligand in the model")
+
+        # if something with the ligand itself is wrong, we can be pretty sure
+        # thats why the ligand is unassigned
+        if self.target_ligand_states[trg_lig_idx] != 0:
+            return self.state_decoding[self.target_ligand_states[trg_lig_idx]]
+
+        # The next best guess comes from looking at pair states
+        tmp = np.unique(self.state_matrix[trg_lig_idx,:])
+
+        # In case of any 0, it could have been assigned so it's probably 
+        # just not selected due to different stoichiometry - this is no
+        # defined state, we just return a hardcoded tuple in this case
+        if 0 in tmp:
+            return ("stoichiometry",
+                    "Ligand was already assigned to an other "
+                    "model ligand (different stoichiometry)")
+
+        # maybe its a symmetry issue?
+        if 2 in tmp:
+            return self.state_decoding[2]
+
+        # if the state is 6 (single_ligand_issue), there is an issue with its
+        # target counterpart.
+        if 6 in tmp:
+            mdl_idx = np.where(self.state_matrix[trg_lig_idx,:]==6)[0]
+            # we're reporting everything except disconnected error...
+            # don't ask...
+            for i in mdl_idx:
+                if self.model_ligand_states[i] == 0:
+                    raise RuntimeError("This should never happen")
+                if self.model_ligand_states[i] != 4:
+                    return self.state_decoding[self.model_ligand_states[i]]
+
+        # get rid of remaining single ligand issues (only disconnected error)
+        if 6 in tmp and len(tmp) > 1:
+            tmp = tmp[tmp!=6]
+
+        # prefer everything over identity state
+        if 1 in tmp and len(tmp) > 1:
+            tmp = tmp[tmp!=1]
+
+        # just return whatever is left
+        return self.state_decoding[tmp[0]]
+
+
+    def guess_model_ligand_unassigned_reason(self, mdl_lig_idx):
+        """ Makes an educated guess why model ligand is not assigned
+
+        This either returns actual error states or custom states that are
+        derived from them.
+
+        :param mdl_lig_idx: Index of model ligand
+        :type mdl_lig_idx: :class:`int`
+        :returns: :class:`tuple` with two elements: 1) keyword 2) human readable
+                  sentence describing the issue, (\"unknown\",\"unknown\") if
+                  nothing obvious can be found.
+        :raises: :class:`RuntimeError` if specified model ligand is assigned
+        """
+        if mdl_lig_idx not in self.unassigned_model_ligands:
+            raise RuntimeError("Specified model ligand is not unassigned")
+
+        # hardcoded tuple if there is simply nothing we can assign it to
+        if len(self.target_ligands) == 0:
+            return ("no_ligand", "No ligand in the target")
+
+        # if something with the ligand itself is wrong, we can be pretty sure
+        # thats why the ligand is unassigned
+        if self.model_ligand_states[mdl_lig_idx] != 0:
+            return self.state_decoding[self.model_ligand_states[mdl_lig_idx]]
+
+        # The next best guess comes from looking at pair states
+        tmp = np.unique(self.state_matrix[:,mdl_lig_idx])
+
+        # In case of any 0, it could have been assigned so it's probably 
+        # just not selected due to different stoichiometry - this is no
+        # defined state, we just return a hardcoded tuple in this case
+        if 0 in tmp:
+            return ("stoichiometry",
+                    "Ligand was already assigned to an other "
+                    "model ligand (different stoichiometry)")
+
+        # maybe its a symmetry issue?
+        if 2 in tmp:
+            return self.state_decoding[2]
+
+        # if the state is 6 (single_ligand_issue), there is an issue with its
+        # target counterpart.
+        if 6 in tmp:
+            trg_idx = np.where(self.state_matrix[:,mdl_lig_idx]==6)[0]
+            # we're reporting everything except disconnected error...
+            # don't ask...
+            for i in trg_idx:
+                if self.target_ligand_states[i] == 0:
+                    raise RuntimeError("This should never happen")
+                if self.target_ligand_states[i] != 4:
+                    return self.state_decoding[self.target_ligand_states[i]]
+
+        # get rid of remaining single ligand issues (only disconnected error)
+        if 6 in tmp and len(tmp) > 1:
+            tmp = tmp[tmp!=6]
+
+        # prefer everything over identity state
+        if 1 in tmp and len(tmp) > 1:
+            tmp = tmp[tmp!=1]
+
+        # just return whatever is left
+        return self.state_decoding[tmp[0]]
+
+    @property
+    def unassigned_model_ligands_reasons(self):
+        return_dict = dict()
+        for i in self.unassigned_model_ligands:
+            lig = self.model_ligands[i]
+            cname = lig.GetChain().GetName()
+            rnum = lig.GetNumber()
+            if cname not in return_dict:
+                return_dict[cname] = dict()
+            return_dict[cname][rnum] = \
+            self.guess_model_ligand_unassigned_reason(i)[0]
+        return return_dict
+    
+    @property
+    def unassigned_target_ligands_reasons(self):
+        return_dict = dict()
+        for i in self.unassigned_target_ligands:
+            lig = self.target_ligands[i]
+            cname = lig.GetChain().GetName()
+            rnum = lig.GetNumber()
+            if cname not in return_dict:
+                return_dict[cname] = dict()
+            return_dict[cname][rnum] = \
+            self.guess_target_ligand_unassigned_reason(i)[0]
+        return return_dict
 
     @property
     def _chain_mapper(self):
@@ -629,23 +825,58 @@ class LigandScorer:
         shape = (len(self.target_ligands), len(self.model_ligands))
         self._score_matrix = np.full(shape, np.nan, dtype=np.float32)
         self._coverage_matrix = np.full(shape, np.nan, dtype=np.float32)
-        self._state_matrix = np.full(shape, -1, dtype=np.int32)
+        self._state_matrix = np.full(shape, 0, dtype=np.int32)
+        self._model_ligand_states = np.zeros(len(self.model_ligands))
+        self._target_ligand_states = np.zeros(len(self.target_ligands))
         self._aux_matrix = np.empty(shape, dtype=dict)
+
+        # precompute ligand graphs
+        target_graphs = [_ResidueToGraph(l, by_atom_index=True) for l in self.target_ligands]
+        model_graphs = [_ResidueToGraph(l, by_atom_index=True) for l in self.model_ligands]
+
+        for g_idx, g in enumerate(target_graphs):
+            if not networkx.is_connected(g):
+                self._target_ligand_states[g_idx] = 4
+                self._state_matrix[g_idx,:] = 6
+                LogVerbose("Disconnected graph observed for target ligand %s" % (
+                        str(self.target_ligands[g_idx])))
+
+        for g_idx, g in enumerate(model_graphs):
+            if not networkx.is_connected(g):
+                self._model_ligand_states[g_idx] = 4
+                self._state_matrix[:,g_idx] = 6
+                LogVerbose("Disconnected graph observed for model ligand %s" % (
+                        str(self.model_ligands[g_idx])))
+
 
         for target_id, target_ligand in enumerate(self.target_ligands):
             LogVerbose("Analyzing target ligand %s" % target_ligand)
+
+            if self._target_ligand_states[target_id] == 4:
+                # Disconnected graph - already updated states and reported
+                # to LogVerbose
+                continue 
+
             for model_id, model_ligand in enumerate(self.model_ligands):
                 LogVerbose("Compare to model ligand %s" % model_ligand)
 
                 #########################################################
                 # Compute symmetries for given target/model ligand pair #
                 #########################################################
+
+                if self._model_ligand_states[model_id] == 4:
+                    # Disconnected graph - already updated states and reported
+                    # to LogVerbose
+                    continue 
+
                 try:
                     symmetries = ComputeSymmetries(
                         model_ligand, target_ligand,
                         substructure_match=self.substructure_match,
                         by_atom_index=True,
-                        max_symmetries=self.max_symmetries)
+                        max_symmetries=self.max_symmetries,
+                        model_graph = model_graphs[model_id],
+                        target_graph = target_graphs[target_id])
                     LogVerbose("Ligands %s and %s symmetry match" % (
                         str(model_ligand), str(target_ligand)))
                 except NoSymmetryError:
@@ -667,38 +898,57 @@ class LigandScorer:
                     self._state_matrix[target_id, model_id] = 3
                     continue
                 except DisconnectedGraphError:
+                    # this should never happen as we guard against
+                    # DisconnectedGraphError when precomputing the graph
                     LogVerbose("Disconnected graph observed for %s and %s" % (
                         str(model_ligand), str(target_ligand)))
-                    self._state_matrix[target_id, model_id] = 4
+                    # just set both ligand states to 4
+                    self._model_ligand_states[model_id] = 4
+                    self._model_ligand_states[target_id] = 4
+                    self._state_matrix[target_id, model_id] = 6
                     continue
 
                 #####################################################
                 # Compute score by calling the child class _compute #
                 #####################################################
-                score, state, aux = self._compute(symmetries, target_ligand,
-                                                  model_ligand)
+                score, pair_state, target_ligand_state, model_ligand_state, aux\
+                 = self._compute(symmetries, target_ligand, model_ligand)
 
                 ############
                 # Finalize #
                 ############
-                if state != 0:
-                    # non-zero error states up to 9 are reserved for base class
-                    if state <= 9:
-                        raise RuntimeError("Child returned reserved err. state")
 
-                    # Ensure that returned state is associated with a
-                    # description. This is a requirement when subclassing
-                    # LigandScorer => state_decoding dict from base class must
-                    # be modified in subclass constructor
-                    if state not in self.state_decoding:
-                        raise RuntimeError(f"Subclass returned state "
-                                           f"\"{state}\" for which no "
-                                           f"description is available. Point "
-                                           f"the developer of the used scorer "
-                                           f"to this error message.")
+                # Ensure that returned states are associated with a
+                # description. This is a requirement when subclassing
+                # LigandScorer => state_decoding dict from base class must
+                # be modified in subclass constructor
+                if pair_state not in self.state_decoding or \
+                   target_ligand_state not in self.state_decoding or \
+                   model_ligand_state not in self.state_decoding:
+                    raise RuntimeError(f"Subclass returned state "
+                                       f"\"{state}\" for which no "
+                                       f"description is available. Point "
+                                       f"the developer of the used scorer "
+                                       f"to this error message.")
 
-                self._state_matrix[target_id, model_id] = state
-                if state == 0:
+                # if any of the ligand states is non-zero, this must be marked
+                # by the scorer subclass by specifying a specific pair state
+                if target_ligand_state != 0 and pair_state != 6:
+                    raise RuntimeError("Observed non-zero target-ligand "
+                                       "state which must trigger certain "
+                                       "pair state. Point the developer of "
+                                       "the used scorer to this error message")
+
+                if model_ligand_state != 0 and pair_state != 6:
+                    raise RuntimeError("Observed non-zero model-ligand "
+                                       "state which must trigger certain "
+                                       "pair state. Point the developer of "
+                                       "the used scorer to this error message")
+
+                self._state_matrix[target_id, model_id] = pair_state
+                self._target_ligand_states[target_id] = target_ligand_state
+                self._model_ligand_states[model_id] = model_ligand_state
+                if pair_state == 0:
                     if score is None or np.isnan(score):
                         raise RuntimeError("LigandScorer returned invalid "
                                            "score despite 0 error state")
@@ -784,7 +1034,8 @@ def _ResidueToGraph(residue, by_atom_index=False):
 
 def ComputeSymmetries(model_ligand, target_ligand, substructure_match=False,
                       by_atom_index=False, return_symmetries=True,
-                      max_symmetries=1e6):
+                      max_symmetries=1e6, model_graph = None,
+                      target_graph = None):
     """Return a list of symmetries (isomorphisms) of the model onto the target
     residues.
 
@@ -820,11 +1071,18 @@ def ComputeSymmetries(model_ligand, target_ligand, substructure_match=False,
     """
 
     # Get the Graphs of the ligands
-    model_graph = _ResidueToGraph(model_ligand, by_atom_index=by_atom_index)
-    target_graph = _ResidueToGraph(target_ligand, by_atom_index=by_atom_index)
+    if model_graph is None:
+        model_graph = _ResidueToGraph(model_ligand,
+                                      by_atom_index=by_atom_index)
 
     if not networkx.is_connected(model_graph):
         raise DisconnectedGraphError("Disconnected graph for model ligand %s" % model_ligand)
+
+
+    if target_graph is None:
+        target_graph = _ResidueToGraph(target_ligand,
+                                       by_atom_index=by_atom_index)
+
     if not networkx.is_connected(target_graph):
         raise DisconnectedGraphError("Disconnected graph for target ligand %s" % target_ligand)
 

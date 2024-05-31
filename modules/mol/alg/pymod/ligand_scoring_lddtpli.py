@@ -153,18 +153,23 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
                                                     target_ligand,
                                                     model_ligand)
 
-        state = 0
+        pair_state = 0
         score = result["lddt_pli"]
 
         if score is None or np.isnan(score):
             if result["lddt_pli_n_contacts"] == 0:
             	# it's a space ship!
-                state = 10
+                pair_state = 10
             else:
             	# unknwon error state
-                state = 20
+                pair_state = 20
 
-        return (score, state, result)
+        # the ligands get a zero-state...
+        target_ligand_state = 0
+        model_ligand_state = 0
+
+        return (score, pair_state, target_ligand_state, model_ligand_state,
+                result)
 
     def _score_dir(self):
         """ Implements interface from parent
