@@ -1788,6 +1788,7 @@ a mmCIF file according to `mmcif_pdbx_v50 <https://mmcif.wwpdb.org/dictionaries/
 
   * id
   * type
+  * name
 
 * `_atom_type <https://mmcif.wwpdb.org/dictionaries/mmcif_pdbx_v50.dic/Categories/atom_type.html>`_
 

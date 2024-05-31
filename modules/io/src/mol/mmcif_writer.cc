@@ -696,6 +696,7 @@ namespace {
     ost::io::StarWriterLoopDesc desc("_chem_comp");
     desc.Add("id");
     desc.Add("type");
+    desc.Add("name");
     ost::io::StarWriterLoopPtr sl(new ost::io::StarWriterLoop(desc));
     return sl;    
   }
@@ -978,7 +979,7 @@ namespace {
         unique_compounds.insert(het_it.second.begin(), het_it.second.end());
       }
     }
-    std::vector<ost::io::StarWriterValue> comp_data(2);
+    std::vector<ost::io::StarWriterValue> comp_data(3);
     for(auto mon_id: unique_compounds) {
       comp_data[0] = ost::io::StarWriterValue::FromString(mon_id);
       ost::conop::CompoundPtr comp = compound_lib->FindCompound(mon_id,
@@ -986,9 +987,11 @@ namespace {
       if(comp) {
         String type = ChemClassToChemCompType(comp->GetChemClass());
         comp_data[1] = ost::io::StarWriterValue::FromString(type);
+        comp_data[2] = ost::io::StarWriterValue::FromString(comp->GetName());
       } else {
         String type = ChemClassToChemCompType(ost::mol::ChemClass::UNKNOWN);
         comp_data[1] = ost::io::StarWriterValue::FromString(type);
+        comp_data[2] = ost::io::StarWriterValue::FromString("");
       }
       chem_comp_ptr->AddData(comp_data);
     }
