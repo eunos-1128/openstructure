@@ -83,7 +83,7 @@ class LigandScorer:
     expected with entities loaded from PDB files, as the `is_ligand` flag is
     probably not set properly.
 
-    Here is a snippet example of how to use this code::
+    Here is an example of how to use setup a scorer code::
 
         from ost.mol.alg.ligand_scoring_scrmsd import SCRMSDScorer
         from ost.mol.alg import Molck, MolckSettings
@@ -370,7 +370,7 @@ class LigandScorer:
         and the whole process is repeated until there are no ligands to
         assign anymore.
 
-        :rtype: :class:`list`: of :class:`tuple` (trg_lig_idx, mdl_lig_idx)
+        :rtype: :class:`list` of :class:`tuple` (trg_lig_idx, mdl_lig_idx)
         """
         if self._assignment is None:
             self._assignment = list()
@@ -1065,9 +1065,10 @@ def ComputeSymmetries(model_ligand, target_ligand, substructure_match=False,
     :type max_symmetries: :class:`int`
     :raises: :class:`NoSymmetryError` when no symmetry can be found;
              :class:`NoIsomorphicSymmetryError` in case of isomorphic
-             subgraph but *substructure_match* is False.
+             subgraph but *substructure_match* is False;
              :class:`TooManySymmetriesError` when more than `max_symmetries`
-             isomorphisms are found.
+             isomorphisms are found; :class:`DisconnectedGraphError` if
+             graph for *model_ligand*/*target_ligand* is disconnected.
     """
 
     # Get the Graphs of the ligands
@@ -1153,3 +1154,8 @@ class DisconnectedGraphError(Exception):
     """ Exception raised when the ligand graph is disconnected.
     """
     pass
+
+# specify public interface
+__all__ = ('LigandScorer', 'ComputeSymmetries', 'NoSymmetryError',
+           'NoIsomorphicSymmetryError', 'TooManySymmetriesError',
+           'DisconnectedGraphError')

@@ -944,3 +944,6 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
             self.__chain_mapping_mdl = \
             self._chain_mapper.GetChemMapping(self.model)
         return self.__chain_mapping_mdl
+
+# specify public interface
+__all__ = ('LDDTPLIScorer',)

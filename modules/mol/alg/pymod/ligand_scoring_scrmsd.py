@@ -442,3 +442,6 @@ def _SCRMSD_symmetries(symmetries, model_ligand, target_ligand,
             best_rmsd = rmsd
 
     return best_rmsd
+
+# specify public interface
+__all__ = ('SCRMSDScorer', 'SCRMSD')
