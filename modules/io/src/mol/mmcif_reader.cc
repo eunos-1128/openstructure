@@ -608,7 +608,7 @@ void MMCifReader::ParseAndAddAtom(const std::vector<StringRef>& columns)
       curr_chain_.SetStringProp("entity_id", ent_id);
       chain_id_pairs_.push_back(std::pair<mol::ChainHandle,String>(curr_chain_,
                                                                    ent_id));
-      info_.AddMMCifEntityIdTr(cif_chain_name, ent_id);
+      info_.AddMMCifEntityIdTr(cif_chain_name, ent_id, profile_.fault_tolerant);
     }
     assert(curr_chain_.IsValid());
   } else if (chain_id_pairs_.back().second != // unit test
@@ -1865,12 +1865,14 @@ void MMCifReader::OnEndData()
       editor.SetChainDescription(css->first, edm_it->second.details);
       // Add chain mapping for all chains
       pdb_auth_chain_name = css->first.GetStringProp("pdb_auth_chain_name");
-      info_.AddMMCifPDBChainTr(css->first.GetName(), pdb_auth_chain_name);
+      info_.AddMMCifPDBChainTr(css->first.GetName(), pdb_auth_chain_name,
+                               profile_.fault_tolerant);
 
       if (edm_it->second.entity_type=="polymer") {
         // PDB -> mmCIF chain mapping only for polymers
         // This is not a 1:1 mapping because of ligands
-        info_.AddPDBMMCifChainTr(pdb_auth_chain_name, css->first.GetName());
+        info_.AddPDBMMCifChainTr(pdb_auth_chain_name, css->first.GetName(),
+                                 profile_.fault_tolerant);
       } else if (edm_it->second.entity_type=="non-polymer") {
         mol::ChainHandle chain=css->first;
         mol::ResidueHandleList residues=chain.GetResidueList();

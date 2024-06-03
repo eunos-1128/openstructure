@@ -23,14 +23,22 @@
 
 namespace ost { namespace io {
 
-void MMCifInfo::AddMMCifPDBChainTr(String cif, String pdb)
+void MMCifInfo::AddMMCifPDBChainTr(String cif, String pdb, bool fault_tolerant)
 {
   std::map<String, String>::iterator tr_it = cif_2_pdb_chain_id_.find(cif);
   if (tr_it != cif_2_pdb_chain_id_.end()) {
-    throw IOException("mmCIF chain id '"+ cif +"' is already mapped to '"+
-                      tr_it->second+"'.");
+    std::stringstream msg;
+    msg << "mmCIF chain id '" <<  cif << "' is already mapped to '" <<
+           tr_it->second << "'. Cannot map it to '" <<  pdb << "'." ;
+    if(fault_tolerant) {
+      LOG_WARNING(msg.str());
+      return;
+    } else {
+      throw IOException(msg.str());
+    }
+  } else {
+    cif_2_pdb_chain_id_.insert(std::pair<String, String>(cif, pdb));
   }
-  cif_2_pdb_chain_id_.insert(std::pair<String, String>(cif, pdb));
 }
 
 String MMCifInfo::GetMMCifPDBChainTr(String cif) const
@@ -41,14 +49,22 @@ String MMCifInfo::GetMMCifPDBChainTr(String cif) const
   return tr_it->second;
 }
 
-void MMCifInfo::AddPDBMMCifChainTr(String pdb, String cif)
+void MMCifInfo::AddPDBMMCifChainTr(String pdb, String cif, bool fault_tolerant)
 {
   std::map<String, String>::iterator tr_it = pdb_2_cif_chain_id_.find(pdb);
   if (tr_it != pdb_2_cif_chain_id_.end()) {
-    throw IOException("PDB chain id '"+ pdb +"' is already mapped to '"+
-                      tr_it->second+"'.");
+    std::stringstream msg;
+    msg << "PDB chain id '" <<  pdb << "' is already mapped to '" <<
+           tr_it->second << "'. Cannot map it to '" <<  cif << "'." ;
+    if(fault_tolerant) {
+      LOG_WARNING(msg.str());
+      return;
+    } else {
+      throw IOException(msg.str());
+    }
+  } else {
+    pdb_2_cif_chain_id_.insert(std::pair<String, String>(pdb, cif));
   }
-  pdb_2_cif_chain_id_.insert(std::pair<String, String>(pdb, cif));
 }
 
 String MMCifInfo::GetPDBMMCifChainTr(String pdb) const
@@ -59,14 +75,23 @@ String MMCifInfo::GetPDBMMCifChainTr(String pdb) const
   return tr_it->second;
 }
 
-void MMCifInfo::AddMMCifEntityIdTr(String cif, String ent_id)
+void MMCifInfo::AddMMCifEntityIdTr(String cif, String ent_id, bool fault_tolerant)
 {
   std::map<String, String>::iterator tr_it = cif_2_entity_id_.find(cif);
   if (tr_it != cif_2_entity_id_.end()) {
-    throw IOException("mmCIF chain id '" + cif + "' is already mapped to "
-                      "entity id '" + tr_it->second + "'.");
+    std::stringstream msg;
+    msg << "mmCIF chain id '" <<  cif << "' is already mapped to " <<
+           "entity id '" << tr_it->second << "'. Cannot map it to '" <<
+           ent_id << "'." ;
+    if(fault_tolerant) {
+      LOG_WARNING(msg.str());
+      return;
+    } else {
+      throw IOException(msg.str());
+    }
+  } else {
+    cif_2_entity_id_.insert(std::pair<String, String>(cif, ent_id));
   }
-  cif_2_entity_id_.insert(std::pair<String, String>(cif, ent_id));
 }
 
 String MMCifInfo::GetMMCifEntityIdTr(String cif) const

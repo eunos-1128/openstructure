@@ -1065,7 +1065,8 @@ public:
   ///
   /// \param cif chain name as used by the mmCIF file (label_asym_id)
   /// \param pdb chain name as used in the PDB file (auth_asym_id)
-  void AddMMCifPDBChainTr(String cif, String pdb);
+  void AddMMCifPDBChainTr(String cif, String pdb,
+                          bool fault_tolerant=false);
 
   /// \brief Get a PDB chain name for a CIF chain name
   ///
@@ -1077,7 +1078,8 @@ public:
   ///
   /// \param pdb chain name as used by the PDB file (auth_asym_id)
   /// \param cif chain name as used in the mmCIF file (label_asym_id)
-  void AddPDBMMCifChainTr(String pdb, String cif);
+  void AddPDBMMCifChainTr(String pdb, String cif,
+                          bool fault_tolerant=false);
 
   /// \brief Get a CIF chain name for a PDB chain name
   ///
@@ -1089,7 +1091,8 @@ public:
   ///
   /// \param cif chain name as used by the mmCIF file (label_asym_id)
   /// \param ent_id entity ID as used by the mmCIF file (label_entity_id)
-  void AddMMCifEntityIdTr(String cif, String ent_id);
+  void AddMMCifEntityIdTr(String cif, String ent_id,
+                          bool fault_tolerant=false);
 
   /// \brief Get the entity ID for a CIF chain name
   ///
