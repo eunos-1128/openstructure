@@ -1704,9 +1704,8 @@ void MMCifReader::ParseStructRefSeqDif(const std::vector<StringRef>& columns)
 
   std::pair<bool,int> seq_rnum;
   if (indices_[SRSD_SEQ_RNUM] != -1) {
-    StringRef col = columns[indices_[SRSD_SEQ_RNUM]];
-    if (col.size()!=1 || (col[0]!='?' && col[0]!='.')) {
-      seq_rnum=this->TryGetInt(col,
+    if (!is_undef(columns[indices_[SRSD_SEQ_RNUM]])) {
+      seq_rnum=this->TryGetInt(columns[indices_[SRSD_SEQ_RNUM]],
                                "_struct_ref_seq_dif.seq_num",
                                profile_.fault_tolerant);
     }
