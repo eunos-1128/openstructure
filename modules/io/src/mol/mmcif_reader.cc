@@ -319,9 +319,11 @@ bool MMCifReader::OnBeginLoop(const StarLoopDesc& header)
     cat_available = true;
   } else if (header.GetCategory()=="struct_ref_seq_dif") {
     category_ = STRUCT_REF_SEQ_DIF;
+    // mandatory
     this->TryStoreIdx(SRSD_ALIGN_ID, "align_id", header);
-    this->TryStoreIdx(SRSD_SEQ_RNUM, "seq_num", header);
-    this->TryStoreIdx(SRSD_DB_RNUM, "pdbx_seq_db_seq_num", header);
+    // optional
+    indices_[SRSD_SEQ_RNUM]=header.GetIndex("seq_num");
+    indices_[SRSD_DB_RNUM]=header.GetIndex("pdbx_seq_db_seq_num");
     indices_[SRSD_DETAILS]=header.GetIndex("details");
     cat_available = true;
   } else if (header.GetCategory()=="database_PDB_rev") {
@@ -1693,17 +1695,23 @@ void MMCifReader::ParseStructRefSeqDif(const std::vector<StringRef>& columns)
 {
   String aln_id=columns[indices_[SRSD_ALIGN_ID]].str();
   String db_rnum;
-  if (!is_undef(columns[indices_[SRSD_DB_RNUM]])) {
+  if (indices_[SRSD_DB_RNUM] != -1) {
     db_rnum=columns[indices_[SRSD_DB_RNUM]].str();
+  } else {
+ 	 	LOG_INFO("Ignoring struct_ref_seq_dif with missing data item "
+ 	 	         "pdbx_seq_db_seq_num");
+ 	 	 return;
   }
-  std::pair<bool,int> seq_rnum(true, -1);
-  if (!is_undef(columns[indices_[SRSD_SEQ_RNUM]])) {
+  std::pair<bool,int> seq_rnum;
+  if (indices_[SRSD_SEQ_RNUM] != -1) {
     seq_rnum=this->TryGetInt(columns[indices_[SRSD_SEQ_RNUM]],
                              "_struct_ref_seq_dif.seq_num",
                              profile_.fault_tolerant);
     
   }
   if (!seq_rnum.first) {
+ 	 	LOG_INFO("Ignoring struct_ref_seq_dif with missing data item "
+ 	 	         "seq_num");
     return;
   }
   String details;
