@@ -1702,12 +1702,15 @@ void MMCifReader::ParseStructRefSeqDif(const std::vector<StringRef>& columns)
  	 	         "pdbx_seq_db_seq_num");
  	 	 return;
   }
+
   std::pair<bool,int> seq_rnum;
   if (indices_[SRSD_SEQ_RNUM] != -1) {
-    seq_rnum=this->TryGetInt(columns[indices_[SRSD_SEQ_RNUM]],
-                             "_struct_ref_seq_dif.seq_num",
-                             profile_.fault_tolerant);
-    
+    StringRef col = columns[indices_[SRSD_SEQ_RNUM]];
+    if (col.size()!=1 || (col[0]!='?' && col[0]!='.')) {
+      seq_rnum=this->TryGetInt(col,
+                               "_struct_ref_seq_dif.seq_num",
+                               profile_.fault_tolerant);
+    }
   }
   if (!seq_rnum.first) {
  	 	LOG_INFO("Ignoring struct_ref_seq_dif with missing data item "
