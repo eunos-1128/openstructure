@@ -1711,8 +1711,7 @@ void MMCifReader::ParseStructRefSeqDif(const std::vector<StringRef>& columns)
     }
   }
   if (!seq_rnum.first) {
- 	 	LOG_INFO("Ignoring struct_ref_seq_dif with missing data item "
- 	 	         "seq_num");
+    LOG_WARNING("Ignoring struct_ref_seq_dif with missing data item seq_num");
     return;
   }
   String details;
