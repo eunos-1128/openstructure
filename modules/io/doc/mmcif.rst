@@ -45,8 +45,8 @@ The following categories of a mmCIF file are considered by the reader:
 * ``pdbx_database_PDB_obs_spr``: Verbose information on obsoleted/ superseded
   entries, stored in :class:`MMCifInfoObsolete`
 * ``struct_ref`` stored in :class:`MMCifInfoStructRef`
-* ``struct_ref_seq`` stored in :class:`MMCifInfoStructRefSeqDif`
-* ``struct_ref_seq_dif`` stored in :class:`MMCifInfoStructRefDif`
+* ``struct_ref_seq`` stored in :class:`MMCifInfoStructRefSeq`
+* ``struct_ref_seq_dif`` stored in :class:`MMCifInfoStructRefSeqDif`
 * ``database_pdb_rev`` (mmCIF dictionary version < 5) stored in
   :class:`MMCifInfoRevisions`
 * ``pdbx_audit_revision_history`` and ``pdbx_audit_revision_details``
@@ -140,7 +140,7 @@ of the annotation available.
     :meth:`SetMethod`.
 
     Some PDB entries have multiple experimental methods. This function
-    only a single one of them.
+    returns only a single one of them.
 
   .. attribute:: resolution
 
@@ -194,7 +194,11 @@ of the annotation available.
 
   .. attribute:: struct_refs
 
-    Lists all links to external databases in the mmCIF file.
+    Lists all links to external databases in the mmCIF file as a
+    list of :class:`MMCifInfoStructRef`.
+
+    Also available as :meth:`GetStructRefs`. May also be modified by
+    :meth:`SetStructRefs`.
 
   .. attribute:: revisions
 
@@ -286,6 +290,16 @@ of the annotation available.
     See :attr:`struct_details`
 
   .. method:: GetStructDetails()
+
+    See :attr:`struct_details`
+
+  .. method:: SetStructRef(refs)
+
+    See :attr:`struct_refs`
+
+  .. method:: GetStructRef()
+
+    See :attr:`struct_refs`
 
   .. method:: AddMMCifPDBChainTr(cif_chain_id, pdb_chain_id)
 
@@ -1141,16 +1155,22 @@ of the annotation available.
     :attr:`db_name`.
 
     :type: :class:`str`
-
-  .. method:: GetAlignedSeq(name)
-
-    Returns the aligned sequence for the given name, None if the sequence does 
-    not exist.
   
   .. attribute:: aligned_seqs
 
     List of aligned sequences (all entries of the struct_ref_seq category 
-    mapping to this struct_ref).
+    mapping to this struct_ref) as :class:`MMCifInfoStructRefSeq`.
+
+    Also available as :meth:`GetAlignedSeqs`.
+
+  .. method:: GetAlignedSeq(name)
+
+    Returns the aligned sequence for the given name, None if the sequence does
+    not exist.
+
+  .. method:: GetAlignedSeqs()
+
+    See :attr:`aligned_seqs`
 
 .. class:: MMCifInfoStructRefSeq
 
@@ -1181,8 +1201,8 @@ of the annotation available.
 
   .. attribute:: difs
 
-    List of differences between the deposited sequence and the sequence in the 
-    database.
+    List of differences (:class:`MMCifInfoStructRefSeqDif`) between the
+    deposited sequence and the sequence in the database.
 
   .. attribute:: chain_name
 
@@ -1193,11 +1213,18 @@ of the annotation available.
   A particular difference between the deposited sequence and the sequence in 
   the database.
 
-  .. attribute:: rnum
+  .. attribute:: seq_rnum
 
     The residue number (1-based) of the residue in the deposited sequence
 
     :type: :class:`int`
+
+  .. attribute:: db_rnum
+
+    The number of the residue in the database sequence or '?' if
+    'struct_ref_seq_dif.pdbx_seq_db_seq_num' was missing.
+
+    :type: :class:`str`
 
   .. attribute:: details
 
