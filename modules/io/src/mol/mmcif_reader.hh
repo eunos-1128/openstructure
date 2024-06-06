@@ -203,7 +203,7 @@ protected:
   /// \param columns data row
   void ParseCitation(const std::vector<StringRef>& columns);
 
-	const MMCifInfoStructRefs& GetStructRefs() const { return struct_refs_; }
+  const MMCifInfoStructRefs& GetStructRefs() const { return struct_refs_; }
 
   /// \brief Fetch mmCIF citation_author information
   ///
@@ -423,13 +423,13 @@ private:
 
   // \enum items of the struct_ref category
   typedef enum {
-  	SR_ENTITY_ID,
-  	SR_ID,
-  	SR_DB_CODE,
-  	SR_DB_NAME,
-  	SR_DB_ACCESS
-	} StructRefItems;
-	
+    SR_ENTITY_ID,
+    SR_ID,
+    SR_DB_CODE,
+    SR_DB_NAME,
+    SR_DB_ACCESS
+  } StructRefItems;
+
   /// \enum items of the struct_ref_seq category
   typedef enum {
     SRS_ALIGN_ID,

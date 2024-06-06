@@ -195,18 +195,18 @@ void MMCifInfoBioUnit::Merge(MMCifInfoBioUnit& from)
 
 MMCifInfoStructRefSeqPtr 
 MMCifInfoStructRef::AddAlignedSeq(const String& aid, const String& chain_name, 
-		                              int seq_begin, int seq_end, int db_begin, 
-		                              int db_end)
+                                  int seq_begin, int seq_end, int db_begin, 
+                                  int db_end)
 {
-	std::map<String, MMCifInfoStructRefSeqPtr>::const_iterator i=seqs_.find(aid);
-	if (i!=seqs_.end()) {
-		throw IOException("duplicate align_id for struct_ref '"+id_+"'");
-	}
-	MMCifInfoStructRefSeqPtr p(new MMCifInfoStructRefSeq(aid, chain_name,
-				                                               seq_begin, seq_end, 
-				                                               db_begin, db_end));
-	seqs_[aid]=p;
-	return p;
+  std::map<String, MMCifInfoStructRefSeqPtr>::const_iterator i=seqs_.find(aid);
+  if (i!=seqs_.end()) {
+    throw IOException("duplicate align_id for struct_ref '"+id_+"'");
+  }
+  MMCifInfoStructRefSeqPtr p(new MMCifInfoStructRefSeq(aid, chain_name,
+                                                       seq_begin, seq_end, 
+                                                       db_begin, db_end));
+  seqs_[aid]=p;
+  return p;
 }
 
 
@@ -221,10 +221,10 @@ MMCifInfoStructRef::GetAlignedSeq(const String& aid) const
 MMCifInfoStructRefSeqDifPtr 
 MMCifInfoStructRefSeq::AddDif(int seq_rnum, const String& db_rnum, const String& details)
 {
-	MMCifInfoStructRefSeqDifPtr d(new MMCifInfoStructRefSeqDif(seq_rnum, db_rnum,
-				                                                     details));
-	difs_.push_back(d);
-	return d;
+  MMCifInfoStructRefSeqDifPtr d(new MMCifInfoStructRefSeqDif(seq_rnum, db_rnum,
+                                                             details));
+  difs_.push_back(d);
+  return d;
 }
 
 void MMCifInfo::AddEntityBranchLink(String chain_name,

@@ -33,7 +33,7 @@ namespace ost { namespace io {
 
 bool is_undef(StringRef value)
 {
-	return value.size()==1 && (value[0]=='?' || value[0]=='.');
+  return value.size()==1 && (value[0]=='?' || value[0]=='.');
 }
 
 MMCifReader::MMCifReader(std::istream& stream, mol::EntityHandle& ent_handle,
@@ -308,7 +308,7 @@ bool MMCifReader::OnBeginLoop(const StarLoopDesc& header)
     indices_[SR_DB_ACCESS]=header.GetIndex("pdbx_db_accession");
     cat_available = true;
   } else if (header.GetCategory() == "struct_ref_seq") {
-    category_ = STRUCT_REF_SEQ;	
+    category_ = STRUCT_REF_SEQ;  
     this->TryStoreIdx(SRS_ALIGN_ID, "align_id", header);
     this->TryStoreIdx(SRS_STRUCT_REF_ID, "ref_id", header);
     this->TryStoreIdx(SRS_ENT_ALIGN_BEG, "seq_align_beg", header);
@@ -1632,17 +1632,17 @@ void MMCifReader::AssignSecStructure(mol::EntityHandle ent)
 
 void MMCifReader::ParseStructRef(const std::vector<StringRef>& columns)
 {
-	String ent_id=columns[indices_[SR_ENTITY_ID]].str();
-	String db_name=columns[indices_[SR_DB_NAME]].str();
-	String db_code=columns[indices_[SR_DB_CODE]].str();
-	String id=columns[indices_[SR_ID]].str();
-	String db_access;
-	if (indices_[SR_DB_ACCESS]!=-1) {
-		db_access=columns[indices_[SR_DB_ACCESS]].str();
-	}
-	MMCifInfoStructRefPtr sr(new MMCifInfoStructRef(id, ent_id, db_name, 
-				                                          db_code, db_access));
-	struct_refs_.push_back(sr);
+  String ent_id=columns[indices_[SR_ENTITY_ID]].str();
+  String db_name=columns[indices_[SR_DB_NAME]].str();
+  String db_code=columns[indices_[SR_DB_CODE]].str();
+  String id=columns[indices_[SR_ID]].str();
+  String db_access;
+  if (indices_[SR_DB_ACCESS]!=-1) {
+    db_access=columns[indices_[SR_DB_ACCESS]].str();
+  }
+  MMCifInfoStructRefPtr sr(new MMCifInfoStructRef(id, ent_id, db_name, 
+                                                  db_code, db_access));
+  struct_refs_.push_back(sr);
 }
 
 void MMCifReader::ParseStructRefSeq(const std::vector<StringRef>& columns)
@@ -1651,43 +1651,43 @@ void MMCifReader::ParseStructRefSeq(const std::vector<StringRef>& columns)
  String sr_id=columns[indices_[SRS_STRUCT_REF_ID]].str();
  String chain_name;
  if (indices_[SRS_PDBX_STRAND_ID]!=-1) {
- 	 chain_name=columns[indices_[SRS_PDBX_STRAND_ID]].str();
+    chain_name=columns[indices_[SRS_PDBX_STRAND_ID]].str();
  }
  std::pair<bool,int> dbbeg=this->TryGetInt(columns[indices_[SRS_DB_ALIGN_BEG]], 
- 		                                        "_struct_ref_seq.db_align_beg",
- 		                                        profile_.fault_tolerant);
+                                             "_struct_ref_seq.db_align_beg",
+                                             profile_.fault_tolerant);
  std::pair<bool,int> dbend=this->TryGetInt(columns[indices_[SRS_DB_ALIGN_END]], 
- 		                                       "_struct_ref_seq.db_align_end",
- 		                                       profile_.fault_tolerant);
+                                            "_struct_ref_seq.db_align_end",
+                                            profile_.fault_tolerant);
  std::pair<bool,int> entbeg=this->TryGetInt(columns[indices_[SRS_ENT_ALIGN_BEG]], 
- 		                                        "_struct_ref_seq.seq_align_beg",
- 		                                        profile_.fault_tolerant);
+                                             "_struct_ref_seq.seq_align_beg",
+                                             profile_.fault_tolerant);
  std::pair<bool,int> entend=this->TryGetInt(columns[indices_[SRS_ENT_ALIGN_END]], 
- 		                                        "_struct_ref_seq.seq_align_END",
- 		                                        profile_.fault_tolerant);
+                                             "_struct_ref_seq.seq_align_END",
+                                             profile_.fault_tolerant);
  if (!(dbbeg.first && dbend.first && entbeg.first && entend.first)) {
- 	 return;
+    return;
  }
  bool found=false;
  for (MMCifInfoStructRefs::iterator i=struct_refs_.begin(), 
- 		  e=struct_refs_.end(); i!=e; ++i) { 
- 	 if ((*i)->GetID()==sr_id) {
-		 (*i)->AddAlignedSeq(aln_id, chain_name, entbeg.second, entend.second, 
-		 		                 dbbeg.second, dbend.second);
-		 found=true;
- 	 	 break;
- 	 }
+       e=struct_refs_.end(); i!=e; ++i) { 
+    if ((*i)->GetID()==sr_id) {
+     (*i)->AddAlignedSeq(aln_id, chain_name, entbeg.second, entend.second, 
+                          dbbeg.second, dbend.second);
+     found=true;
+       break;
+    }
  }
  if (!found) {
- 	 if (profile_.fault_tolerant) {
- 	 	 LOG_ERROR("struct_ref_seq.ref_id points to inexistent struct_ref '"
- 	 	 		       << sr_id <<  "'");
- 	 	 return;
- 	 }
-	 std::stringstream ss;
-	 ss << "struct_ref_seq.ref_id points to inexistent struct_ref '";
-	 ss << sr_id << "'";
-	 throw IOException(ss.str());
+    if (profile_.fault_tolerant) {
+       LOG_ERROR("struct_ref_seq.ref_id points to inexistent struct_ref '"
+                  << sr_id <<  "'");
+       return;
+    }
+   std::stringstream ss;
+   ss << "struct_ref_seq.ref_id points to inexistent struct_ref '";
+   ss << sr_id << "'";
+   throw IOException(ss.str());
  }
 }
 
@@ -1716,27 +1716,27 @@ void MMCifReader::ParseStructRefSeqDif(const std::vector<StringRef>& columns)
   }
   String details;
   if (indices_[SRSD_DETAILS]!=-1) {
-	  details=columns[indices_[SRSD_DETAILS]].str();
+    details=columns[indices_[SRSD_DETAILS]].str();
   }
   bool found=false;
   for (MMCifInfoStructRefs::iterator i=struct_refs_.begin(), 
- 		  e=struct_refs_.end(); i!=e; ++i) { 
- 	 if (MMCifInfoStructRefSeqPtr s=(*i)->GetAlignedSeq(aln_id)) {
-		 s->AddDif(seq_rnum.second, db_rnum, details); 
-		 found=true;
- 	 	 break;
- 	 }
+       e=struct_refs_.end(); i!=e; ++i) { 
+    if (MMCifInfoStructRefSeqPtr s=(*i)->GetAlignedSeq(aln_id)) {
+     s->AddDif(seq_rnum.second, db_rnum, details); 
+     found=true;
+       break;
+    }
  }
  if (!found) {
- 	 if (profile_.fault_tolerant) {
- 	 	 LOG_ERROR("struct_ref_seq_dif.align_id points to inexistent "
- 	 	 		       "struct_ref_seq '" << aln_id <<  "'");
- 	 	 return;
- 	 }
-	 std::stringstream ss;
-	 ss << "struct_ref_seq.ref_id points to inexistent struct_ref '";
-	 ss << aln_id << "'";
-	 throw IOException(ss.str());
+    if (profile_.fault_tolerant) {
+       LOG_ERROR("struct_ref_seq_dif.align_id points to inexistent "
+                  "struct_ref_seq '" << aln_id <<  "'");
+       return;
+    }
+   std::stringstream ss;
+   ss << "struct_ref_seq.ref_id points to inexistent struct_ref '";
+   ss << aln_id << "'";
+   throw IOException(ss.str());
  }
 }
 

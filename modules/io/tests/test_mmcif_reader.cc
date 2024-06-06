@@ -1098,7 +1098,7 @@ BOOST_AUTO_TEST_CASE(mmcif_parseatomident)
     columns.push_back(StringRef("30.691", 6)); // Cartn_y
     columns.push_back(StringRef("11.795", 6)); // Cartn_z
     BOOST_CHECK_EQUAL(tmmcif_p.ParseAtomIdent(columns, auth_chain_name,
-    			                                    cif_chain_name, res_name,
+                                              cif_chain_name, res_name,
                                               resnum, valid_res_num, atom_name,
                                               alt_loc), true);
     columns.pop_back();
@@ -1118,7 +1118,7 @@ BOOST_AUTO_TEST_CASE(mmcif_parseatomident)
     columns.push_back(StringRef("30.691", 6)); // Cartn_y
     columns.push_back(StringRef("11.795", 6)); // Cartn_z
     BOOST_CHECK_EQUAL(tmmcif_p.ParseAtomIdent(columns, auth_chain_name, 
-    			                                    cif_chain_name, res_name,
+                                              cif_chain_name, res_name,
                                               resnum, valid_res_num, atom_name,
                                               alt_loc), false);
   }

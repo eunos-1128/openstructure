@@ -846,47 +846,47 @@ typedef std::vector<MMCifInfoStructRefSeqDifPtr> MMCifInfoStructRefSeqDifs;
 class DLLEXPORT_OST_IO MMCifInfoStructRef {
 public:
   MMCifInfoStructRef(const String& id, const String& ent_id, 
-  		               const String& db_name, 
-  		               const String& db_ident, const String& db_access):
-  	id_(id), ent_id_(ent_id), db_name_(db_name), db_ident_(db_ident), 
-  	db_access_(db_access)
-	{ }
+                     const String& db_name,
+                     const String& db_ident, const String& db_access):
+    id_(id), ent_id_(ent_id), db_name_(db_name), db_ident_(db_ident),
+    db_access_(db_access)
+  { }
   const String& GetID() const { return id_; }
   const String& GetDBName() const { return db_name_; }
   const String& GetDBID() const { return db_ident_; }
   const String& GetEntityID() const { return ent_id_; }
   const String& GetDBAccess() const { return db_access_; }
-  MMCifInfoStructRefSeqPtr AddAlignedSeq(const String& align_id, 
-  		                                   const String& chain_name, int seq_begin, 
-  		                                   int seq_end, int db_begin, int db_end);
+  MMCifInfoStructRefSeqPtr AddAlignedSeq(const String& align_id,
+                                         const String& chain_name, int seq_begin,
+                                         int seq_end, int db_begin, int db_end);
   MMCifInfoStructRefSeqPtr GetAlignedSeq(const String& align_id) const;
   MMCifInfoStructRefSeqs GetAlignedSeqs() const
-	{
-		MMCifInfoStructRefSeqs seqs;
-		seqs.reserve(seqs_.size());
-		for (std::map<String, MMCifInfoStructRefSeqPtr>::const_iterator
-				 i=seqs_.begin(), e=seqs_.end(); i!=e; ++i) {
-		  seqs.push_back(i->second);
-		}
-		return seqs;
-	}
+  {
+    MMCifInfoStructRefSeqs seqs;
+    seqs.reserve(seqs_.size());
+    for (std::map<String, MMCifInfoStructRefSeqPtr>::const_iterator
+         i=seqs_.begin(), e=seqs_.end(); i!=e; ++i) {
+      seqs.push_back(i->second);
+    }
+    return seqs;
+  }
 private:
-	String  id_;
-	String  ent_id_;
-	String  db_name_;
-	String  db_ident_;
-	String  db_access_;
-	std::map<String, MMCifInfoStructRefSeqPtr> seqs_;
+  String  id_;
+  String  ent_id_;
+  String  db_name_;
+  String  db_ident_;
+  String  db_access_;
+  std::map<String, MMCifInfoStructRefSeqPtr> seqs_;
 };
 
 class DLLEXPORT_OST_IO MMCifInfoStructRefSeq {
 public:
-  MMCifInfoStructRefSeq(const String& align_id, const String& chain_name, 
-  		                  int seq_begin, int seq_end, 
-  		                  int db_begin, int db_end):
-  	id_(align_id), chain_name_(chain_name), 
-  	seq_begin_(seq_begin), seq_end_(seq_end), db_begin_(db_begin), db_end_(db_end)
-	{ }
+  MMCifInfoStructRefSeq(const String& align_id, const String& chain_name,
+                        int seq_begin, int seq_end,
+                        int db_begin, int db_end):
+    id_(align_id), chain_name_(chain_name),
+    seq_begin_(seq_begin), seq_end_(seq_end), db_begin_(db_begin), db_end_(db_end)
+  { }
 
   const String& GetID() const { return id_; }
   const String& GetChainName() const { return chain_name_; }
@@ -894,30 +894,30 @@ public:
   int GetSeqEnd() const { return seq_end_; }
   int GetDBBegin() const { return db_begin_; }
   int GetDBEnd() const { return db_end_; }
-  MMCifInfoStructRefSeqDifPtr AddDif(int seq_num, const String& db_rnum, 
+  MMCifInfoStructRefSeqDifPtr AddDif(int seq_num, const String& db_rnum,
                                      const String& details);
   const std::vector<MMCifInfoStructRefSeqDifPtr>& GetDifs() const { return difs_; }
 private:
-	String   id_;
-	String   chain_name_;
-	int      seq_begin_;
-	int      seq_end_;
-	int      db_begin_;
-	int      db_end_;
-	std::vector<MMCifInfoStructRefSeqDifPtr> difs_;
+  String   id_;
+  String   chain_name_;
+  int      seq_begin_;
+  int      seq_end_;
+  int      db_begin_;
+  int      db_end_;
+  std::vector<MMCifInfoStructRefSeqDifPtr> difs_;
 };
 
 class DLLEXPORT_OST_IO MMCifInfoStructRefSeqDif {
 public:
-	MMCifInfoStructRefSeqDif(int seq_rnum, const String& db_rnum, const String& details): 
-		seq_rnum_(seq_rnum), db_rnum_(db_rnum), details_(details) {}
-	int GetSeqRNum() const { return seq_rnum_;}
-	const String& GetDBRNum() const { return db_rnum_; }
-	const String& GetDetails() const { return details_; }
+  MMCifInfoStructRefSeqDif(int seq_rnum, const String& db_rnum, const String& details):
+    seq_rnum_(seq_rnum), db_rnum_(db_rnum), details_(details) {}
+  int GetSeqRNum() const { return seq_rnum_;}
+  const String& GetDBRNum() const { return db_rnum_; }
+  const String& GetDetails() const { return details_; }
 private:
-	int    seq_rnum_;
-	String db_rnum_;
-	String details_;
+  int    seq_rnum_;
+  String db_rnum_;
+  String details_;
 };
 
 /// \brief Store information on branched structures (oligosaccharides)
