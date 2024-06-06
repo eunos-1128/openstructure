@@ -301,27 +301,31 @@ bool MMCifReader::OnBeginLoop(const StarLoopDesc& header)
     cat_available = true;
   } else if (header.GetCategory() == "struct_ref") {
     category_ = STRUCT_REF;
+    // mandatory items
     this->TryStoreIdx(SR_ENTITY_ID, "entity_id", header);
     this->TryStoreIdx(SR_ID, "id", header);
     this->TryStoreIdx(SR_DB_NAME, "db_name", header);
     this->TryStoreIdx(SR_DB_CODE, "db_code", header);
+    // optional items
     indices_[SR_DB_ACCESS]=header.GetIndex("pdbx_db_accession");
     cat_available = true;
   } else if (header.GetCategory() == "struct_ref_seq") {
-    category_ = STRUCT_REF_SEQ;  
+    category_ = STRUCT_REF_SEQ;
+    // mandatory items
     this->TryStoreIdx(SRS_ALIGN_ID, "align_id", header);
     this->TryStoreIdx(SRS_STRUCT_REF_ID, "ref_id", header);
     this->TryStoreIdx(SRS_ENT_ALIGN_BEG, "seq_align_beg", header);
     this->TryStoreIdx(SRS_ENT_ALIGN_END, "seq_align_end", header);
     this->TryStoreIdx(SRS_DB_ALIGN_BEG, "db_align_beg", header);
     this->TryStoreIdx(SRS_DB_ALIGN_END, "db_align_end", header);
+    // optional items
     indices_[SRS_PDBX_STRAND_ID]=header.GetIndex("pdbx_strand_id");
     cat_available = true;
   } else if (header.GetCategory()=="struct_ref_seq_dif") {
     category_ = STRUCT_REF_SEQ_DIF;
-    // mandatory
+    // mandatory items
     this->TryStoreIdx(SRSD_ALIGN_ID, "align_id", header);
-    // optional
+    // optional items
     indices_[SRSD_SEQ_RNUM]=header.GetIndex("seq_num");
     indices_[SRSD_DB_RNUM]=header.GetIndex("pdbx_seq_db_seq_num");
     indices_[SRSD_DETAILS]=header.GetIndex("details");
