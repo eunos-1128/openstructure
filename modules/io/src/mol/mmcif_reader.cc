@@ -1698,9 +1698,8 @@ void MMCifReader::ParseStructRefSeqDif(const std::vector<StringRef>& columns)
   if (indices_[SRSD_DB_RNUM] != -1) {
     db_rnum=columns[indices_[SRSD_DB_RNUM]].str();
   } else {
- 	 	LOG_INFO("Ignoring struct_ref_seq_dif with missing data item "
- 	 	         "pdbx_seq_db_seq_num");
- 	 	 return;
+    db_rnum="?";
+    LOG_INFO("Setting missing struct_ref_seq_dif.pdbx_seq_db_seq_num to '?");
   }
 
   std::pair<bool,int> seq_rnum;
