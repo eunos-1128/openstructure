@@ -525,8 +525,10 @@ void export_mmcif_io()
                                    return_value_policy<copy_const_reference>()))
     .def("SetStructDetails", &MMCifInfo::SetStructDetails)
     .def("GetStructDetails", &MMCifInfo::GetStructDetails)
-    .def("SetStructRefs", &MMCifInfo::SetStructRefs)
-    .def("GetStructRefs", &MMCifInfo::GetStructRefs)
+    .def("SetStructRefs", make_function(&MMCifInfo::SetStructRefs,
+                                   return_value_policy<copy_const_reference>()))
+    .def("GetStructRefs", make_function(&MMCifInfo::GetStructRefs,
+                                   return_value_policy<copy_const_reference>()))
     .def("SetObsoleteInfo", &MMCifInfo::SetObsoleteInfo)
     .def("GetObsoleteInfo", &MMCifInfo::GetObsoleteInfo)
     .def("AddMMCifPDBChainTr", &MMCifInfo::AddMMCifPDBChainTr)
