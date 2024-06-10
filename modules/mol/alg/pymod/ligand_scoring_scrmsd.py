@@ -40,22 +40,21 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
     * lddt_lp: lDDT of the binding site used for superposition
     * bs_ref_res: :class:`list` of binding site residues in target
     * bs_ref_res_mapped: :class:`list` of target binding site residues that
-                         are mapped to model
+      are mapped to model
     * bs_mdl_res_mapped: :class:`list` of same length with respective model
-                         residues
+      residues
     * bb_rmsd: Backbone RMSD (CA, C3' for nucleotides) for mapped residues
-               given transform
+      given transform
     * target_ligand: The actual target ligand for which the score was computed
     * model_ligand: The actual model ligand for which the score was computed
     * chain_mapping: :class:`dict` with a chain mapping of chains involved in
-                      binding site - key: trg chain name, value: mdl chain name
+      binding site - key: trg chain name, value: mdl chain name
     * transform: :class:`geom.Mat4` to transform model binding site onto target
-                 binding site
+      binding site
     * inconsistent_residues: :class:`list` of :class:`tuple` representing
-                             residues with inconsistent residue names upon
-                             mapping (which is given by bs_ref_res_mapped
-                             and bs_mdl_res_mapped). Tuples have two elements:
-                             1) trg residue 2) mdl residue
+      residues with inconsistent residue names upon mapping (which is given by
+      bs_ref_res_mapped and bs_mdl_res_mapped). Tuples have two elements:
+      1) trg residue 2) mdl residue
 
     :param model: Passed to parent constructor - see :class:`LigandScorer`.
     :type model: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
@@ -180,7 +179,8 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
             rmsd = _SCRMSD_symmetries(symmetries, model_ligand, 
                                       target_ligand, transformation=r.transform)
 
-            if best_rmsd_result["rmsd"] is None or rmsd < best_rmsd_result["rmsd"]:
+            if best_rmsd_result["rmsd"] is None or \
+               rmsd < best_rmsd_result["rmsd"]:
                 best_rmsd_result = {"rmsd": rmsd,
                                     "lddt_lp": r.lDDT,
                                     "bs_ref_res": r.substructure.residues,
@@ -191,7 +191,8 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
                                     "model_ligand": model_ligand,
                                     "chain_mapping": r.GetFlatChainMapping(),
                                     "transform": r.transform,
-                                    "inconsistent_residues": r.inconsistent_residues}
+                                    "inconsistent_residues":
+                                    r.inconsistent_residues}
 
         target_ligand_state = 0
         model_ligand_state = 0
@@ -203,13 +204,15 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
             # try to identify error states
             best_rmsd = np.nan
             error_state = 20 # unknown error
-            if self._get_target_binding_site(target_ligand).GetResidueCount() == 0:
+            N = self._get_target_binding_site(target_ligand).GetResidueCount() 
+            if N == 0:
                 pair_state = 6 # binding_site
                 target_ligand_state = 10
             elif len(representations) == 0:
                 pair_state = 11
 
-        return (best_rmsd, pair_state, target_ligand_state, model_ligand_state, best_rmsd_result)
+        return (best_rmsd, pair_state, target_ligand_state, model_ligand_state,
+                best_rmsd_result)
 
     def _score_dir(self):
         """ Implements interface from parent
@@ -223,7 +226,8 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
             # all possible binding sites, independent from actual model ligand
             key = (target_ligand.handle.hash_code, 0)
         else:
-            key = (target_ligand.handle.hash_code, model_ligand.handle.hash_code)
+            key = (target_ligand.handle.hash_code,
+                   model_ligand.handle.hash_code)
 
         if key not in self._repr:
             ref_bs = self._get_target_binding_site(target_ligand)
@@ -232,10 +236,12 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
                     ref_bs, self.model, inclusion_radius=self.lddt_lp_radius,
                     topn=self.binding_sites_topn)
             else:
+                repr_in = self._get_get_repr_input(model_ligand)
+                radius = self.lddt_lp_radius
                 reprs = self._chain_mapper.GetRepr(ref_bs, self.model,
-                                                  inclusion_radius=self.lddt_lp_radius,
+                                                  inclusion_radius=radius,
                                                   topn=self.binding_sites_topn,
-                                                  chem_mapping_result = self._get_get_repr_input(model_ligand))
+                                                  chem_mapping_result=repr_in)
             self._repr[key] = reprs
 
         return self._repr[key]
@@ -245,35 +251,41 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
         if target_ligand.handle.hash_code not in self._binding_sites:
 
             # create view of reference binding site
-            ref_residues_hashes = set()  # helper to keep track of added residues
+            ref_residues_hashes = set() # helper to keep track of added residues
             ignored_residue_hashes = {target_ligand.hash_code}
             for ligand_at in target_ligand.atoms:
-                close_atoms = self.target.FindWithin(ligand_at.GetPos(), self.bs_radius)
+                close_atoms = self.target.FindWithin(ligand_at.GetPos(),
+                                                     self.bs_radius)
                 for close_at in close_atoms:
                     # Skip any residue not in the chain mapping target
                     ref_res = close_at.GetResidue()
                     h = ref_res.handle.GetHashCode()
                     if h not in ref_residues_hashes and \
                             h not in ignored_residue_hashes:
-                        if self._chain_mapper.target.ViewForHandle(ref_res).IsValid():
+                        view = self._chain_mapper.target.ViewForHandle(ref_res) 
+                        if view.IsValid():
                             h = ref_res.handle.GetHashCode()
                             ref_residues_hashes.add(h)
                         elif ref_res.is_ligand:
-                            LogWarning("Ignoring ligand %s in binding site of %s" % (
-                                ref_res.qualified_name, target_ligand.qualified_name))
+                            msg = f"Ignoring ligand {ref_res.qualified_name} "
+                            msg += "in binding site of "
+                            msg += str(target_ligand.qualified_name)
+                            LogWarning(msg)
                             ignored_residue_hashes.add(h)
                         elif ref_res.chem_type == mol.ChemType.WATERS:
                             pass # That's ok, no need to warn
                         else:
-                            LogWarning("Ignoring residue %s in binding site of %s" % (
-                                ref_res.qualified_name, target_ligand.qualified_name))
+                            msg = f"Ignoring residue {ref_res.qualified_name} "
+                            msg += "in binding site of "
+                            msg += str(target_ligand.qualified_name)
+                            LogWarning(msg)
                             ignored_residue_hashes.add(h)
 
             ref_bs = self.target.CreateEmptyView()
             if ref_residues_hashes:
-                # reason for doing that separately is to guarantee same ordering of
-                # residues as in underlying entity. (Reorder by ResNum seems only
-                # available on ChainHandles)
+                # reason for doing that separately is to guarantee same ordering
+                # of residues as in underlying entity. (Reorder by ResNum seems
+                # only available on ChainHandles)
                 for ch in self.target.chains:
                     for r in ch.residues:
                         if r.handle.GetHashCode() in ref_residues_hashes:
@@ -307,9 +319,9 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
         if self.__ref_mdl_alns is None:
             self.__ref_mdl_alns = \
             chain_mapping._GetRefMdlAlns(self._chain_mapper.chem_groups,
-                                         self._chain_mapper.chem_group_alignments,
-                                         self._chem_mapping,
-                                         self._chem_group_alns)
+                                    self._chain_mapper.chem_group_alignments,
+                                    self._chem_mapping,
+                                    self._chem_group_alns)
         return self.__ref_mdl_alns
   
     @property
@@ -383,17 +395,19 @@ def SCRMSD(model_ligand, target_ligand, transformation=geom.Mat4(),
       generating at least that many isomorphisms and can take some time.
     :type max_symmetries: :class:`int`
     :rtype: :class:`float`
-    :raises: :class:`NoSymmetryError` when no symmetry can be found,
-             :class:`DisconnectedGraphError` when ligand graph is disconnected,
-             :class:`TooManySymmetriesError` when more than `max_symmetries`
-             isomorphisms are found.
+    :raises: :class:`ost.mol.alg.ligand_scoring_base.NoSymmetryError` when no
+             symmetry can be found,
+             :class:`ost.mol.alg.ligand_scoring_base.DisconnectedGraphError`
+             when ligand graph is disconnected,
+             :class:`ost.mol.alg.ligand_scoring_base.TooManySymmetriesError`
+             when more than *max_symmetries* isomorphisms are found.
     """
 
     symmetries = ligand_scoring_base.ComputeSymmetries(model_ligand,
-    	                                               target_ligand,
-                                                       substructure_match=substructure_match,
-                                                       by_atom_index=True,
-                                                       max_symmetries=max_symmetries)
+                                        target_ligand,
+                                        substructure_match=substructure_match,
+                                        by_atom_index=True,
+                                        max_symmetries=max_symmetries)
     return _SCRMSD_symmetries(symmetries, model_ligand, target_ligand,
                               transformation)
 

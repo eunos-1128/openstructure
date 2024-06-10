@@ -52,9 +52,9 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
     * target_ligand: The actual target ligand for which the score was computed
     * model_ligand: The actual model ligand for which the score was computed
     * bs_ref_res: :class:`set` of residues with potentially non-zero
-                  contribution to score. That is every residue with at least one
-                  atom within *lddt_pli_radius* + max(*lddt_pli_thresholds*) of
-                  the ligand.
+      contribution to score. That is every residue with at least one
+      atom within *lddt_pli_radius* + max(*lddt_pli_thresholds*) of
+      the ligand.
     * bs_mdl_res: Same for model
 
     :param model: Passed to parent constructor - see :class:`LigandScorer`.
@@ -292,7 +292,8 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
                     if a is not None and b is not None:
                         flat_mapping[b] = a
 
-            # for each mdl bs atom (as atom hash), the trg bs atoms (as index in scorer)
+            # for each mdl bs atom (as atom hash), the trg bs atoms (as index in
+            # scorer)
             bs_atom_mapping = dict()
             for mdl_cname, ref_cname in flat_mapping.items():
                 aln = cut_ref_mdl_alns[(ref_cname, mdl_cname)]
@@ -347,7 +348,8 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
                     # mask selects entries in trg_bs_indices that are not yet
                     # part of classic lDDT ref_indices for atom at trg_a_idx
                     # => added mdl contacts
-                    mask = np.isin(trg_bs_indices, ref_indices[ligand_start_idx + trg_a_idx],
+                    mask = np.isin(trg_bs_indices,
+                                   ref_indices[ligand_start_idx + trg_a_idx],
                                    assume_unique=True, invert=True)
                     added_indices = np.asarray([], dtype=np.int64)
                     added_distances = np.asarray([], dtype=np.float64)
@@ -355,17 +357,19 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
                         # compute ref distances on reference positions
                         added_indices = trg_bs_indices[mask]
                         tmp = scorer.positions.take(added_indices, axis=0)
-                        np.subtract(tmp, trg_ligand_pos[trg_a_idx][None, :], out=tmp)
+                        np.subtract(tmp, trg_ligand_pos[trg_a_idx][None, :],
+                                    out=tmp)
                         np.square(tmp, out=tmp)
                         tmp = tmp.sum(axis=1)
-                        np.sqrt(tmp, out=tmp)  # distances against all relevant atoms
+                        np.sqrt(tmp, out=tmp)
                         added_distances = tmp
 
                     # extract the distances towards bs atoms that are symmetric
                     sym_mask = np.isin(added_indices, symmetric_atoms,
                                        assume_unique=True)
 
-                    cache[(mdl_a_idx, trg_a_idx)] = (added_indices, added_distances,
+                    cache[(mdl_a_idx, trg_a_idx)] = (added_indices,
+                                                     added_distances,
                                                      added_indices[sym_mask],
                                                      added_distances[sym_mask])
 
@@ -401,7 +405,8 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
         sym_idx_collector = [None] * scorer.n_atoms
         sym_dist_collector = [None] * scorer.n_atoms
 
-        for mapping, s_cache, p_cache in zip(chain_mappings, scoring_cache, penalty_cache):
+        for mapping, s_cache, p_cache in zip(chain_mappings, scoring_cache,
+                                             penalty_cache):
 
             lddt_chain_mapping = dict()
             lddt_alns = dict()
@@ -437,17 +442,17 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
             for mdl_ch in mdl_chains:
                 if mdl_ch not in lddt_chain_mapping:
                     # check which chain in trg is closest
-                    chem_group_idx = None
+                    chem_grp_idx = None
                     for i, m in enumerate(self._chem_mapping):
                         if mdl_ch in m:
-                            chem_group_idx = i
+                            chem_grp_idx = i
                             break
-                    if chem_group_idx is None:
+                    if chem_grp_idx is None:
                         raise RuntimeError("This should never happen... "
                                            "ask Gabriel...")
                     closest_ch = None
                     closest_dist = None
-                    for trg_ch in self._chain_mapper.chem_groups[chem_group_idx]:
+                    for trg_ch in self._chain_mapper.chem_groups[chem_grp_idx]:
                         if trg_ch not in lddt_chain_mapping.values():
                             if trg_ch not in already_mapped:
                                 ch = self._chain_mapper.target.FindChain(trg_ch) 
@@ -526,7 +531,8 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
                 conserved = np.sum(scorer._EvalAtoms(pos, ligand_at_indices,
                                                      self.lddt_pli_thresholds,
                                                      funky_ref_indices,
-                                                     funky_ref_distances), axis=0)
+                                                     funky_ref_distances),
+                                   axis=0)
                 score = None
                 if N > 0:
                     score = np.mean(conserved/N)
@@ -692,7 +698,8 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
                 # the select statement also excludes the ligand in mdl_bs
                 # as it resides in a separate chain
                 mdl_cname = ch_tuple[1]
-                mdl_bs_ch = mdl_bs.Select(f"cname={mol.QueryQuoteName(mdl_cname)}")
+                query = "cname=" + mol.QueryQuoteName(mdl_cname)
+                mdl_bs_ch = mdl_bs.Select(query)
                 for a in mdl_ligand_res.atoms:
                     close_atoms = \
                     mdl_bs_ch.FindWithin(a.GetPos(), self.lddt_pli_radius)
@@ -895,8 +902,10 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
             self.__mappable_atoms = dict()
             for (ref_cname, mdl_cname), aln in self._ref_mdl_alns.items():
                 self._mappable_atoms[(ref_cname, mdl_cname)] = set()
-                ref_ch = self._chain_mapper.target.Select(f"cname={mol.QueryQuoteName(ref_cname)}")
-                mdl_ch = self._chain_mapping_mdl.Select(f"cname={mol.QueryQuoteName(mdl_cname)}")
+                ref_query = f"cname={mol.QueryQuoteName(ref_cname)}"
+                mdl_query = f"cname={mol.QueryQuoteName(mdl_cname)}"
+                ref_ch = self._chain_mapper.target.Select(ref_query)
+                mdl_ch = self._chain_mapping_mdl.Select(mdl_query)
                 aln.AttachView(0, ref_ch)
                 aln.AttachView(1, mdl_ch)
                 for col in aln:
@@ -932,9 +941,9 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
         if self.__ref_mdl_alns is None:
             self.__ref_mdl_alns = \
             chain_mapping._GetRefMdlAlns(self._chain_mapper.chem_groups,
-                                         self._chain_mapper.chem_group_alignments,
-                                         self._chem_mapping,
-                                         self._chem_group_alns)
+                                    self._chain_mapper.chem_group_alignments,
+                                    self._chem_mapping,
+                                    self._chem_group_alns)
         return self.__ref_mdl_alns
   
     @property

@@ -6,7 +6,7 @@ from ost import LogWarning, LogScript, LogVerbose, LogDebug
 from ost.mol.alg import chain_mapping
 
 class LigandScorer:
-    """ Scorer class to compute various small molecule ligand (non polymer) scores.
+    """ Scorer to compute various small molecule ligand (non polymer) scores.
 
     .. note ::
       Extra requirements:
@@ -16,7 +16,8 @@ class LigandScorer:
 
     :class:`LigandScorer` is an abstract base class dealing with all the setup,
     data storage, enumerating ligand symmetries and target/model ligand
-    matching/assignment. But actual score computation is delegated to child classes.
+    matching/assignment. But actual score computation is delegated to child
+    classes.
 
     At the moment, two such classes are available:
 
@@ -26,25 +27,10 @@ class LigandScorer:
     * :class:`ost.mol.alg.ligand_scoring_scrmsd.SCRMSDScorer`
       that computes a binding-site superposed, symmetry-corrected RMSD.
 
-    By default, only exact matches between target and model ligands are
-    considered. This is a problem when the target only contains a subset
-    of the expected atoms (for instance if atoms are missing in an
-    experimental structure, which often happens in the PDB). With
-    `substructure_match=True`, complete model ligands can be scored against
-    partial target ligands. One problem with this approach is that it is
-    very easy to find good matches to small, irrelevant ligands like EDO, CO2
-    or GOL. To counter that, the assignment algorithm considers the coverage,
-    expressed as the fraction of atoms of the model ligand atoms covered in the
-    target. Higher coverage matches are prioritized, but a match with a better
-    score will be preferred if it falls within a window of `coverage_delta`
-    (by default 0.2) of a worse-scoring match. As a result, for instance,
-    with a delta of 0.2, a low-score match with coverage 0.96 would be
-    preferred over a high-score match with coverage 0.70.
-
     All versus all scores are available through the lazily computed
     :attr:`score_matrix`. However, many things can go wrong... be it even
     something as simple as two ligands not matching. Error states therefore
-    encode scoring issues. Issues with a particular ligand are indicated by a
+    encode scoring issues. An Issue for a particular ligand is indicated by a
     non-zero state in :attr:`model_ligand_states`/:attr:`target_ligand_states`.
     This invalidates pairwise scores of such a ligand with all other ligands.
     This and other issues in pairwise score computation are reported in
@@ -52,10 +38,28 @@ class LigandScorer:
     Only if the respective location is 0, a valid pairwise score can be
     expected. The states and their meaning can be explored with code::
 
-      for state_code, (short_desc, desc) in scorer_obj.items():
+      for state_code, (short_desc, desc) in scorer_obj.state_decoding.items():
           print(state_code)
           print(short_desc)
           print(desc)
+
+    A common use case is to derive a one-to-one mapping between ligands in
+    the model and the target for which :class:`LigandScorer` provides an
+    automated assignment procedure.
+    By default, only exact matches between target and model ligands are
+    considered. This is a problem when the target only contains a subset
+    of the expected atoms (for instance if atoms are missing in an
+    experimental structure, which often happens in the PDB). With
+    `substructure_match=True`, complete model ligands can be scored against
+    partial target ligands. One problem with this approach is that it is
+    very easy to find good matches to small, irrelevant ligands like EDO, CO2
+    or GOL. The assignment algorithm therefore considers the coverage,
+    expressed as the fraction of atoms of the model ligand atoms covered in the
+    target. Higher coverage matches are prioritized, but a match with a better
+    score will be preferred if it falls within a window of `coverage_delta`
+    (by default 0.2) of a worse-scoring match. As a result, for instance,
+    with a delta of 0.2, a low-score match with coverage 0.96 would be
+    preferred over a high-score match with coverage 0.70.
 
     Assumptions:
 
@@ -71,11 +75,11 @@ class LigandScorer:
     scoring. :ref:`Molck <molck>` should be used with extra
     care, as many of the options (such as `rm_non_std` or `map_nonstd_res`) can
     cause ligands to be removed from the structure. If cleanup with Molck is
-    needed, ligands should be kept aside and passed separately. Non-ligand residues
-    should be valid compounds with atom names following the naming conventions
-    of the component dictionary. Non-standard residues are acceptable, and if
-    the model contains a standard residue at that position, only atoms with
-    matching names will be considered.
+    needed, ligands should be kept aside and passed separately. Non-ligand
+    residues should be valid compounds with atom names following the naming
+    conventions of the component dictionary. Non-standard residues are
+    acceptable, and if the model contains a standard residue at that position,
+    only atoms with matching names will be considered.
 
     Unlike most of OpenStructure, this class does not assume that the ligands
     (either in the model or the target) are part of the PDB component
@@ -129,35 +133,47 @@ class LigandScorer:
 
         # Setup scorer object and compute lDDT-PLI
         model_ligands = [model_ligand.Select("ele != H")]
-        ls = SCRMSDScorer(cleaned_model, cleaned_target, model_ligands)
+        sc = SCRMSDScorer(cleaned_model, cleaned_target, model_ligands)
+
+        # Perform assignment and read respective scores
+        for lig_pair in sc.assignment:
+            trg_lig = sc.target_ligands[lig_pair[0]]
+            mdl_lig = sc.model_ligands[lig_pair[1]]
+            score = sc.score_matrix[lig_pair[0], lig_pair[1]]
+            print(f"Score for {trg_lig} and {mdl_lig}: {score}")
 
     :param model: Model structure - a deep copy is available as :attr:`model`.
                   No additional processing (ie. Molck), checks,
                   stereochemistry checks or sanitization is performed on the
                   input. Hydrogen atoms are kept.
     :type model: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
-    :param target: Target structure - a deep copy is available as :attr:`target`.
-                  No additional processing (ie. Molck), checks or sanitization
-                  is performed on the input. Hydrogen atoms are kept.
+    :param target: Target structure - a deep copy is available as
+                   :attr:`target`. No additional processing (ie. Molck), checks
+                   or sanitization is performed on the input. Hydrogen atoms are
+                   kept.
     :type target: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
     :param model_ligands: Model ligands, as a list of
-                  :class:`~ost.mol.ResidueHandle` belonging to the model
-                  entity. Can be instantiated with either a :class:list of
-                  :class:`~ost.mol.ResidueHandle`/:class:`ost.mol.ResidueView`
-                  or of :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`.
-                  If `None`, ligands will be extracted based on the
-                  :attr:`~ost.mol.ResidueHandle.is_ligand` flag (this is
-                  normally set properly in entities loaded from mmCIF).
+                          :class:`~ost.mol.ResidueHandle` belonging to the model
+                          entity. Can be instantiated with either a :class:list
+                          of :class:`~ost.mol.ResidueHandle`/
+                          :class:`ost.mol.ResidueView` or of
+                          :class:`ost.mol.EntityHandle`/
+                          :class:`ost.mol.EntityView`.
+                          If `None`, ligands will be extracted based on the
+                          :attr:`~ost.mol.ResidueHandle.is_ligand` flag (this is
+                          normally set properly in entities loaded from mmCIF).
     :type model_ligands: :class:`list`
     :param target_ligands: Target ligands, as a list of
-                  :class:`~ost.mol.ResidueHandle` belonging to the target
-                  entity. Can be instantiated either a :class:list of
-                  :class:`~ost.mol.ResidueHandle`/:class:`ost.mol.ResidueView`
-                  or of :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
-                  containing a single residue each.
-                  If `None`, ligands will be extracted based on the
-                  :attr:`~ost.mol.ResidueHandle.is_ligand` flag (this is
-                  normally set properly in entities loaded from mmCIF).
+                           :class:`~ost.mol.ResidueHandle` belonging to the
+                           target entity. Can be instantiated either a
+                           :class:list of :class:`~ost.mol.ResidueHandle`/
+                           :class:`ost.mol.ResidueView` or of
+                           :class:`ost.mol.EntityHandle`/
+                           :class:`ost.mol.EntityView` containing a single
+                           residue each. If `None`, ligands will be extracted
+                           based on the :attr:`~ost.mol.ResidueHandle.is_ligand`
+                           flag (this is normally set properly in entities
+                           loaded from mmCIF).
     :type target_ligands: :class:`list`
     :param resnum_alignments: Whether alignments between chemically equivalent
                               chains in *model* and *target* can be computed
@@ -174,14 +190,14 @@ class LigandScorer:
                                 will be logged to the console with SCRIPT
                                 level.
     :type rename_ligand_chain: :class:`bool`
-    :param substructure_match: Set this to True to allow incomplete (ie
+    :param substructure_match: Set this to True to allow incomplete (i.e.
                                partially resolved) target ligands.
     :type substructure_match: :class:`bool`
     :param coverage_delta: the coverage delta for partial ligand assignment.
     :type coverage_delta: :class:`float`
     :param max_symmetries: If more than that many isomorphisms exist for
-                       a target-ligand pair, it will be ignored and reported
-                       as unassigned.
+                           a target-ligand pair, it will be ignored and reported
+                           as unassigned.
     :type max_symmetries: :class:`int`
     """
 
@@ -236,8 +252,8 @@ class LigandScorer:
         self.__chain_mapper = None
 
         # keep track of states
-        # simple integers instead of enums - documentation of property describes
-        # encoding
+        # simple integers instead of enums - encoding available in
+        # self.state_decoding
         self._state_matrix = None
         self._model_ligand_states = None
         self._target_ligand_states = None
@@ -284,7 +300,8 @@ class LigandScorer:
         Ligand pairs can be matched and a valid score can be expected if
         respective location in this matrix is 0.
         Target ligands are in rows, model ligands in columns. States are encoded
-        as integers <= 9. Larger numbers encode errors for child classes.       
+        as integers <= 9. Larger numbers encode errors for child classes.
+        Use something like ``self.state_decoding[3]`` to get a decscription.       
 
         :rtype: :class:`~numpy.ndarray`
         """
@@ -325,8 +342,8 @@ class LigandScorer:
         Target ligands are in rows, model ligands in columns.
 
         NaN values indicate that no value could be computed (i.e. different
-        ligands). In other words: values are only valid if respective location
-        :attr:`~state_matrix` is 0. 
+        ligands). In other words: values are only valid if the respective
+        location in :attr:`~state_matrix` is 0. 
 
         :rtype: :class:`~numpy.ndarray`
         """
@@ -341,10 +358,10 @@ class LigandScorer:
         Target ligands are in rows, model ligands in columns.
 
         NaN values indicate that no value could be computed (i.e. different
-        ligands). In other words: values are only valid if respective location
-        :attr:`~state_matrix` is 0. If `substructure_match=False`, only full
-        match isomorphisms are considered, and therefore only values of 1.0
-        can be observed.
+        ligands). In other words: values are only valid if the respective
+        location in :attr:`~state_matrix` is 0. If `substructure_match=False`,
+        only full match isomorphisms are considered, and therefore only values
+        of 1.0 can be observed.
 
         :rtype: :class:`~numpy.ndarray`
         """
@@ -362,7 +379,7 @@ class LigandScorer:
         class to provide additional information for a scored ligand pair.
         empty dictionaries indicate that the child class simply didn't return
         anything or that no value could be computed (e.g. different ligands).
-        In other words: values are only valid if respective location
+        In other words: values are only valid if respective location in the
         :attr:`~state_matrix` is 0.
 
         :rtype: :class:`~numpy.ndarray`
@@ -429,7 +446,7 @@ class LigandScorer:
         """ Get a dictionary of score values, keyed by model ligand
 
         Extract score with something like:
-        `scorer.score[lig.GetChain().GetName()][lig.GetNumber()]`.
+        ``scorer.score[lig.GetChain().GetName()][lig.GetNumber()]``.
         The returned scores are based on :attr:`~assignment`.
 
         :rtype: :class:`dict`
@@ -451,7 +468,7 @@ class LigandScorer:
         """ Get a dictionary of score details, keyed by model ligand
  
         Extract dict with something like:
-        `scorer.score[lig.GetChain().GetName()][lig.GetNumber()]`.
+        ``scorer.score[lig.GetChain().GetName()][lig.GetNumber()]``.
         The returned info dicts are based on :attr:`~assignment`. The content is
         documented in the respective child class.
 
@@ -767,23 +784,27 @@ class LigandScorer:
                     if rename_chain:
                         chain_ext = 2  # Extend the chain name by this
                         while True:
-                            new_chain_name = residue.chain.name + "_" + str(chain_ext)
+                            new_chain_name = \
+                            residue.chain.name + "_" + str(chain_ext)
                             new_chain = new_entity.FindChain(new_chain_name)
                             if new_chain.IsValid():
                                 chain_ext += 1
                                 continue
                             else:
-                                new_chain = new_editor.InsertChain(new_chain_name)
+                                new_chain = \
+                                new_editor.InsertChain(new_chain_name)
                                 break
                         LogScript("Moved ligand residue %s to new chain %s" % (
                             residue.qualified_name, new_chain.name))
                     else:
-                        msg = "A residue number %s already exists in chain %s" % (
+                        msg = \
+                        "A residue number %s already exists in chain %s" % (
                             residue.number, residue.chain.name)
                         raise RuntimeError(msg)
 
             # Add the residue with its original residue number
-            new_res = new_editor.AppendResidue(new_chain, residue.name, residue.number)
+            new_res = new_editor.AppendResidue(new_chain, residue.name,
+                                               residue.number)
             # Add atoms
             for old_atom in residue.atoms:
                 new_editor.InsertAtom(new_res, old_atom.name, old_atom.pos, 
@@ -802,28 +823,35 @@ class LigandScorer:
             new_res = None
             if res.entity.handle == old_entity.handle:
                 # Residue is part of the old_entity handle.
-                # However, it may not be in the copied one, for instance it may have been a view
-                # We try to grab it first, otherwise we copy it
+                # However, it may not be in the copied one, for instance it may
+                # have been a view We try to grab it first, otherwise we copy it
                 new_res = new_entity.FindResidue(res.chain.name, res.number)
             if new_res and new_res.valid:
-                LogVerbose("Ligand residue %s already in entity" % res.handle.qualified_name)
+                qname = res.handle.qualified_name
+                LogVerbose("Ligand residue %s already in entity" % qname)
             else:
                 # Residue is not part of the entity, need to copy it first
                 new_res = _copy_residue(res, rename_chain)
-                LogVerbose("Copied ligand residue %s" % res.handle.qualified_name)
+                qname = res.handle.qualified_name
+                LogVerbose("Copied ligand residue %s" % qname)
             new_res.SetIsLigand(True)
             return new_res
 
         for ligand in ligands:
-            if isinstance(ligand, mol.EntityHandle) or isinstance(ligand, mol.EntityView):
+            is_eh = isinstance(ligand, mol.EntityHandle)
+            is_ev = isinstance(ligand, mol.EntityView)
+            is_rh = isinstance(ligand, mol.ResidueHandle)
+            is_rv = isinstance(ligand, mol.ResidueView)
+            if is_eh or is_ev:
                 for residue in ligand.residues:
                     new_residue = _process_ligand_residue(residue, rename_chain)
                     extracted_ligands.append(new_residue)
-            elif isinstance(ligand, mol.ResidueHandle) or isinstance(ligand, mol.ResidueView):
+            elif is_rh or is_rv:
                 new_residue = _process_ligand_residue(ligand, rename_chain)
                 extracted_ligands.append(new_residue)
             else:
-                raise RuntimeError("Ligands should be given as Entity or Residue")
+                raise RuntimeError("Ligands should be given as Entity or "
+                                   "Residue")
 
         if new_editor is not None:
             new_editor.UpdateICS()
@@ -846,22 +874,26 @@ class LigandScorer:
         self._aux_matrix = np.empty(shape, dtype=dict)
 
         # precompute ligand graphs
-        target_graphs = [_ResidueToGraph(l, by_atom_index=True) for l in self.target_ligands]
-        model_graphs = [_ResidueToGraph(l, by_atom_index=True) for l in self.model_ligands]
+        target_graphs = \
+        [_ResidueToGraph(l, by_atom_index=True) for l in self.target_ligands]
+        model_graphs = \
+        [_ResidueToGraph(l, by_atom_index=True) for l in self.model_ligands]
 
         for g_idx, g in enumerate(target_graphs):
             if not networkx.is_connected(g):
                 self._target_ligand_states[g_idx] = 4
                 self._state_matrix[g_idx,:] = 6
-                LogVerbose("Disconnected graph observed for target ligand %s" % (
-                        str(self.target_ligands[g_idx])))
+                msg = "Disconnected graph observed for target ligand "
+                msg += str(self.target_ligands[g_idx])
+                LogVerbose(msg)
 
         for g_idx, g in enumerate(model_graphs):
             if not networkx.is_connected(g):
                 self._model_ligand_states[g_idx] = 4
                 self._state_matrix[:,g_idx] = 6
-                LogVerbose("Disconnected graph observed for model ligand %s" % (
-                        str(self.model_ligands[g_idx])))
+                msg = "Disconnected graph observed for model ligand "
+                msg += str(self.model_ligands[g_idx])
+                LogVerbose(msg)
 
 
         for target_id, target_ligand in enumerate(self.target_ligands):
@@ -1001,7 +1033,8 @@ class LigandScorer:
                   Returned score must be valid in this case (not None/NaN).
                   Child specific non-zero states must be >= 10.
         """
-        raise NotImplementedError("_compute must be implemented by child class")
+        raise NotImplementedError("_compute must be implemented by child "
+                                  "class")
 
     def _score_dir(self):
         """ Return direction of score - defined by child class
@@ -1010,7 +1043,8 @@ class LigandScorer:
         '+' for ascending scores, i.e. higher is better (lddt etc.)
         '-' for descending scores, i.e. lower is better (rmsd etc.)
         """
-        raise NotImplementedError("_score_dir must be implemented by child class")
+        raise NotImplementedError("_score_dir must be implemented by child "
+                                  "class")
 
 
 def _ResidueToGraph(residue, by_atom_index=False):
@@ -1026,7 +1060,8 @@ def _ResidueToGraph(residue, by_atom_index=False):
     :type by_atom_index: :class:`bool`
     :rtype: :class:`~networkx.classes.graph.Graph`
 
-    Nodes are labeled with the Atom's uppercase :attr:`~ost.mol.AtomHandle.element`.
+    Nodes are labeled with the Atom's uppercase
+    :attr:`~ost.mol.AtomHandle.element`.
     """
     nxg = networkx.Graph()
 
@@ -1034,7 +1069,8 @@ def _ResidueToGraph(residue, by_atom_index=False):
         nxg.add_node(atom.name, element=atom.element.upper())
 
     # This will list all edges twice - once for every atom of the pair.
-    # But as of NetworkX 3.0 adding the same edge twice has no effect, so we're good.
+    # But as of NetworkX 3.0 adding the same edge twice has no effect,
+    # so we're good.
     nxg.add_edges_from([(
         b.first.name,
         b.second.name) for a in residue.atoms for b in a.GetBondList()])
@@ -1092,7 +1128,8 @@ def ComputeSymmetries(model_ligand, target_ligand, substructure_match=False,
                                       by_atom_index=by_atom_index)
 
     if not networkx.is_connected(model_graph):
-        raise DisconnectedGraphError("Disconnected graph for model ligand %s" % model_ligand)
+        msg = "Disconnected graph for model ligand %s" % model_ligand
+        raise DisconnectedGraphError(msg)
 
 
     if target_graph is None:
@@ -1100,11 +1137,12 @@ def ComputeSymmetries(model_ligand, target_ligand, substructure_match=False,
                                        by_atom_index=by_atom_index)
 
     if not networkx.is_connected(target_graph):
-        raise DisconnectedGraphError("Disconnected graph for target ligand %s" % target_ligand)
+        msg = "Disconnected graph for target ligand %s" % target_ligand
+        raise DisconnectedGraphError(msg)
 
     # Note the argument order (model, target) which differs from spyrmsd.
-    # This is because a subgraph of model is isomorphic to target - but not the opposite
-    # as we only consider partial ligands in the reference.
+    # This is because a subgraph of model is isomorphic to target - but not the
+    # opposite as we only consider partial ligands in the reference.
     # Make sure to generate the symmetries correctly in the end
     gm = networkx.algorithms.isomorphism.GraphMatcher(
         model_graph, target_graph, node_match=lambda x, y:
@@ -1118,7 +1156,8 @@ def ComputeSymmetries(model_ligand, target_ligand, substructure_match=False,
                 raise TooManySymmetriesError(
                     "Too many symmetries between %s and %s" % (
                         str(model_ligand), str(target_ligand)))
-            symmetries.append((list(isomorphism.values()), list(isomorphism.keys())))
+            symmetries.append((list(isomorphism.values()),
+                               list(isomorphism.keys())))
         assert len(symmetries) > 0
         LogDebug("Found %s isomorphic mappings (symmetries)" % len(symmetries))
     elif gm.subgraph_is_isomorphic() and substructure_match:
@@ -1130,11 +1169,13 @@ def ComputeSymmetries(model_ligand, target_ligand, substructure_match=False,
                 raise TooManySymmetriesError(
                     "Too many symmetries between %s and %s" % (
                         str(model_ligand), str(target_ligand)))
-            symmetries.append((list(isomorphism.values()), list(isomorphism.keys())))
+            symmetries.append((list(isomorphism.values()),
+                               list(isomorphism.keys())))
         assert len(symmetries) > 0
         # Assert that all the atoms in the target are part of the substructure
         assert len(symmetries[0][0]) == len(target_ligand.atoms)
-        LogDebug("Found %s subgraph isomorphisms (symmetries)" % len(symmetries))
+        n_sym = len(symmetries)
+        LogDebug("Found %s subgraph isomorphisms (symmetries)" % n_sym)
     elif gm.subgraph_is_isomorphic():
         LogDebug("Found subgraph isomorphisms (symmetries), but"
                  " ignoring because substructure_match=False")
