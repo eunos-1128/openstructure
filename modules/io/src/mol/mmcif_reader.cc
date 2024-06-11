@@ -517,7 +517,10 @@ void MMCifReader::ParseAndAddAtom(const std::vector<StringRef>& columns)
   }
 
   if (indices_[OCCUPANCY] != -1) { // unit test
-    occ = this->TryGetReal(columns[indices_[OCCUPANCY]], "atom_site.occupancy");
+    occ = this->GetRealOrDefault(columns[indices_[OCCUPANCY]],
+                                 "atom_site.occupancy",
+                                 1.0,
+                                 is_undef);
   }
   if (indices_[B_ISO_OR_EQUIV] != -1) {
     if (!is_undef(columns[indices_[B_ISO_OR_EQUIV]])) {

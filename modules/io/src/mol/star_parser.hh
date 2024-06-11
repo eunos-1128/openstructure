@@ -160,6 +160,19 @@ public:
   /// \return converted value
   Real TryGetReal(const StringRef& data, const String& name) const;
 
+  /// \brief try to convert a value to Real, on failure return default value.
+  ///
+  /// \param data value to be converted
+  /// \param name to be included in the message
+  /// \param alt value
+  /// \param is_default a function to check if data is a default value.
+  ///
+  /// \return converted or alt value
+  Real GetRealOrDefault(const StringRef& data,
+                        const String& name,
+                        Real alt,
+                        bool (*is_default)(StringRef)) const;
+
   /// \brief try to convert a value to float, on failure raise an exception.
   ///
   /// \param data value to be converted

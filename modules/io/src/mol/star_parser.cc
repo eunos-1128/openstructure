@@ -98,6 +98,18 @@ Real StarParser::TryGetReal(const StringRef& data, const String& name) const
   return value.second;
 }
 
+Real StarParser::GetRealOrDefault(const StringRef& data,
+                                  const String& name,
+                                  Real alt,
+                                  bool (*is_default)(StringRef)) const
+{
+  if(is_default(data)) {
+    return alt;
+  }
+
+  return TryGetReal(data, name);
+}
+
 float StarParser::TryGetFloat(const StringRef& data, const String& name) const
 {
   std::pair<bool, float> value = data.to_float();
