@@ -47,10 +47,10 @@ options, this is a dictionary with three keys:
    content of the JSON output will be \"status\" set to FAILURE and an
    additional key: "traceback".
 
-Each score is opt-in and, be enabled with optional arguments and is added
-to the output. Keys correspond to the values in "model_ligands" above.
-Unassigned ligands are reported with a message in "unassigned_model_ligands"
-and "unassigned_reference_ligands".
+Each score is opt-in and must be enabled with optional arguments. The scores
+perform a model/reference ligand assignment and report a score for each assigned
+model ligand. Optionally, unassigned model ligands are reported with a null
+score and a reason why no assignment has been performed (--unassigned/-u).
 """
 
 import argparse
@@ -177,21 +177,6 @@ def _ParseArgs():
               "a global BLOSUM62-based alignment (NUC44 for nucleotides)."))
 
     parser.add_argument(
-        "-ec",
-        "--enforce-consistency",
-        dest="enforce_consistency",
-        default=False,
-        action="store_true",
-        help=("Enforce consistency of residue names between the reference "
-              "binding site and the model. By default residue name "
-              "discrepancies are reported but the program proceeds. "
-              "If this is set to True, the program will fail with an error "
-              "message if the residues names differ. "
-              "Note: more binding site mappings may be explored during "
-              "scoring, but only inconsistencies in the selected mapping are "
-              "reported."))
-
-    parser.add_argument(
         "-sm",
         "--substructure-match",
         dest="substructure_match",
@@ -207,15 +192,6 @@ def _ParseArgs():
         help=("Coverage delta for partial ligand assignment."))
 
     parser.add_argument(
-        "-fbs",
-        "--full-bs-search",
-        dest="full_bs_search",
-        default=False,
-        action="store_true",
-        help=("Enumerate all potential binding sites in the model when "
-              "searching rigid superposition for RMSD computation"))
-
-    parser.add_argument(
         "-u",
         "--unassigned",
         dest="unassigned",
@@ -226,11 +202,36 @@ def _ParseArgs():
               "assigned."))
 
     parser.add_argument(
+        '-v',
+        '--verbosity',
+        dest="verbosity",
+        type=int,
+        default=3,
+        help="Set verbosity level. Defaults to 3 (INFO).")
+
+    # arguments relevant for lddt-pli
+
+    parser.add_argument(
         "--lddt-pli",
         dest="lddt_pli",
         default=False,
         action="store_true",
         help=("Compute lDDT-PLI score and store as key \"lddt-pli\"."))
+
+    parser.add_argument(
+        "--lddt-pli-radius",
+        dest="lddt_pli_radius",
+        default=6.0,
+        help=("lDDT inclusion radius for lDDT-PLI."))
+
+    parser.add_argument(
+        "--lddt-pli-amc",
+        dest="lddt_pli_amc",
+        default=False,
+        action="store_true",
+        help=("Add model contacts (amc) when computing lDDT-PLI."))
+
+    # arguments relevant for rmsd
 
     parser.add_argument(
         "--rmsd",
@@ -248,24 +249,19 @@ def _ParseArgs():
               "distance of the ligand will be included in the binding site."))
 
     parser.add_argument(
-        "--lddt-pli-radius",
-        dest="lddt_pli_radius",
-        default=6.0,
-        help=("lDDT inclusion radius for lDDT-PLI."))
-
-    parser.add_argument(
         "--lddt-lp-radius",
         dest="lddt_lp_radius",
         default=15.0,
         help=("lDDT inclusion radius for lDDT-LP."))
 
     parser.add_argument(
-        '-v',
-        '--verbosity',
-        dest="verbosity",
-        type=int,
-        default=3,
-        help="Set verbosity level. Defaults to 3 (INFO).")
+        "-fbs",
+        "--full-bs-search",
+        dest="full_bs_search",
+        default=False,
+        action="store_true",
+        help=("Enumerate all potential binding sites in the model when "
+              "searching rigid superposition for RMSD computation"))
 
     return parser.parse_args()
 
@@ -408,11 +404,11 @@ def _SetupLDDTPLIScorer(model, model_ligands, reference, reference_ligands, args
                                                 model_ligands = model_ligands,
                                                 target_ligands = reference_ligands,
                                                 resnum_alignments = args.residue_number_alignment,
-                                                check_resnames = args.enforce_consistency,
                                                 rename_ligand_chain = True,
                                                 substructure_match = args.substructure_match,
                                                 coverage_delta = args.coverage_delta,
-                                                lddt_pli_radius = args.lddt_pli_radius)
+                                                lddt_pli_radius = args.lddt_pli_radius,
+                                                add_mdl_contacts = args.lddt_pli_amc)
 
 def _SetupSCRMSDScorer(model, model_ligands, reference, reference_ligands, args):
     return ligand_scoring_scrmsd.SCRMSDScorer(model, reference,
