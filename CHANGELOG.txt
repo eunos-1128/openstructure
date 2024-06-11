@@ -7,11 +7,29 @@ Changes in Release x.x.x
  * Changed default value of '--rmsd-assignment' to False for ligand scoring
  * Added 'full_bs_search' argument in ligand scoring to optionally speed up
    computations in large complexes.
-   the number of model binding sites
  * SEQRES information is now read from the entity_poly_seq category in mmCIF.
    The canonical as well as semi-canonical (with 3 letter-codes in bracket)
    SEQRES are now available from the MMCifInfo object. The
    (Get|Set)ReadCanonicalSeqRes (Get|Set)ReadSeqRes methods no longer exist.
+ * Disabled numpy support in C++ layer to simplify build system. Some exotic
+   OST functionality directly accessed Python numpy arrays from the C++ layer
+   which required to compile against numpy headers.
+ * Introduce GDT score which is equivalent to LGA (99.2% of CASP15 TS models
+   score within 3 GDTTS points when compared to LGA results).
+   Oligo/RNA support comes for free when using the ost.mol.alg.scoring.Scorer
+   object.
+ * Rigid superposition based scores (RMSD, GDT) in ost.mol.alg.scoring.Scorer
+   now use RMSD based chain mapping when scoring oligos.
+ * Ligand scoring refactoring. lDDT-PLI and symmetry corrected RMSD are now
+   completely separated.
+ * Added model contacts in lDDT. lDDT is not symmetric in a sense that
+   added/wrong contacts in the model do not penalize the score. lDDT now comes
+   with a flag to add such contacts, i.e. contacts between atom pairs in the
+   model that are within the specified lDDT threshold (usually 15A), IF the
+   respective atom pair is also present in the target.
+ * lDDT-PLI can optionally use the new added mdl contacts feature. Think of
+   nasty loops that interact with the ligand in the model which would not be
+   penalized by classic lDDT!
  * Several bug fixes and improvements.
 
 Changes in Release 2.7.0
