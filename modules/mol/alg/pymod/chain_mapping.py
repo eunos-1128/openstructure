@@ -3390,6 +3390,9 @@ def _RefEqualGenerator(ref_chains, mdl_chains):
     for p in itertools.permutations(mdl_chains):
         yield list(p)
 
+def _RefEmptyGenerator(ref_chains, mdl_chains):
+    yield list()
+
 def _ConcatIterators(iterators):
     for item in itertools.product(*iterators):
         yield list(item)
@@ -3435,8 +3438,8 @@ def _ChainMappings(ref_chains, mdl_chains, n_max=None):
     iterators = list()
     for ref, mdl in zip(ref_chains, mdl_chains):
         if len(ref) == 0:
-            raise RuntimeError("Expext at least one chain in ref chem group")
-        if len(ref) == len(mdl):
+            iterators.append(_RefEmptyGenerator(ref, mdl))
+        elif len(ref) == len(mdl):
             iterators.append(_RefEqualGenerator(ref, mdl))
         elif len(ref) < len(mdl):
             iterators.append(_RefSmallerGenerator(ref, mdl))

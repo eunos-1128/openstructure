@@ -395,141 +395,133 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
 
 .. code-block:: console
 
-    usage: ost compare-ligand-structures [-h] -m MODEL [-ml [MODEL_LIGANDS ...]]
-                                         -r REFERENCE [-rl [REFERENCE_LIGANDS ...]]
-                                         [-o OUTPUT] [-mf {pdb,mmcif,cif}]
-                                         [-rf {pdb,mmcif,cif}] [-ft] [-rna] [-ec] [-sm]
-                                         [-gcm] [-c CHAIN_MAPPING [CHAIN_MAPPING ...]]
-                                         [-ra] [--lddt-pli] [--rmsd] [--radius RADIUS]
-                                         [--lddt-pli-radius LDDT_PLI_RADIUS]
-                                         [--lddt-lp-radius LDDT_LP_RADIUS]
-                                         [-v VERBOSITY] [--n-max-naive N_MAX_NAIVE]
+  usage: ost compare-ligand-structures [-h] -m MODEL [-ml [MODEL_LIGANDS ...]]
+                                       -r REFERENCE
+                                       [-rl [REFERENCE_LIGANDS ...]] [-o OUTPUT]
+                                       [-mf {pdb,cif,mmcif}]
+                                       [-rf {pdb,cif,mmcif}] [-mb MODEL_BIOUNIT]
+                                       [-rb REFERENCE_BIOUNIT] [-ft] [-rna]
+                                       [-sm] [-cd COVERAGE_DELTA] [-u]
+                                       [-v VERBOSITY] [--lddt-pli]
+                                       [--lddt-pli-radius LDDT_PLI_RADIUS]
+                                       [--lddt-pli-amc] [--rmsd]
+                                       [--radius RADIUS]
+                                       [--lddt-lp-radius LDDT_LP_RADIUS] [-fbs]
 
-    Evaluate model with non-polymer/small molecule ligands against reference.
+  Evaluate model with non-polymer/small molecule ligands against reference.
 
-    Example: ost compare-ligand-structures \
-        -m model.pdb \
-        -ml ligand.sdf \
-        -r reference.cif \
-        --lddt-pli --rmsd
+  Example: ost compare-ligand-structures \
+      -m model.pdb \
+      -ml ligand.sdf \
+      -r reference.cif \
+      --lddt-pli --rmsd
 
-    Structures of polymer entities (proteins and nucleotides) can be given in PDB
-    or mmCIF format. If the structure is given in mmCIF format, only the asymmetric
-    unit (AU) is used for scoring.
+  Structures of polymer entities (proteins and nucleotides) can be given in PDB
+  or mmCIF format.
 
-    Ligands can be given as path to SDF files containing the ligand for both model
-    (--model-ligands/-ml) and reference (--reference-ligands/-rl). If omitted,
-    ligands will be detected in the model and reference structures. For structures
-    given in mmCIF format, this is based on the annotation as "non polymer entity"
-    (i.e. ligands in the _pdbx_entity_nonpoly mmCIF category) and works reliably.
-    For structures given in PDB format, this is based on the HET records and is
-    normally not what you want. You should always give ligands as SDF for
-    structures in PDB format.
+  Ligands can be given as path to SDF files containing the ligand for both model
+  (--model-ligands/-ml) and reference (--reference-ligands/-rl). If omitted,
+  ligands will be detected in the model and reference structures. For structures
+  given in mmCIF format, this is based on the annotation as "non polymer entity"
+  (i.e. ligands in the _pdbx_entity_nonpoly mmCIF category) and works reliably.
+  For structures given in legacy PDB format, this is based on the HET records
+  which is usually only set properly on files downloaded from the PDB (and even
+  then, this is not always the case). This is normally not what you want. You
+  should always give ligands as SDF for structures in legacy PDB format.
 
-    Polymer/oligomeric ligands (saccharides, peptides, nucleotides) are not
-    supported.
+  Polymer/oligomeric ligands (saccharides, peptides, nucleotides) are not
+  supported.
 
-    Only minimal cleanup steps are performed (remove hydrogens, and for structures
-    of polymers only, remove unknown atoms and cleanup element column).
+  Only minimal cleanup steps are performed (remove hydrogens and deuteriums,
+  and for structures of polymers only, remove unknown atoms and cleanup element
+  column).
 
-    Ligands in mmCIF and PDB files must comply with the PDB component dictionary
-    definition, and have properly named residues and atoms, in order for
-    ligand connectivity to be loaded correctly. Ligands loaded from SDF files
-    are exempt from this restriction, meaning any arbitrary ligand can be assessed.
+  Ligands in mmCIF and PDB files must comply with the PDB component dictionary
+  definition, and have properly named residues and atoms, in order for
+  ligand connectivity to be loaded correctly. Ligands loaded from SDF files
+  are exempt from this restriction, meaning any arbitrary ligand can be assessed.
 
-    Output is written in JSON format (default: out.json). In case of no additional
-    options, this is a dictionary with three keys:
+  Output is written in JSON format (default: out.json). In case of no additional
+  options, this is a dictionary with three keys:
 
-     * "model_ligands": A list of ligands in the model. If ligands were provided
-       explicitly with --model-ligands, elements of the list will be the paths to
-       the ligand SDF file(s). Otherwise, they will be the chain name, residue
-       number and insertion code of the ligand, separated by a dot.
-     * "reference_ligands": A list of ligands in the reference. If ligands were
-       provided explicitly with --reference-ligands, elements of the list will be
-       the paths to the ligand SDF file(s). Otherwise, they will be the chain name,
-       residue number and insertion code of the ligand, separated by a dot.
-     * "status": SUCCESS if everything ran through. In case of failure, the only
-       content of the JSON output will be "status" set to FAILURE and an
-       additional key: "traceback".
+   * "model_ligands": A list of ligands in the model. If ligands were provided
+     explicitly with --model-ligands, elements of the list will be the paths to
+     the ligand SDF file(s). Otherwise, they will be the chain name, residue
+     number and insertion code of the ligand, separated by a dot.
+   * "reference_ligands": A list of ligands in the reference. If ligands were
+     provided explicitly with --reference-ligands, elements of the list will be
+     the paths to the ligand SDF file(s). Otherwise, they will be the chain name,
+     residue number and insertion code of the ligand, separated by a dot.
+   * "status": SUCCESS if everything ran through. In case of failure, the only
+     content of the JSON output will be "status" set to FAILURE and an
+     additional key: "traceback".
 
-    Each score is opt-in and, be enabled with optional arguments and is added
-    to the output. Keys correspond to the values in "model_ligands" above.
-    Unassigned ligands are reported with a message in
-    "unassigned_model_ligands" and "unassigned_reference_ligands".
+  Each score is opt-in and must be enabled with optional arguments. The scores
+  perform a model/reference ligand assignment and report a score for each assigned
+  model ligand. Optionally, unassigned model ligands are reported with a null
+  score and a reason why no assignment has been performed (--unassigned/-u).
 
-    options:
-      -h, --help            show this help message and exit
-      -m MODEL, --mdl MODEL, --model MODEL
-                            Path to model file.
-      -ml [MODEL_LIGANDS ...], --mdl-ligands [MODEL_LIGANDS ...],
-                            --model-ligands [MODEL_LIGANDS ...]
-                            Path to model ligand files.
-      -r REFERENCE, --ref REFERENCE, --reference REFERENCE
-                            Path to reference file.
-      -rl [REFERENCE_LIGANDS ...], --ref-ligands [REFERENCE_LIGANDS ...],
-                            --reference-ligands [REFERENCE_LIGANDS ...]
-                            Path to reference ligand files.
-      -o OUTPUT, --out OUTPUT, --output OUTPUT
-                            Output file name. The output will be saved as a JSON
-                            file. default: out.json
-      -mf {pdb,mmcif,cif}, --mdl-format {pdb,mmcif,cif},
-                            --model-format {pdb,mmcif,cif}
-                            Format of model file. Inferred from path if not
-                            given.
-      -rf {pdb,mmcif,cif}, --reference-format {pdb,mmcif,cif},
-                            --ref-format {pdb,mmcif,cif}
-                            Format of reference file. Inferred from path if not
-                            given.
-      -ft, --fault-tolerant
-                            Fault tolerant parsing.
-      -rna, --residue-number-alignment
-                            Make alignment based on residue number instead of
-                            using a global BLOSUM62-based alignment (NUC44 for
-                            nucleotides).
-      -ec, --enforce-consistency
-                            Enforce consistency of residue names between the
-                            reference binding site and the model. By default
-                            residue name discrepancies are reported but the
-                            program proceeds. If this is set to True, the program
-                            will fail with an error message if the residues names
-                            differ. Note: more binding site mappings may be
-                            explored during scoring, but only inconsistencies in
-                            the selected mapping are reported.
-      -sm, --substructure-match
-                            Allow incomplete target ligands.
-      -gcm, --global-chain-mapping
-                            Use a global chain mapping.
-      -c CHAIN_MAPPING [CHAIN_MAPPING ...],
-                            --chain-mapping CHAIN_MAPPING [CHAIN_MAPPING ...]
-                            Custom mapping of chains between the reference and
-                            the model. Each separate mapping consist of key:value
-                            pairs where key is the chain name in reference and
-                            value is the chain name in model. Only has an effect
-                            if global-chain-mapping flag is set.
-      -ra, --rmsd-assignment
-                            Use RMSD for ligand assignment.
-      -u, --unassigned      Report unassigned model ligands in the output
-                            together with assigned ligands, with a null score,
-                            and reason for not being assigned.
-
-      --lddt-pli            Compute lDDT-PLI score and store as key "lddt-pli".
-      --rmsd                Compute RMSD score and store as key "rmsd".
-      --radius RADIUS       Inclusion radius for the binding site. Any residue
-                            with atoms within this distance of the ligand will
-                            be included in the binding site.
-      --lddt-pli-radius LDDT_PLI_RADIUS
-                            lDDT inclusion radius for lDDT-PLI.
-      --lddt-lp-radius LDDT_LP_RADIUS
-                            lDDT inclusion radius for lDDT-LP.
-      -v VERBOSITY, --verbosity VERBOSITY
-                            Set verbosity level. Defaults to 3 (INFO).
-      --n-max-naive N_MAX_NAIVE
-                            If number of chains in model and reference are
-                            below or equal that number, the global chain
-                            mapping will naively enumerate all possible
-                            mappings. A heuristic is used otherwise.
-
-
-Additional information about the scores and output values is available in
-:meth:`rmsd_details <ost.mol.alg.ligand_scoring.LigandScorer.rmsd_details>` and
-:meth:`lddt_pli_details <ost.mol.alg.ligand_scoring.LigandScorer.lddt_pli_details>`.
+  options:
+    -h, --help            show this help message and exit
+    -m MODEL, --mdl MODEL, --model MODEL
+                          Path to model file.
+    -ml [MODEL_LIGANDS ...], --mdl-ligands [MODEL_LIGANDS ...], --model-ligands [MODEL_LIGANDS ...]
+                          Path to model ligand files.
+    -r REFERENCE, --ref REFERENCE, --reference REFERENCE
+                          Path to reference file.
+    -rl [REFERENCE_LIGANDS ...], --ref-ligands [REFERENCE_LIGANDS ...], --reference-ligands [REFERENCE_LIGANDS ...]
+                          Path to reference ligand files.
+    -o OUTPUT, --out OUTPUT, --output OUTPUT
+                          Output file name. The output will be saved as a JSON
+                          file. default: out.json
+    -mf {pdb,cif,mmcif}, --mdl-format {pdb,cif,mmcif}, --model-format {pdb,cif,mmcif}
+                          Format of model file. pdb reads pdb but also pdb.gz,
+                          same applies to cif/mmcif. Inferred from filepath if
+                          not given.
+    -rf {pdb,cif,mmcif}, --reference-format {pdb,cif,mmcif}, --ref-format {pdb,cif,mmcif}
+                          Format of reference file. pdb reads pdb but also
+                          pdb.gz, same applies to cif/mmcif. Inferred from
+                          filepath if not given.
+    -mb MODEL_BIOUNIT, --model-biounit MODEL_BIOUNIT
+                          Only has an effect if model is in mmcif format. By
+                          default, the asymmetric unit (AU) is used for scoring.
+                          If there are biounits defined in the mmcif file, you
+                          can specify the ID (as a string) of the one which
+                          should be used.
+    -rb REFERENCE_BIOUNIT, --reference-biounit REFERENCE_BIOUNIT
+                          Only has an effect if reference is in mmcif format. By
+                          default, the asymmetric unit (AU) is used for scoring.
+                          If there are biounits defined in the mmcif file, you
+                          can specify the ID (as a string) of the one which
+                          should be used.
+    -ft, --fault-tolerant
+                          Fault tolerant parsing.
+    -rna, --residue-number-alignment
+                          Make alignment based on residue number instead of
+                          using a global BLOSUM62-based alignment (NUC44 for
+                          nucleotides).
+    -sm, --substructure-match
+                          Allow incomplete (ie partially resolved) target
+                          ligands.
+    -cd COVERAGE_DELTA, --coverage-delta COVERAGE_DELTA
+                          Coverage delta for partial ligand assignment.
+    -u, --unassigned      Report unassigned model ligands in the output together
+                          with assigned ligands, with a null score, and reason
+                          for not being assigned.
+    -v VERBOSITY, --verbosity VERBOSITY
+                          Set verbosity level. Defaults to 3 (INFO).
+    --lddt-pli            Compute lDDT-PLI score and store as key "lddt-pli".
+    --lddt-pli-radius LDDT_PLI_RADIUS
+                          lDDT inclusion radius for lDDT-PLI.
+    --lddt-pli-amc        Add model contacts (amc) when computing lDDT-PLI.
+    --rmsd                Compute RMSD score and store as key "rmsd".
+    --radius RADIUS       Inclusion radius to extract reference binding site
+                          that is used for RMSD computation. Any residue with
+                          atoms within this distance of the ligand will be
+                          included in the binding site.
+    --lddt-lp-radius LDDT_LP_RADIUS
+                          lDDT inclusion radius for lDDT-LP.
+    -fbs, --full-bs-search
+                          Enumerate all potential binding sites in the model
+                          when searching rigid superposition for RMSD
+                          computation
