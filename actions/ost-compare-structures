@@ -266,6 +266,15 @@ def _ParseArgs():
               "local_lddt."))
 
     parser.add_argument(
+        "--ilddt",
+        dest="ilddt",
+        default=False,
+        action="store_true",
+        help=("Compute global lDDT score which is solely based on inter-chain "
+              "contacts and store as key \"ilddt\". Same stereochemical "
+              "irregularities as for lddt apply."))
+
+    parser.add_argument(
         "--cad-score",
         dest="cad_score",
         default=False,
@@ -791,6 +800,9 @@ def _Process(model, reference, args, model_format, reference_format):
 
     if args.bb_local_lddt:
         out["bb_local_lddt"] = _LocalScoresToJSONDict(scorer.bb_local_lddt)
+
+    if args.ilddt:
+        out["ilddt"] = _RoundOrNone(scorer.ilddt)
 
     if args.cad_score:
         out["cad_score"] = scorer.cad_score

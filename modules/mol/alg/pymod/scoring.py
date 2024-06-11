@@ -300,6 +300,7 @@ class Scorer:
         self._local_lddt = None
         self._bb_lddt = None
         self._bb_local_lddt = None
+        self._ilddt = None
 
         self._qs_global = None
         self._qs_best = None
@@ -710,6 +711,24 @@ class Scorer:
         if self._bb_local_lddt is None:
             self._compute_bb_lddt()
         return self._bb_local_lddt
+
+    @property
+    def ilddt(self):
+        """ Global interface lDDT score in range [0.0, 1.0]
+
+        This is lDDT only based on inter-chain contacts. Value is None if no
+        such contacts are present. For example if we're dealing with a monomer.
+        Computed based on :attr:`~stereochecked_model` and :attr:`~mapping` for
+        chain mapping.
+
+        :type: :class:`float`
+        """
+        if self._ilddt is None:
+            # the whole None business kind of invalidates the idea of lazy
+            # evaluation. The assumption is that this is called only once...
+            self._compute_ilddt()
+        return self._ilddt
+    
 
     @property
     def qs_global(self):
@@ -1725,6 +1744,45 @@ class Scorer:
 
         self._bb_lddt = lddt_score
         self._bb_local_lddt = local_lddt
+
+    def _compute_ilddt(self):
+        LogScript("Computing all-atom ilDDT")
+        # lDDT requires a flat mapping with mdl_ch as key and trg_ch as value
+        flat_mapping = self.mapping.GetFlatMapping(mdl_as_key=True)
+
+        if self.lddt_no_stereochecks:
+            alns = dict()
+            for aln in self.aln:
+                mdl_seq = aln.GetSequence(1)
+                alns[mdl_seq.name] = aln
+            lddt_chain_mapping = dict()
+            for mdl_ch, trg_ch in flat_mapping.items():
+                if mdl_ch in alns:
+                    lddt_chain_mapping[mdl_ch] = trg_ch
+            self._ilddt = self.lddt_scorer.lDDT(self.model,
+                                                chain_mapping = lddt_chain_mapping,
+                                                residue_mapping = alns,
+                                                check_resnames=False,
+                                                local_lddt_prop="lddt",
+                                                add_mdl_contacts = self.lddt_add_mdl_contacts,
+                                                no_intrachain=True)[0]
+        else:
+            alns = dict()
+            for aln in self.stereochecked_aln:
+                mdl_seq = aln.GetSequence(1)
+                alns[mdl_seq.name] = aln
+            lddt_chain_mapping = dict()
+            for mdl_ch, trg_ch in flat_mapping.items():
+                if mdl_ch in alns:
+                    lddt_chain_mapping[mdl_ch] = trg_ch
+            self._ilddt = self.lddt_scorer.lDDT(self.stereochecked_model,
+                                                chain_mapping = lddt_chain_mapping,
+                                                residue_mapping = alns,
+                                                check_resnames=False,
+                                                local_lddt_prop="lddt",
+                                                add_mdl_contacts = self.lddt_add_mdl_contacts,
+                                                no_intrachain=True)[0]
+
 
     def _compute_qs(self):
         LogScript("Computing global QS-score")
