@@ -60,6 +60,7 @@ results:
  * "min_pep_length"
  * "min_nuc_length"
  * "lddt_add_mdl_contacts"
+ * "dockq_capri_peptide"
 
 The pairwise sequence alignments are computed with Needleman-Wunsch using
 BLOSUM62 (NUC44 for nucleotides). Many benchmarking scenarios preprocess the
@@ -362,6 +363,25 @@ def _ParseArgs():
               "reference. \"dockq_ave_full\" and \"dockq_wave_full\" add zeros "
               "in the average computation for each interface that is only "
               "present in the reference but not in the model."))
+
+    parser.add_argument(
+        "--dockq-capri-peptide",
+        dest="dockq_capri_peptide",
+        default=False,
+        action="store_true",
+        help=("Flag that changes two things in the way DockQ and its "
+              "underlying scores are computed which is proposed by the CAPRI "
+              "community when scoring peptides (PMID: 31886916). "
+              "ONE: Two residues are considered in contact if any of their "
+              "atoms is within 5A. This is relevant for fnat and fnonat "
+              "scores. CAPRI suggests to lower this threshold to 4A for "
+              "protein-peptide interactions. "
+              "TWO: irmsd is computed on interface residues. A residue is "
+              "defined as interface residue if any of its atoms is within 10A "
+              "of another chain. CAPRI suggests to lower the default of 10A to "
+              "8A in combination with only considering CB atoms for "
+              "protein-peptide interactions. "
+              "This flag has no influence on patch_dockq scores."))
 
     parser.add_argument(
         "--ics",
@@ -757,7 +777,8 @@ def _Process(model, reference, args, model_format, reference_format):
                             oum = args.oum,
                             min_pep_length = args.min_pep_length,
                             min_nuc_length = args.min_nuc_length,
-                            lddt_add_mdl_contacts = args.lddt_add_mdl_contacts)
+                            lddt_add_mdl_contacts = args.lddt_add_mdl_contacts,
+                            dockq_capri_peptide = args.dockq_capri_peptide)
 
     ir = _GetInconsistentResidues(scorer.aln)
     if len(ir) > 0 and args.enforce_consistency:
@@ -937,6 +958,7 @@ def _Main():
         out["min_pep_length"] = args.min_pep_length
         out["min_nuc_length"] = args.min_nuc_length
         out["lddt_add_mdl_contacts"] = args.lddt_add_mdl_contacts
+        out["dockq_capri_peptide"] = args.dockq_capri_peptide
         out["status"] = "SUCCESS"
         with open(args.output, 'w') as fh:
             json.dump(out, fh, indent=4, sort_keys=False)

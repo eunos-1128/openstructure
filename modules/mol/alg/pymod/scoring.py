@@ -14,6 +14,7 @@ from ost.mol.alg import dockq
 from ost.mol.alg.lddt import lDDTScorer
 from ost.mol.alg.qsscore import QSScorer
 from ost.mol.alg.contact_score import ContactScorer
+from ost.mol.alg.contact_score import ContactEntity
 from ost.mol.alg import GDT
 from ost.mol.alg import Molck, MolckSettings
 from ost import bindings
@@ -175,13 +176,32 @@ class Scorer:
                                   respective atom pair is not resolved in the
                                   target.
     :type lddt_add_mdl_contacts: :class:`bool`
+    :param dockq_capri_peptide: Flag that changes two things in the way DockQ
+                                and its underlying scores are computed which is
+                                proposed by the CAPRI community when scoring
+                                peptides (PMID: 31886916).
+                                ONE: Two residues are considered in contact if 
+                                any of their atoms is within 5A. This is
+                                relevant for fnat and fnonat scores. CAPRI
+                                suggests to lower this threshold to 4A for
+                                protein-peptide interactions.
+                                TWO: irmsd is computed on interface residues. A
+                                residue is defined as interface residue if any
+                                of its atoms is within 10A of another chain.
+                                CAPRI suggests to lower the default of 10A to
+                                8A in combination with only considering CB atoms
+                                for protein-peptide interactions.
+                                This flag has no influence on patch_dockq
+                                scores.
+    :type dockq_capri_peptide: :class:`bool`
     """
     def __init__(self, model, target, resnum_alignments=False,
                  molck_settings = None, cad_score_exec = None,
                  custom_mapping=None, usalign_exec = None,
                  lddt_no_stereochecks=False, n_max_naive=40320,
                  oum=False, min_pep_length = 6, min_nuc_length = 4,
-                 lddt_add_mdl_contacts=False):
+                 lddt_add_mdl_contacts=False,
+                 dockq_capri_peptide=False):
 
         self._target_orig = target
         self._model_orig = model
@@ -270,6 +290,7 @@ class Scorer:
         self.min_pep_length = min_pep_length
         self.min_nuc_length = min_nuc_length
         self.lddt_add_mdl_contacts = lddt_add_mdl_contacts
+        self.dockq_capri_peptide = dockq_capri_peptide
 
         # lazily evaluated attributes
         self._stereochecked_model = None
@@ -1042,18 +1063,32 @@ class Scorer:
     def dockq_target_interfaces(self):
         """ Interfaces in :attr:`target` that are relevant for DockQ
 
-        In principle a subset of :attr:`~contact_target_interfaces` that only
-        contains peptide sequences. Chain names are lexicographically sorted.
+        All interfaces in :attr:`~target` with non-zero contacts that are
+        relevant for DockQ. Chain names are lexicographically sorted.
 
         :type: :class:`list` of :class:`tuple` with 2 elements each:
                (trg_ch1, trg_ch2)
         """
         if self._dockq_target_interfaces is None:
-            self._dockq_target_interfaces = list()
+            
+            # interacting chains are identified with ContactEntity
+            contact_d = 5.0
+            if self.dockq_capri_peptide:
+                contact_d = 4.0
+            cent = ContactEntity(self.target, contact_mode = "aa",
+                                 contact_d = contact_d)
+
+            # fetch lexicographically sorted interfaces
+            interfaces = cent.interacting_chains
+            interfaces = [(min(x[0],x[1]), max(x[0],x[1])) for x in interfaces]
+
+            # select the ones with only peptides involved
             pep_seqs = set([s.GetName() for s in self.chain_mapper.polypep_seqs])
-            for interface in self.contact_target_interfaces:
+            self._dockq_target_interfaces = list()
+            for interface in interfaces:
                 if interface[0] in pep_seqs and interface[1] in pep_seqs:
                     self._dockq_target_interfaces.append(interface)
+
         return self._dockq_target_interfaces
 
     @property
@@ -1882,9 +1917,17 @@ class Scorer:
             mdl_ch2 = interface[3]
             aln1 = dockq_alns[(trg_ch1, mdl_ch1)]
             aln2 = dockq_alns[(trg_ch2, mdl_ch2)]
-            res = dockq.DockQ(self.model, self.target, mdl_ch1, mdl_ch2,
-                              trg_ch1, trg_ch2, ch1_aln=aln1,
-                              ch2_aln=aln2)
+            if self.dockq_capri_peptide:
+                res = dockq.DockQ(self.model, self.target, mdl_ch1, mdl_ch2,
+                                  trg_ch1, trg_ch2, ch1_aln=aln1,
+                                  ch2_aln=aln2, contact_dist_thresh = 4.0,
+                                  interface_dist_thresh=8.0,
+                                  interface_cb = True)
+            else:
+                res = dockq.DockQ(self.model, self.target, mdl_ch1, mdl_ch2,
+                                  trg_ch1, trg_ch2, ch1_aln=aln1,
+                                  ch2_aln=aln2)
+
             self._fnat.append(res["fnat"])
             self._fnonnat.append(res["fnonnat"])
             self._irmsd.append(res["irmsd"])
@@ -1905,8 +1948,17 @@ class Scorer:
                 # match for sure
                 trg_ch1 = interface[0]
                 trg_ch2 = interface[1]
-                res = dockq.DockQ(self.target, self.target,
-                                  trg_ch1, trg_ch2, trg_ch1, trg_ch2)
+
+                if self.dockq_capri_peptide:
+                    res = dockq.DockQ(self.target, self.target,
+                                      trg_ch1, trg_ch2, trg_ch1, trg_ch2,
+                                      contact_dist_thresh = 4.0,
+                                      interface_dist_thresh=8.0,
+                                      interface_cb = True)
+                else:
+                    res = dockq.DockQ(self.target, self.target,
+                                      trg_ch1, trg_ch2, trg_ch1, trg_ch2)
+
                 not_covered_counts.append(res["nnat"])
   
         # there are 4 types of combined scores
