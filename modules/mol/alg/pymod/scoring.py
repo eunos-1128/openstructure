@@ -2490,3 +2490,6 @@ class Scorer:
         self._usalign_mapping = dict()
         for a,b in zip(res.ent1_mapped_chains, res.ent2_mapped_chains):
             self._usalign_mapping[b] = a
+
+# specify public interface
+__all__ = ('lDDTBSScorer', 'Scorer',)
