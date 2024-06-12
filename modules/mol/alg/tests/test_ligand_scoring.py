@@ -318,31 +318,6 @@ class TestLigandScoringFancy(unittest.TestCase):
         self.assertAlmostEqual(sc.score_matrix[5, 0], 1.0)
         self.assertTrue(np.isnan(sc.score_matrix[6, 0]))
 
-    def test_check_resnames(self):
-        """Test that the check_resname argument works.
-
-        When set to True, it should raise an error if any residue in the
-        representation of the binding site in the model has a different
-        name than in the reference. Here we manually modify a residue
-        name to achieve that effect. This is only relevant for the LDDTPLIScorer
-        """
-        trg_4c0a = _LoadMMCIF("4c0a.cif.gz")
-        trg = trg_4c0a.Select("cname=C or cname=I")
-
-        # Here we modify the name of a residue in 4C0A (THR => TPO in C.15)
-        # This residue is in the binding site and should trigger the error
-        mdl = ost.mol.CreateEntityFromView(trg, include_exlusive_atoms=False)
-        ed = mdl.EditICS()
-        ed.RenameResidue(mdl.FindResidue("C", 15), "TPO")
-        ed.UpdateXCS()
-
-        with self.assertRaises(RuntimeError):
-            sc = ligand_scoring_lddtpli.LDDTPLIScorer(mdl, trg, [mdl.FindResidue("I", 1)], [trg.FindResidue("I", 1)], check_resnames=True)
-            sc._compute_scores()
-
-        sc = ligand_scoring_lddtpli.LDDTPLIScorer(mdl, trg, [mdl.FindResidue("I", 1)], [trg.FindResidue("I", 1)], check_resnames=False)
-        sc._compute_scores()
-
     def test_added_mdl_contacts(self):
 
         # binding site for ligand in chain G consists of chains A and B
@@ -467,7 +442,6 @@ class TestLigandScoringFancy(unittest.TestCase):
         trg = _LoadMMCIF("1r8q.cif.gz")
         trg_4c0a = _LoadMMCIF("4c0a.cif.gz")
         sc = ligand_scoring_lddtpli.LDDTPLIScorer(trg, trg_4c0a, None, None,
-                                                  check_resnames=False,
                                                   add_mdl_contacts=False,
                                                   lddt_pli_binding_site_radius = 4.0)
         expected_keys = {"J", "F"}
@@ -489,7 +463,6 @@ class TestLigandScoringFancy(unittest.TestCase):
 
         # lddt_pli with added mdl contacts
         sc = ligand_scoring_lddtpli.LDDTPLIScorer(trg, trg_4c0a, None, None,
-                                                  check_resnames=False,
                                                   add_mdl_contacts=True)
         self.assertAlmostEqual(sc.score["J"][mol.ResNum(1)], 0.8988340192043895, 5)
         self.assertAlmostEqual(sc.score["F"][mol.ResNum(1)], 0.9039735099337749, 5)
