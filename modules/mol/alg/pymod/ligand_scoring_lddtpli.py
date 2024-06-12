@@ -203,15 +203,6 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
         mdl_residues, mdl_bs, mdl_chains, mdl_ligand_chain, mdl_ligand_res, \
         chem_mapping = self._lddt_pli_get_mdl_data(model_ligand)
 
-        if len(mdl_chains) == 0 or len(trg_chains) == 0:
-            # It's a spaceship!
-            return {"lddt_pli": None,
-                    "lddt_pli_n_contacts": 0,
-                    "target_ligand": target_ligand,
-                    "model_ligand": model_ligand,
-                    "bs_ref_res": trg_residues,
-                    "bs_mdl_res": mdl_residues}
-
         ####################
         # Setup alignments #
         ####################
