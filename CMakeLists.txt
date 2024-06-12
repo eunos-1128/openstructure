@@ -46,6 +46,7 @@ option(ENABLE_STATIC "whether static libraries should be compiled" OFF)
 option(UBUNTU_LAYOUT "whether Debian/Ubuntu's lib and libexec directory layout should be used" OFF)
 option(HIDDEN_VISIBILITY "on gcc, use -fvisibility=hidden" OFF)
 option(ENABLE_MM "whether openmm support is added" OFF)
+option(ENABLE_PARASAIL, "whether parasail alignment library should be included" OFF)
 
 if (CXX)
   set(CMAKE_CXX_COMPILER ${CXX})
@@ -129,6 +130,11 @@ if(ENABLE_MM)
   set(_OPENMM ON)
 else()
   set(_OPENMM OFF)
+endif()
+if(ENABLE_PARASAIL)
+  set(_PARASAIL ON)
+else()
+  set(_PARASAIL OFF)
 endif()
 
 
@@ -228,6 +234,10 @@ else(ENABLE_MM)
   set(_OPENMM_PLUGINS "NONE")
 endif(ENABLE_MM)
 
+if(ENABLE_PARASAIL)
+  find_package(Parasail REQUIRED)
+endif(ENABLE_PARASAIL)
+
 if (ENABLE_STATIC)
   set(Boost_LIBRARIES)
   set(Boost_USE_STATIC_LIBS ON)
@@ -290,7 +300,7 @@ include_directories(${Boost_INCLUDE_DIRS}
                     ${PNG_INCLUDE_DIRS}
                     ${OPEN_MM_INCLUDE_DIRS}
                     ${SQLITE3_INCLUDE_DIRS}
-                    )
+                    ${PARASAIL_INCLUDE_DIR})
 
 if (UNIX)
   SET(CMAKE_SKIP_BUILD_RPATH  FALSE)
@@ -342,6 +352,7 @@ message(STATUS
         "   SpaceNav Device support         (-DENABLE_SPNAV) : ${_SPNAV}\n"
         "   OpenMM support                     (-DENABLE_MM) : ${_OPENMM}\n"
         "   OpenMM plugins            (-DOPEN_MM_PLUGIN_DIR) : ${_OPENMM_PLUGINS}\n"
+        "   Parasail alignment library   (-DENABLE_PARASAIL) : ${_PARASAIL}\n"
         "   Optimize                            (-DOPTIMIZE) : ${_OPT}\n"
         "   Profiling support                    (-DPROFILE) : ${_PROFILE}\n"
         "   Double Precision        (-DUSE_DOUBLE_PRECISION) : ${_DOUBLE_PREC}\n"

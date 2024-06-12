@@ -25,3 +25,4 @@ So far, the binding module includes:
   lga
   cadscore
   dockq
+  parasail

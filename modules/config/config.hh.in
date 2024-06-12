@@ -31,5 +31,6 @@
 #define OST_FFT_USE_THREADS @fftw_use_threads@
 #define OST_UBUNTU_LAYOUT @ubuntu_layout@
 #define OST_INFO_ENABLED @info_enabled@
+#define OST_PARASAIL_ENABLED @parasail_enabled@
 
 #endif
