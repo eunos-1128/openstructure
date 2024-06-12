@@ -381,6 +381,8 @@ def _ParseArgs():
               "of another chain. CAPRI suggests to lower the default of 10A to "
               "8A in combination with only considering CB atoms for "
               "protein-peptide interactions. "
+              "Note that the resulting DockQ is not evaluated for these "
+              "slightly updated fnat and irmsd (lrmsd stays the same)."
               "This flag has no influence on patch_dockq scores."))
 
     parser.add_argument(
