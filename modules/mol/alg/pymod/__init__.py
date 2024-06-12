@@ -1,6 +1,9 @@
 import os.path
 from ._ost_mol_alg import *
-from ost.mol.alg.superpose import *
+from ost.mol.alg.scoring import *
+from ost.mol.alg.ligand_scoring_base import *
+from ost.mol.alg.ligand_scoring_lddtpli import *
+from ost.mol.alg.ligand_scoring_scrmsd import *
 import ost.mol.alg.trajectory_analysis
 import ost.mol.alg.structure_analysis
 import ost.mol.alg.helix_kinks
