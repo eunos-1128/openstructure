@@ -82,9 +82,6 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
     :param max_symmetries: Passed to parent constructor - see
                            :class:`LigandScorer`.
     :type max_symmetries: :class:`int`
-    :param check_resnames: On by default. Enforces residue name matches
-                           between mapped model and target residues.
-    :type check_resnames: :class:`bool`
     :param lddt_pli_radius: lDDT inclusion radius for lDDT-PLI.
     :type lddt_pli_radius: :class:`float`
     :param add_mdl_contacts: Whether to add mdl contacts.
@@ -105,7 +102,7 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
     def __init__(self, model, target, model_ligands=None, target_ligands=None,
                  resnum_alignments=False, rename_ligand_chain=False,
                  substructure_match=False, coverage_delta=0.2,
-                 max_symmetries=1e5, check_resnames=True, lddt_pli_radius=6.0,
+                 max_symmetries=1e5, lddt_pli_radius=6.0,
                  add_mdl_contacts=False,
                  lddt_pli_thresholds = [0.5, 1.0, 2.0, 4.0],
                  lddt_pli_binding_site_radius=None):
@@ -118,7 +115,6 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
                          coverage_delta = coverage_delta,
                          max_symmetries = max_symmetries)
 
-        self.check_resnames = check_resnames
         self.lddt_pli_radius = lddt_pli_radius
         self.add_mdl_contacts = add_mdl_contacts
         self.lddt_pli_thresholds = lddt_pli_thresholds
@@ -427,7 +423,7 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
             scorer._ProcessModel(mdl_bs, lddt_chain_mapping,
                                  residue_mapping = lddt_alns,
                                  thresholds = self.lddt_pli_thresholds,
-                                 check_resnames = self.check_resnames)
+                                 check_resnames = False)
 
             # estimate a penalty for unsatisfied model contacts from chains
             # that are not in the local trg binding site, but can be mapped in
@@ -650,7 +646,7 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
             scorer._ProcessModel(mdl_bs, lddt_chain_mapping,
                                  residue_mapping = lddt_alns,
                                  thresholds = self.lddt_pli_thresholds,
-                                 check_resnames = self.check_resnames)
+                                 check_resnames = False)
 
             for (trg_sym, mdl_sym) in symmetries:
                 for mdl_i, trg_i in zip(mdl_sym, trg_sym):
