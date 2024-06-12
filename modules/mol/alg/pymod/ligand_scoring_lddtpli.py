@@ -154,10 +154,10 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
 
         if score is None or np.isnan(score):
             if result["lddt_pli_n_contacts"] == 0:
-            	# it's a space ship!
+                # it's a space ship!
                 pair_state = 10
             else:
-            	# unknwon error state
+                # unknwon error state
                 pair_state = 20
 
         # the ligands get a zero-state...
