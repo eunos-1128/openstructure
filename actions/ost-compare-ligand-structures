@@ -538,7 +538,7 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
         out["rmsd"] = dict()
         for lig_pair in scrmsd_scorer.assignment:
             score = float(scrmsd_scorer.score_matrix[lig_pair[0], lig_pair[1]])
-            coverage = float(lddtpli_scorer.coverage_matrix[lig_pair[0], lig_pair[1]])
+            coverage = float(scrmsd_scorer.coverage_matrix[lig_pair[0], lig_pair[1]])
             aux_data = scrmsd_scorer.aux_matrix[lig_pair[0], lig_pair[1]]
             target_key = out["reference_ligands"][lig_pair[0]]
             model_key = out["model_ligands"][lig_pair[1]]
