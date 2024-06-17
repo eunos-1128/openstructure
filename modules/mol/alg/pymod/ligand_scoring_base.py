@@ -777,6 +777,8 @@ class LigandScorer:
             new_chain = new_entity.FindChain(residue.chain.name)
             if not new_chain.IsValid():
                 new_chain = new_editor.InsertChain(residue.chain.name)
+                new_editor.SetChainType(new_chain,
+                                        mol.ChainType.CHAINTYPE_NON_POLY)
             else:
                 # Does a residue with the same name already exist?
                 already_exists = new_chain.FindResidue(residue.number).IsValid()
