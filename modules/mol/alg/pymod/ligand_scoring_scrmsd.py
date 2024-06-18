@@ -133,7 +133,7 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
         # entity ligand belongs to
         self._binding_sites = dict()
 
-	    # cache for GetRepr chain mapping calls
+        # cache for GetRepr chain mapping calls
         self._repr = dict()
 
         # lazily precomputed variables to speedup GetRepr chain mapping calls
@@ -199,7 +199,7 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
         pair_state = 0
 
         if best_rmsd_result["rmsd"] is not None:
-        	best_rmsd = best_rmsd_result["rmsd"]
+            best_rmsd = best_rmsd_result["rmsd"]
         else:
             # try to identify error states
             best_rmsd = np.nan
