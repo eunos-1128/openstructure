@@ -255,6 +255,8 @@ class QSScorerResult:
     def QS_best(self):
         """ QS_best - the actual score as described in formula section above
 
+        Returns None if there are no contacts in the compared structures
+
         :type: :class:`float`
         """
         nominator = self.weighted_scores
@@ -262,11 +264,13 @@ class QSScorerResult:
         if denominator != 0.0:
             return nominator/denominator
         else:
-            return 0.0
+            return None
 
     @property
     def QS_global(self):
         """ QS_global - the actual score as described in formula section above
+
+        Returns None if there are no contacts in the compared structures
 
         :type: :class:`float`
         """
@@ -275,7 +279,7 @@ class QSScorerResult:
         if denominator != 0.0:
             return nominator/denominator
         else:
-            return 0.0
+            return None
 
 
 class QSScorer:
