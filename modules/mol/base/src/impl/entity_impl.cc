@@ -20,6 +20,7 @@
 #include <sys/time.h>
 #endif
 #include <map>
+#include <stack>
 
 #include <boost/shared_ptr.hpp>
 #include <boost/version.hpp>
@@ -59,6 +60,109 @@
 
 using boost::logic::tribool;
 using boost::logic::indeterminate;
+
+namespace{
+
+// TraceDirectionality calls were performed recursively on AtomImpl pointers.
+// For large polymer chains segfaults were observed which were likely caused
+// by filling up the stack memory. The following is basically a one to one
+// reimplementation using an actual stack data structure without the recursive.
+// calls. Don't blame me for inefficient code.
+
+// The original behavior can be re-activated by just uncommenting the respective
+// line in EntityImpl::TraceDirectionality and comment out the call to Trace
+struct TraceParam{
+  TraceParam(ost::mol::impl::AtomImplPtr at,
+             ost::mol::impl::FragmentImplP frag,
+             ost::mol::impl::ConnectorImplP conn,
+             int n): at(at), frag(frag), conn(conn), n(n) { }
+  ost::mol::impl::AtomImplPtr at;
+  ost::mol::impl::FragmentImplP frag;
+  ost::mol::impl::ConnectorImplP conn;
+  int n;
+};
+
+void Trace(ost::mol::impl::AtomImplPtr at,
+           ost::mol::impl::FragmentImplP frag,
+           ost::mol::impl::ConnectorImplP conn,
+           int n, unsigned int& count) {
+
+  std::stack<TraceParam> param_stack;
+  param_stack.emplace(at, frag, conn, 0);
+
+  while(!param_stack.empty()) {
+
+    TraceParam param = param_stack.top();
+    param_stack.pop();
+
+    if (param.conn) {
+#if !defined(NDEBUG)
+      if (param.conn->GetFirst()==param.at) {
+        LOG_TRACE("dir:" << String(param.n,' ') << " atom " << param.at->GetResidue()->GetNumber()
+                  << "." << param.at->Name() << "  [" << param.conn->GetSecond()->GetQualifiedName()
+                  << " ]");
+      } else {
+        LOG_TRACE("dir:" << String(param.n,' ') << " atom " << param.at->GetResidue()->GetNumber()
+                  << "." << param.at->Name() << "  [" << param.conn->GetFirst()->GetQualifiedName()
+                  << " ]");
+      }
+#endif
+    } else {
+      LOG_TRACE("dir:" << String(param.n,' ') << " atom " << param.at->GetResidue()->GetNumber()
+                << "." << param.at->Name() << "  [ ]");
+    }
+
+    // presence of a primary connector indicates ring closure
+    if (param.at->IsTraced()){
+      continue;
+    }
+
+    // recursive count
+    count+=1;
+    param.at->SetTraced(true);
+    param.at->SetFragment(frag);
+
+    // assumes that AtomImpl::ClearDirectionality was called before.
+    // This transfers all connectors to secondary connectors and wipes
+    // primary connector
+    ost::mol::impl::ConnectorImplList& connector_list = param.at->GetSecondaryConnectors();
+
+    if (param.conn) {
+      ost::mol::impl::ConnectorImplList::iterator prim_it=connector_list.end();
+      for (ost::mol::impl::ConnectorImplList::iterator it=connector_list.begin();
+           it!=connector_list.end(); ++it) {
+        ost::mol::impl::ConnectorImplP c=*it;
+        if (c->GetFirst() == param.at) {
+          param_stack.emplace(c->GetSecond(), frag, c, param.n+1);
+        } else {
+          if (c==param.conn) {
+            prim_it=it; // found primary connector => thats basically the incoming connector
+          } else {
+            c->Switch(); // reverse order of connector
+            param_stack.emplace(c->GetSecond(), frag, c, param.n+1);
+          }
+        }
+      }
+      if (prim_it!=connector_list.end()) {
+        param.at->SetPrimaryConnector(*prim_it);
+        connector_list.erase(prim_it); // directly operate on atoms connector list
+      }
+    } else {
+      for (ost::mol::impl::ConnectorImplList::iterator it=connector_list.begin();
+           it!=connector_list.end(); ++it) {
+        ost::mol::impl::ConnectorImplP c=*it;
+        if (c->GetFirst() == param.at) {
+          param_stack.emplace(c->GetSecond(), frag, c, param.n+1);
+        } else {
+          c->Switch(); // reverse order of connector
+          param_stack.emplace(c->GetSecond(), frag, c, param.n+1);
+        }
+      }
+    }
+  }
+}
+
+} // anon ns
 
 
 namespace ost { namespace mol { namespace impl {
@@ -581,8 +685,15 @@ void EntityImpl::TraceDirectionality()
         FragmentImplP frag( new FragmentImpl(it->second));
 #endif
         fragment_list_.push_back(frag);
-        it->second->TraceDirectionality(frag,ConnectorImplP(), 0, 
-                                        traced_atom_count);
+
+        // Recursive call to TraceDirectionality triggered issues with recursive
+        // depth and resulted in segfaults for very large polymer chains.
+        // Trace in anonymous namespace implements the same functionality but
+        // without recursion. Old behavior with recursion can be enabled
+        // by just swapping the function calls again.
+        Trace(it->second, frag, ConnectorImplP(), 0, traced_atom_count);
+        //it->second->TraceDirectionality(frag,ConnectorImplP(), 0,
+        //                                traced_atom_count);
       }
     }
     if(traced_atom_count<atom_map_.size()) {
