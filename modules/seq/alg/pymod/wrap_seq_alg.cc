@@ -37,6 +37,7 @@
 #include <ost/seq/alg/variance_map.hh>
 #include <ost/seq/alg/hmm_pseudo_counts.hh>
 #include <ost/seq/alg/hmm_score.hh>
+#include <ost/seq/alg/wrap_parasail.hh>
 
 #include <algorithm>
 
@@ -167,12 +168,26 @@ void export_aln_alg()
   
   def("MergePairwiseAlignments", &MergePairwiseAlignments);
   def("Conservation", &Conservation, (arg("assign")=true, arg("prop_name")="cons", arg("ignore_gap")=false));
+
+// bend alignment functions around to parasail if available
+  def("ParasailAvailable", &ParasailAvailable);
+#if OST_PARASAIL_ENABLED
+  def("LocalAlign", &ParaLocalAlign, (arg("seq1"), arg("seq2"),arg("subst_weight"), 
+      arg("gap_open")=-5, arg("gap_ext")=-2));
+  def("GlobalAlign", &ParaGlobalAlign,(arg("seq1"),arg("seq2"),arg("subst_weight"), 
+      arg("gap_open")=-5, arg("gap_ext")=-2));
+  def("SemiGlobalAlign", &ParaSemiGlobalAlign,(arg("seq1"),arg("seq2"),arg("subst_weight"), 
+      arg("gap_open")=-5, arg("gap_ext")=-2));
+#else
   def("LocalAlign", &LocalAlign, (arg("seq1"), arg("seq2"),arg("subst_weight"), 
       arg("gap_open")=-5, arg("gap_ext")=-2));
   def("GlobalAlign", &GlobalAlign,(arg("seq1"),arg("seq2"),arg("subst_weight"), 
       arg("gap_open")=-5, arg("gap_ext")=-2));
   def("SemiGlobalAlign", &SemiGlobalAlign,(arg("seq1"),arg("seq2"),arg("subst_weight"), 
       arg("gap_open")=-5, arg("gap_ext")=-2));
+#endif
+
+
   def("ShannonEntropy", &ShannonEntropy, (arg("aln"), arg("ignore_gaps")=true));
 }
 

@@ -21,7 +21,6 @@ dockq.py
 
 set(OST_BINDINGS_PYMOD_SOURCES
   export_tmalign.cc
-  export_parasail.cc
   wrap_bindings.cc
 )
 

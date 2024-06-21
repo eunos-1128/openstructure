@@ -21,6 +21,7 @@ data/default_contact_weight_matrix.hh
 data/default_pair_subst_weight_matrix.hh
 hmm_pseudo_counts.hh
 hmm_score.hh
+wrap_parasail.hh
 )
 
 set(OST_SEQ_ALG_SOURCES
@@ -42,7 +43,8 @@ subst_weight_matrix.cc
 variance_map.cc
 hmm_pseudo_counts.cc
 hmm_score.cc
+wrap_parasail.cc
 )
 
 module(NAME seq_alg HEADER_OUTPUT_DIR ost/seq/alg SOURCES ${OST_SEQ_ALG_SOURCES}
-       HEADERS ${OST_SEQ_ALG_HEADERS} DEPENDS_ON ost_seq)
+       HEADERS ${OST_SEQ_ALG_HEADERS} DEPENDS_ON ost_seq LINK ${PARASAIL_LIBRARY})

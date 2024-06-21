@@ -31,6 +31,9 @@ Changes in Release x.x.x
    nasty loops that interact with the ligand in the model which would not be
    penalized by classic lDDT!
  * Remove seq.alg.MATCH and seq.alg.IDENTITY preset substitution matrices
+ * Enable parasail (https://github.com/jeffdaily/parasail) as drop-in
+   replacement for naive LocalAlign/GlobalAlign/SemiGlobalAlign implementations.
+   Must be enabled at compile time - see installation instructions.
  * Several bug fixes and improvements.
 
 Changes in Release 2.7.0

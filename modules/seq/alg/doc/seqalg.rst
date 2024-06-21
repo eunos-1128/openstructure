@@ -109,6 +109,97 @@ Algorithms for Alignments
       aligned to only gaps, is considered highly conserved (depending on the
       number of gap sequences).
 
+.. function:: ShannonEntropy(aln, ignore_gaps=True)
+
+  Returns the per-column Shannon entropies of the alignment. The entropy
+  describes how conserved a certain column in the alignment is. The higher
+  the entropy is, the less conserved the column. For a column with no amino 
+  aids, the entropy value is set to NAN.
+
+  :param aln: Multiple sequence alignment
+  :type aln: :class:`~ost.seq.AlignmentHandle`
+  :param ignore_gaps: Whether to ignore gaps in the column.
+  :type ignore_gaps: bool
+
+  :returns: List of column entropies
+
+.. autofunction:: ost.seq.alg.renumber.Renumber
+
+.. function:: SequenceIdentity(aln, ref_mode=seq.alg.RefMode.ALIGNMENT, seq_a=0, seq_b=1)
+
+  Calculates the sequence identity between two sequences at index seq_a and seq_b in
+  a multiple sequence alignment.
+
+  :param aln: multiple sequence alignment
+  :type aln: :class:`~ost.seq.AlignmentHandle`
+  :param ref_mode: influences the way the sequence identity is calculated. When
+    set to `seq.alg.RefMode.LONGER_SEQUENCE`, the sequence identity is 
+    calculated as the number of matches divided by the length of the longer
+    sequence. If set to `seq.alg.RefMode.ALIGNMENT` (the default), the sequence
+    identity is calculated as the number of matches divided by the number of
+    aligned residues (not including the gaps).
+  :type ref_mode: int
+  :param seq_a: the index of the first sequence
+  :type seq_a: int
+  :param seq_b: the index of the second sequence
+  :type seq_b: int
+  :returns: sequence identity in the range 0 to 100.
+  :rtype: float
+
+.. function:: SequenceSimilarity(aln, subst_weight, normalize=false, seq_a=0, seq_b=1)
+
+  Calculates the sequence similarity between two sequences at index seq_a and seq_b in
+  a multiple sequence alignment.
+
+  :param aln: Multiple sequence alignment
+  :type aln: :class:`~ost.seq.AlignmentHandle`
+  :param subst_weight: the substitution weight matrix 
+    (see the :ref:`BLOSUM Matrix<blosum>` section below)
+  :type subst_weight: :class:`~SubstWeightMatrix` 
+  :param normalize: if set to True, normalize to the range of the
+    substitution weight matrix
+  :type normalize: bool
+  :param seq_a: the index of the first sequence
+  :type seq_a: int
+  :param seq_b: the index of the second sequence
+  :type seq_b: int
+  :returns: sequence similarity
+  :rtype: float
+
+
+Create pairwise alignments
+--------------------------------------------------------------------------------
+
+OpenStructure provides naive implementations to create pairwise local, global
+and semi-global alignments between two sequences:
+
+* :func:`LocalAlign`
+* :func:`GlobalAlign`
+* :func:`SemiGlobalAlign`
+
+The use of `parasail <https://github.com/jeffdaily/parasail/>`_ as a drop
+in replacement is optional and provides significant speedups.
+It must be enabled at compile time - see installation instructions.
+
+Reference:
+
+  Jeff Daily. Parasail: SIMD C library for global, semi-global,
+  and local pairwise sequence alignments. (2016) BMC Bioinformatics
+
+Parasail allows to choose from various strategies but for the sake of
+simplicity, this Python binding always calls
+``parasail_<mode>_trace_scan_sat`` which seems reasonably fast across the
+global, semi-global and local modes. See parasail documentation for more
+information.
+
+You can always check if the alignment algorithms use parasail or the naive
+implementations by calling:
+
+.. function:: ParasailAvailable()
+
+  Returns True if OpenStructure has been compiled with parasail support,
+  False if not.
+
 .. function:: LocalAlign(seq1, seq2, subst_weight, gap_open=-5, gap_ext=-2)
 
   Performs a Smith/Waterman local alignment of *seq1* and *seq2* and returns
@@ -164,20 +255,6 @@ Algorithms for Alignments
   :param gap_ext: The gap extension penalty. Must be a negative number
   :returns: Best-scoring alignment of *seq1* and *seq2*.
 
-.. function:: ShannonEntropy(aln, ignore_gaps=True)
-
-  Returns the per-column Shannon entropies of the alignment. The entropy
-  describes how conserved a certain column in the alignment is. The higher
-  the entropy is, the less conserved the column. For a column with no amino 
-  aids, the entropy value is set to NAN.
-
-  :param aln: Multiple sequence alignment
-  :type aln: :class:`~ost.seq.AlignmentHandle`
-  :param ignore_gaps: Whether to ignore gaps in the column.
-  :type ignore_gaps: bool
-
-  :returns: List of column entropies
-
 .. function:: SemiGlobalAlign(seq1, seq2, subst_weight, gap_open=-5, gap_ext=-2)
 
   Performs a semi-global alignment of *seq1* and *seq2* and returns the best-
@@ -211,49 +288,6 @@ Algorithms for Alignments
   :param gap_open: The gap opening penalty. Must be a negative number
   :param gap_ext: The gap extension penalty. Must be a negative number
   :returns: best-scoring alignment of *seq1* and *seq2*.
-
-.. autofunction:: ost.seq.alg.renumber.Renumber
-
-.. function:: SequenceIdentity(aln, ref_mode=seq.alg.RefMode.ALIGNMENT, seq_a=0, seq_b=1)
-
-  Calculates the sequence identity between two sequences at index seq_a and seq_b in
-  a multiple sequence alignment.
-
-  :param aln: multiple sequence alignment
-  :type aln: :class:`~ost.seq.AlignmentHandle`
-  :param ref_mode: influences the way the sequence identity is calculated. When
-    set to `seq.alg.RefMode.LONGER_SEQUENCE`, the sequence identity is 
-    calculated as the number of matches divided by the length of the longer
-    sequence. If set to `seq.alg.RefMode.ALIGNMENT` (the default), the sequence
-    identity is calculated as the number of matches divided by the number of
-    aligned residues (not including the gaps).
-  :type ref_mode: int
-  :param seq_a: the index of the first sequence
-  :type seq_a: int
-  :param seq_b: the index of the second sequence
-  :type seq_b: int
-  :returns: sequence identity in the range 0 to 100.
-  :rtype: float
-
-.. function:: SequenceSimilarity(aln, subst_weight, normalize=false, seq_a=0, seq_b=1)
-
-  Calculates the sequence similarity between two sequences at index seq_a and seq_b in
-  a multiple sequence alignment.
-
-  :param aln: Multiple sequence alignment
-  :type aln: :class:`~ost.seq.AlignmentHandle`
-  :param subst_weight: the substitution weight matrix 
-    (see the :ref:`BLOSUM Matrix<blosum>` section below)
-  :type subst_weight: :class:`~SubstWeightMatrix` 
-  :param normalize: if set to True, normalize to the range of the
-    substitution weight matrix
-  :type normalize: bool
-  :param seq_a: the index of the first sequence
-  :type seq_a: int
-  :param seq_b: the index of the second sequence
-  :type seq_b: int
-  :returns: sequence similarity
-  :rtype: float
 
 
 .. _substitution-weight-matrices:

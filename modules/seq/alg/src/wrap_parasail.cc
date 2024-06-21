@@ -17,7 +17,7 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 //------------------------------------------------------------------------------
 
-#include <ost/bindings/wrap_parasail.hh>
+#include <ost/seq/alg/wrap_parasail.hh>
 
 #if OST_PARASAIL_ENABLED
 
@@ -29,12 +29,19 @@ typedef parasail_result_t* (*parasail_aln_fn)(const char*, int, const char*,
 
 namespace{
 
-ost::seq::AlignmentHandle Align(const ost::seq::SequenceHandle& s1,
-                                const ost::seq::SequenceHandle& s2,
-                                int gap_open_penalty, int gap_extension_penalty,
-                                const parasail_matrix_t* matrix,
-                                parasail_aln_fn aln_fn,
-                                bool set_offset) {
+ost::seq::AlignmentList Align(const ost::seq::ConstSequenceHandle& s1,
+                              const ost::seq::ConstSequenceHandle& s2,
+                              int gap_open_penalty, int gap_extension_penalty,
+                              ost::seq::alg::SubstWeightMatrixPtr& subst_matrix,
+                              parasail_aln_fn aln_fn,
+                              bool set_offset) {
+
+    // original ost provides penalties as negative numbers... 
+    gap_open_penalty = std::abs(gap_open_penalty);
+    gap_extension_penalty = std::abs(gap_extension_penalty);
+
+    const parasail_matrix_t* matrix =
+    parasail_matrix_lookup(subst_matrix->GetName().c_str());
 
     parasail_result_t *r = NULL;
     parasail_traceback_t *traceback_r = NULL;
@@ -108,80 +115,80 @@ ost::seq::AlignmentHandle Align(const ost::seq::SequenceHandle& s1,
     }
     aln.AddSequence(aln_s1);
     aln.AddSequence(aln_s2);
+
+    if(s1.HasAttachedView()) {
+        aln.AttachView(0, s1.GetAttachedView());
+    }
+
+    if(s2.HasAttachedView()) {
+        aln.AttachView(1, s2.GetAttachedView());
+    }
     
     parasail_result_free(r);
     parasail_traceback_free(traceback_r);
     
-    return aln;
+    ost::seq::AlignmentList aln_list = {aln};
+    return aln_list;
 }
 
 }
 
-namespace ost{ namespace bindings{
+namespace ost{ namespace seq{ namespace alg{
 
-ost::seq::AlignmentHandle ParaLocalAlign(const ost::seq::SequenceHandle& s1,
-                                         const ost::seq::SequenceHandle& s2,
-                                         int gap_open_penalty,
-                                         int gap_extension_penalty,
-                                         const String& matrix) {
-  const parasail_matrix_t* m = parasail_matrix_lookup(matrix.c_str());
-  return Align(s1, s2, gap_open_penalty, gap_extension_penalty,
-               m, parasail_sw_trace_scan_sat, true); 
+ost::seq::AlignmentList ParaLocalAlign(const ost::seq::ConstSequenceHandle& s1,
+                                       const ost::seq::ConstSequenceHandle& s2,
+                                       ost::seq::alg::SubstWeightMatrixPtr& subst,
+                                       int gap_open, int gap_ext) {
+  return Align(s1, s2, gap_open, gap_ext, subst,
+               parasail_sw_trace_scan_sat, true); 
 }
 
-ost::seq::AlignmentHandle ParaGlobalAlign(const ost::seq::SequenceHandle& s1,
-                                          const ost::seq::SequenceHandle& s2,
-                                          int gap_open_penalty,
-                                          int gap_extension_penalty,
-                                          const String& matrix) {
-  const parasail_matrix_t* m = parasail_matrix_lookup(matrix.c_str());
-  return Align(s1, s2, gap_open_penalty, gap_extension_penalty,
-               m, parasail_nw_trace_scan_sat, false);  
+ost::seq::AlignmentList ParaGlobalAlign(const ost::seq::ConstSequenceHandle& s1,
+                                        const ost::seq::ConstSequenceHandle& s2,
+                                        ost::seq::alg::SubstWeightMatrixPtr& subst,
+                                        int gap_open, int gap_ext) {
+  return Align(s1, s2, gap_open, gap_ext, subst,
+               parasail_nw_trace_scan_sat, false);  
 }
 
-ost::seq::AlignmentHandle ParaSemiGlobalAlign(const ost::seq::SequenceHandle& s1,
-                                              const ost::seq::SequenceHandle& s2,
-                                              int gap_open_penalty,
-                                              int gap_extension_penalty,
-                                              const String& matrix) {
-  const parasail_matrix_t* m = parasail_matrix_lookup(matrix.c_str());
-  return Align(s1, s2, gap_open_penalty, gap_extension_penalty,
-               m, parasail_sg_trace_scan_sat, false);   
+ost::seq::AlignmentList ParaSemiGlobalAlign(const ost::seq::ConstSequenceHandle& s1,
+                                            const ost::seq::ConstSequenceHandle& s2,
+                                            ost::seq::alg::SubstWeightMatrixPtr& subst,
+                                            int gap_open, int gap_ext) {
+  return Align(s1, s2, gap_open, gap_ext, subst,
+               parasail_sg_trace_scan_sat, false);   
 }
 
 bool ParasailAvailable() {
   return true;
 }
 
-}} // ns
+}}} // ns
 
 #else
 
-namespace ost{ namespace bindings{
+namespace ost{ namespace seq{ namespace alg{
 
-ost::seq::AlignmentHandle ParaLocalAlign(const ost::seq::SequenceHandle& s1,
-                                         const ost::seq::SequenceHandle& s2,
-                                         int gap_open_penalty,
-                                         int gap_extension_penalty,
-                                         const String& matrix) {
+ost::seq::AlignmentList ParaLocalAlign(const ost::seq::ConstSequenceHandle& s1,
+                                       const ost::seq::ConstSequenceHandle& s2,
+                                       ost::seq::alg::SubstWeightMatrixPtr& subst,
+                                       int gap_open, int gap_ext) {
   throw ost::Error("Must enable Parasail when compiling OpenStructure to use "
                    "ParaLocalAlign");
 }
 
-ost::seq::AlignmentHandle ParaGlobalAlign(const ost::seq::SequenceHandle& s1,
-                                          const ost::seq::SequenceHandle& s2,
-                                          int gap_open_penalty,
-                                          int gap_extension_penalty,
-                                          const String& matrix) {
+ost::seq::AlignmentList ParaGlobalAlign(const ost::seq::ConstSequenceHandle& s1,
+                                        const ost::seq::ConstSequenceHandle& s2,
+                                        ost::seq::alg::SubstWeightMatrixPtr& subst,
+                                        int gap_open, int gap_ext) {
   throw ost::Error("Must enable Parasail when compiling OpenStructure to use "
                    "ParaGlobalAlign");  
 }
 
-ost::seq::AlignmentHandle ParaSemiGlobalAlign(const ost::seq::SequenceHandle& s1,
-                                              const ost::seq::SequenceHandle& s2,
-                                              int gap_open_penalty,
-                                              int gap_extension_penalty,
-                                              const String& matrix) {
+ost::seq::AlignmentList ParaSemiGlobalAlign(const ost::seq::ConstSequenceHandle& s1,
+                                            const ost::seq::ConstSequenceHandle& s2,
+                                            ost::seq::alg::SubstWeightMatrixPtr& subst,
+                                            int gap_open, int gap_ext) {
   throw ost::Error("Must enable Parasail when compiling OpenStructure to use "
                    "ParaSemiGlobalAlign");  
 }
@@ -190,6 +197,6 @@ bool ParasailAvailable() {
   return false;
 }
 
-}} // ns
+}}} // ns
 
 #endif

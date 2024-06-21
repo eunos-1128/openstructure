@@ -24,10 +24,8 @@ using namespace boost::python;
 
 
 void export_TMAlign();
-void export_parasail();
 
 BOOST_PYTHON_MODULE(_ost_bindings)
 {
   export_TMAlign();
-  export_parasail();
 }
