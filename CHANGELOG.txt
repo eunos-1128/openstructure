@@ -30,6 +30,7 @@ Changes in Release x.x.x
  * lDDT-PLI can optionally use the new added mdl contacts feature. Think of
    nasty loops that interact with the ligand in the model which would not be
    penalized by classic lDDT!
+ * Remove seq.alg.MATCH and seq.alg.IDENTITY preset substitution matrices
  * Several bug fixes and improvements.
 
 Changes in Release 2.7.0
