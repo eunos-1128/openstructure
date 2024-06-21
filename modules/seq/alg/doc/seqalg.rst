@@ -261,23 +261,58 @@ Algorithms for Alignments
 Substitution Weight Matrices and BLOSUM Matrices
 --------------------------------------------------------------------------------
 
-.. autoclass:: SubstWeightMatrix
-   :members:
+.. class:: SubstWeightMatrix
+
+  Substitution weights for alignment algorithms
+
+  .. method:: GetWeight(olc_one, olc_two)
+
+    Get :class:`int` weight for pair of characters
+
+    :param olc_one: first character
+    :type olc_one: :class:`string`
+    :param olc_two: second character
+    :type olc_two: :class:`string`
+
+  .. method:: SetWeight(olc_one, olc_two, weight)
+
+    Set :class:`int` weight for pair of characters
+
+    :param olc_one: first character
+    :type olc_one: :class:`string`
+    :param olc_two: second character
+    :type olc_two: :class:`string`
+    :param weight: the weight
+    :type weight: :class:`int`
+
+  .. method:: GetMinWeight()
+
+    Returns the minimal weight of the matrix
+
+  .. method:: GetMaxWeight()
+
+    Returns the maximum weight of the matrix
+
+  .. method:: GetName()
+
+    Getter for name (empty string if not set)
+
+  .. method:: SetName(name)
+
+    Setter for name
+
+    :param name: Name to be set
+    :type name: :class:`str`
 
 .. _blosum:
 
-Four preset BLOSUM (BLOcks SUbstitution Matrix) matrices are available at 
-different levels of sequence identity:
+Four already preset BLOSUM (BLOcks SUbstitution Matrix) matrices are available
+at different levels of sequence identity:
 
 - BLOSUM45
 - BLOSUM62
 - BLOSUM80
 - BLOSUM100
-
-Two naive substitution matrices:
-
-- IDENTITY: Matches have score of 1, all other are 0
-- MATCH: Matches have score of 1, all other are -1
 
 Nucleotide substitution matrices:
 
@@ -285,6 +320,14 @@ Nucleotide substitution matrices:
   ambiguity codes. ATTENTION: has been edited to explicitely encode T/U
   equivalence, i.e. you can just do `m.GetWeight('G', 'U')` instead of first
   translating 'U' to 'T'. 
+
+They can be directly accessed upon importing the sequence module:
+
+.. code-block:: python
+
+  from ost import seq
+  mat = seq.alg.BLOSUM62
+  print(mat.GetWeight('A', 'A'))
 
 
 .. _contact-prediction:

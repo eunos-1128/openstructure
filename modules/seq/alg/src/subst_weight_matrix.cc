@@ -170,28 +170,6 @@ void FillNucData(ost::seq::alg::SubstWeightMatrix* subst,
   }
 }
 
-void FillIdentity(ost::seq::alg::SubstWeightMatrix* subst) {
-  char chars[26] = {'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O',
-                    'P','Q','R','S','T','U','V','W','X','Y','Z'};
-  for(uint i = 0; i < 26; ++i) {
-    subst->SetWeight(chars[i], chars[i], 1.0);
-  }
-}
-
-void FillMatch(ost::seq::alg::SubstWeightMatrix* subst) {
-  char chars[26] = {'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O',
-                    'P','Q','R','S','T','U','V','W','X','Y','Z'};
-  for(uint i = 0; i < 26; ++i) {
-    for(uint j = 0; j < 26; ++j) {
-      if(i == j){
-        subst->SetWeight(chars[i], chars[j], 1.0);
-      } else {
-        subst->SetWeight(chars[i], chars[j], -1.0);
-      }
-    }
-  }
-}
-
 }
 
 namespace ost { namespace seq { namespace alg {
@@ -205,34 +183,30 @@ void SubstWeightMatrix::AssignPreset(SubstWeightMatrix::Preset p)
   switch(p){
     case BLOSUM45:{
       FillData(this,RAW_BLOSUM45_DATA);
+      this->SetName("blosum45");
       break;
     }
     case BLOSUM62:{
       FillData(this,RAW_BLOSUM62_DATA);
+      this->SetName("blosum62");
       break;
     }
     case BLOSUM80:{
       FillData(this,RAW_BLOSUM80_DATA);
+      this->SetName("blosum80");
       break;
     }
     case BLOSUM100:{
       FillData(this,RAW_BLOSUM100_DATA);
-      break;
-    }
-    case IDENTITY:{
-      FillIdentity(this);
-      break;
-    }
-    case MATCH:{
-      FillMatch(this);
+      this->SetName("blosum100");
       break;
     }
     case NUC44:{
       FillNucData(this,RAW_NUC44_DATA);
+      this->SetName("nuc44");
       break;
     }
   }
 }
-
 
 }}}

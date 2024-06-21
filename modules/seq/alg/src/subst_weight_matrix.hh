@@ -22,6 +22,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <boost/shared_ptr.hpp>
+#include <ost/base.hh>
 #include <ost/config.hh>
 #include <ost/seq/alg/module_config.hh>
 
@@ -44,9 +45,7 @@ public:
               BLOSUM62 = 1,
               BLOSUM80 = 2,
               BLOSUM100 = 3,
-              IDENTITY = 4,
-              MATCH = 5,
-              NUC44 = 6};
+              NUC44 = 4};
   /// \brief Initialize substitution matrix with zero.
   /// 
   /// In order to get a useful  substitution weight matrix, use SetWeight(). 
@@ -92,6 +91,10 @@ public:
     }
   }
 
+  void SetName(const String& name) { name_ = name; }
+
+  const String& GetName() { return name_; }
+
 private:
   int Index(char aa_one, char aa_two) const {
     return (toupper(aa_one)-'A')*ALPHABET_SIZE+(toupper(aa_two)-'A');
@@ -104,6 +107,7 @@ private:
   WeightType weights_[ALPHABET_SIZE*ALPHABET_SIZE];
   WeightType max_weight_;
   WeightType min_weight_;
+  String name_;
 };
 
 }}}
