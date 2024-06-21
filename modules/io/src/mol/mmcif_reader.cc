@@ -1922,7 +1922,6 @@ void MMCifReader::OnEndData()
           mol::AtomHandle a2 = res2.FindAtom(bl_it->atm_nm_2);
           if(a1.IsValid() && a2.IsValid()) {
             editor.Connect(a1, a2, bl_it->bond_order);
-            std::cout << a1 << ' ' << a2 << std::endl;
           }
         }
       }
