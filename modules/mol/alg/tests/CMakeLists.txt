@@ -14,6 +14,7 @@ set(OST_MOL_ALG_UNIT_TESTS
   test_contact_score.py
   test_biounit.py
   test_ost_dockq.py
+  test_bblddt.py
 )
 
 if (COMPOUND_LIB)

@@ -18,6 +18,7 @@ from ost import mol
 from ost import geom
 
 from ost.mol.alg import lddt
+from ost.mol.alg import bb_lddt
 from ost.mol.alg import qsscore
 
 def _CSel(ent, cnames):
@@ -925,7 +926,7 @@ class ChainMapper:
                 mapping = _lDDTGreedyBlock(the_greed, block_seed_size,
                                            block_blocks_per_chem_group)
             # cached => lDDT computation is fast here
-            opt_lddt = the_greed.lDDT(self.chem_groups, mapping)
+            opt_lddt = the_greed.Score(mapping)
 
         alns = dict()
         for ref_group, mdl_group in zip(self.chem_groups, mapping):
@@ -1063,7 +1064,7 @@ class ChainMapper:
                 mapping = _QSScoreGreedyBlock(the_greed, block_seed_size,
                                               block_blocks_per_chem_group)
             # cached => QSScore computation is fast here
-            opt_qsscore = the_greed.Score(mapping, check=False)
+            opt_qsscore = the_greed.Score(mapping, check=False).QS_global
               
         alns = dict()
         for ref_group, mdl_group in zip(self.chem_groups, mapping):
@@ -1230,10 +1231,19 @@ class ChainMapper:
         performed (greedy_prune_contact_map = True). The default for
         *n_max_naive* of 40320 corresponds to an octamer (8!=40320). A
         structure with stoichiometry A6B2 would be 6!*2!=1440 etc.
+
+        If :attr:`~target` has nucleotide sequences, the QS-score target
+        function is replaced with a backbone only lDDT score that has
+        an inclusion radius of 30A. 
         """
-        return self.GetQSScoreMapping(model, strategy="heuristic",
-                                      greedy_prune_contact_map=True,
-                                      heuristic_n_max_naive = n_max_naive)
+        if len(self.polynuc_seqs) > 0:
+            return self.GetlDDTMapping(model, strategy = "heuristic",
+                                       inclusion_radius = 30.0,
+                                       heuristic_n_max_naive = n_max_naive)
+        else:
+            return self.GetQSScoreMapping(model, strategy="heuristic",
+                                          greedy_prune_contact_map=True,
+                                          heuristic_n_max_naive = n_max_naive)
 
     def GetRepr(self, substructure, model, topn=1, inclusion_radius=15.0,
                 thresholds=[0.5, 1.0, 2.0, 4.0], bb_only=False,
@@ -2028,166 +2038,25 @@ def _CheckOneToOneMapping(ref_chains, mdl_chains):
     else:
         return None
 
-class _lDDTDecomposer:
-
-    def __init__(self, ref, mdl, ref_mdl_alns, inclusion_radius = 15.0,
-                 thresholds = [0.5, 1.0, 2.0, 4.0]):
-        """ Compute backbone only lDDT scores for ref/mdl
-
-        Uses the pairwise decomposable property of backbone only lDDT and
-        implements a caching mechanism to efficiently enumerate different
-        chain mappings. 
-        """
-
-        self.ref = ref
-        self.mdl = mdl
-        self.ref_mdl_alns = ref_mdl_alns
-        self.inclusion_radius = inclusion_radius
-        self.thresholds = thresholds
-
-        # keep track of single chains and interfaces in ref
-        self.ref_chains = list() # e.g. ['A', 'B', 'C']
-        self.ref_interfaces = list() # e.g. [('A', 'B'), ('A', 'C')]
-
-        # holds lDDT scorer for each chain in ref
-        # key: chain name, value: scorer
-        self.single_chain_scorer = dict()
-
-        # cache for single chain conserved contacts
-        # key: tuple (ref_ch, mdl_ch) value: number of conserved contacts
-        self.single_chain_cache = dict()
-
-        # holds lDDT scorer for each pairwise interface in target
-        # key: tuple (ref_ch1, ref_ch2), value: scorer
-        self.interface_scorer = dict()
-
-        # cache for interface conserved contacts
-        # key: tuple of tuple ((ref_ch1, ref_ch2),((mdl_ch1, mdl_ch2))
-        # value: number of conserved contacts
-        self.interface_cache = dict()
-
-        self.n = 0
-
-        self._SetupScorer()
-
-    def _SetupScorer(self):
-        for ch in self.ref.chains:
-            # Select everything close to that chain
-            query = f"{self.inclusion_radius} <> "
-            query += f"[cname={mol.QueryQuoteName(ch.GetName())}] "
-            query += f"and cname!={mol.QueryQuoteName(ch.GetName())}"
-            for close_ch in self.ref.Select(query).chains:
-                k1 = (ch.GetName(), close_ch.GetName())
-                k2 = (close_ch.GetName(), ch.GetName())
-                if k1 not in self.interface_scorer and \
-                k2 not in self.interface_scorer:
-                    dimer_ref = _CSel(self.ref, [k1[0], k1[1]])
-                    s = lddt.lDDTScorer(dimer_ref, bb_only=True)
-                    self.interface_scorer[k1] = s
-                    self.interface_scorer[k2] = s
-                    self.n += sum([len(x) for x in self.interface_scorer[k1].ref_indices_ic])
-                    self.ref_interfaces.append(k1)
-                    # single chain scorer are actually interface scorers to save
-                    # some distance calculations
-                    if ch.GetName() not in self.single_chain_scorer:
-                        self.single_chain_scorer[ch.GetName()] = s
-                        self.n += s.GetNChainContacts(ch.GetName(),
-                                                      no_interchain=True)
-                        self.ref_chains.append(ch.GetName())
-                    if close_ch.GetName() not in self.single_chain_scorer:
-                        self.single_chain_scorer[close_ch.GetName()] = s
-                        self.n += s.GetNChainContacts(close_ch.GetName(),
-                                                      no_interchain=True)
-                        self.ref_chains.append(close_ch.GetName())
-
-        # add any missing single chain scorer
-        for ch in self.ref.chains:
-            if ch.GetName() not in self.single_chain_scorer:
-                single_chain_ref = _CSel(self.ref, [ch.GetName()])
-                self.single_chain_scorer[ch.GetName()] = \
-                lddt.lDDTScorer(single_chain_ref, bb_only = True)
-                self.n += self.single_chain_scorer[ch.GetName()].n_distances
-                self.ref_chains.append(ch.GetName())
-
-    def lDDT(self, ref_chain_groups, mdl_chain_groups):
-
-        flat_map = dict()
-        for ref_chains, mdl_chains in zip(ref_chain_groups, mdl_chain_groups):
-            for ref_ch, mdl_ch in zip(ref_chains, mdl_chains):
-                flat_map[ref_ch] = mdl_ch
-
-        return self.lDDTFromFlatMap(flat_map)
-
-
-    def lDDTFromFlatMap(self, flat_map):
-        conserved = 0
-
-        # do single chain scores
-        for ref_ch in self.ref_chains:
-            if ref_ch in flat_map and flat_map[ref_ch] is not None:
-                conserved += self.SCCounts(ref_ch, flat_map[ref_ch])
-
-        # do interfaces
-        for ref_ch1, ref_ch2 in self.ref_interfaces:
-            if ref_ch1 in flat_map and ref_ch2 in flat_map:
-                mdl_ch1 = flat_map[ref_ch1]
-                mdl_ch2 = flat_map[ref_ch2]
-                if mdl_ch1 is not None and mdl_ch2 is not None:
-                    conserved += self.IntCounts(ref_ch1, ref_ch2, mdl_ch1,
-                                                mdl_ch2)
-
-        return conserved / (len(self.thresholds) * self.n)
-
-    def SCCounts(self, ref_ch, mdl_ch):
-        if not (ref_ch, mdl_ch) in self.single_chain_cache:
-            alns = dict()
-            alns[mdl_ch] = self.ref_mdl_alns[(ref_ch, mdl_ch)]
-            mdl_sel = _CSel(self.mdl, [mdl_ch])
-            s = self.single_chain_scorer[ref_ch]
-            _,_,_,conserved,_,_,_ = s.lDDT(mdl_sel,
-                                           residue_mapping=alns,
-                                           return_dist_test=True,
-                                           no_interchain=True,
-                                           chain_mapping={mdl_ch: ref_ch},
-                                           check_resnames=False)
-            self.single_chain_cache[(ref_ch, mdl_ch)] = conserved
-        return self.single_chain_cache[(ref_ch, mdl_ch)]
-
-    def IntCounts(self, ref_ch1, ref_ch2, mdl_ch1, mdl_ch2):
-        k1 = ((ref_ch1, ref_ch2),(mdl_ch1, mdl_ch2))
-        k2 = ((ref_ch2, ref_ch1),(mdl_ch2, mdl_ch1))
-        if k1 not in self.interface_cache and k2 not in self.interface_cache:
-            alns = dict()
-            alns[mdl_ch1] = self.ref_mdl_alns[(ref_ch1, mdl_ch1)]
-            alns[mdl_ch2] = self.ref_mdl_alns[(ref_ch2, mdl_ch2)]
-            mdl_sel = _CSel(self.mdl, [mdl_ch1, mdl_ch2])
-            s = self.interface_scorer[(ref_ch1, ref_ch2)]
-            _,_,_,conserved,_,_,_ = s.lDDT(mdl_sel,
-                                           residue_mapping=alns,
-                                           return_dist_test=True,
-                                           no_intrachain=True,
-                                           chain_mapping={mdl_ch1: ref_ch1,
-                                                          mdl_ch2: ref_ch2},
-                                           check_resnames=False)
-            self.interface_cache[k1] = conserved
-            self.interface_cache[k2] = conserved
-        return self.interface_cache[k1]
-
-class _lDDTGreedySearcher(_lDDTDecomposer):
+class _lDDTGreedySearcher(bb_lddt.BBlDDTScorer):
     def __init__(self, ref, mdl, ref_chem_groups, mdl_chem_groups,
                  ref_mdl_alns, inclusion_radius = 15.0,
                  thresholds = [0.5, 1.0, 2.0, 4.0],
                  steep_opt_rate = None):
+
         """ Greedy extension of already existing but incomplete chain mappings
         """
-        super().__init__(ref, mdl, ref_mdl_alns,
-                         inclusion_radius = inclusion_radius,
-                         thresholds = thresholds)
+        super().__init__(ref, ref_chem_groups, mdl, ref_mdl_alns,
+                         dist_thresh=inclusion_radius,
+                         dist_diff_thresholds=thresholds)
+
+        self.mdl_chem_groups = mdl_chem_groups
         self.steep_opt_rate = steep_opt_rate
-        self.neighbors = {k: set() for k in self.ref_chains}
-        for k in self.interface_scorer.keys():
-            self.neighbors[k[0]].add(k[1])
-            self.neighbors[k[1]].add(k[0])
+
+        self.neighbors = {k: set() for k in self.trg.chain_names}
+        for interface in self.trg.interacting_chains:
+            self.neighbors[interface[0]].add(interface[1])
+            self.neighbors[interface[1]].add(interface[0])
 
         assert(len(ref_chem_groups) == len(mdl_chem_groups))
         self.ref_chem_groups = ref_chem_groups
@@ -2203,16 +2072,10 @@ class _lDDTGreedySearcher(_lDDTDecomposer):
 
         # keep track of mdl chains that potentially give lDDT contributions,
         # i.e. they have locations within inclusion_radius + max(thresholds)
-        self.mdl_neighbors = dict()
-        d = self.inclusion_radius + max(self.thresholds)
-        for ch in self.mdl.chains:
-            ch_name = ch.GetName()
-            self.mdl_neighbors[ch_name] = set()
-            query = f"{d} <> [cname={mol.QueryQuoteName(ch_name)}]"
-            query += f" and cname !={mol.QueryQuoteName(ch_name)}"
-            for close_ch in self.mdl.Select(query).chains:
-                self.mdl_neighbors[ch_name].add(close_ch.GetName())
-
+        self.mdl_neighbors = {k: set() for k in self.mdl.chain_names}
+        for interface in self.mdl.potentially_contributing_chains:
+            self.mdl_neighbors[interface[0]].add(interface[1])
+            self.mdl_neighbors[interface[1]].add(interface[0])
 
     def ExtendMapping(self, mapping, max_ext = None):
 
@@ -2261,14 +2124,14 @@ class _lDDTGreedySearcher(_lDDTDecomposer):
                 chem_group_idx = self.ref_ch_group_mapper[ref_ch]
                 for mdl_ch in free_mdl_chains[chem_group_idx]:
                     # single chain score
-                    n_single = self.SCCounts(ref_ch, mdl_ch)
+                    n_single = self._NSCConserved(ref_ch, mdl_ch).sum()
                     # scores towards neighbors that are already mapped
                     n_inter = 0
                     for neighbor in self.neighbors[ref_ch]:
                         if neighbor in mapping and mapping[neighbor] in \
                         self.mdl_neighbors[mdl_ch]:
-                            n_inter += self.IntCounts(ref_ch, neighbor, mdl_ch,
-                                                      mapping[neighbor])
+                            n_inter += self._NPairConserved((ref_ch, neighbor),
+                                                            (mdl_ch, mapping[neighbor])).sum()
                     n = n_single + n_inter
 
                     if n_inter > 0 and n > max_n:
@@ -2322,7 +2185,7 @@ class _lDDTGreedySearcher(_lDDTDecomposer):
 
         # try all possible mapping swaps. Swaps that improve the score are
         # immediately accepted and we start all over again
-        current_lddt = self.lDDTFromFlatMap(mapping)
+        current_lddt = self.FromFlatMapping(mapping)
         something_happened = True
         while something_happened:
             something_happened = False
@@ -2333,13 +2196,12 @@ class _lDDTGreedySearcher(_lDDTDecomposer):
                     swapped_mapping = dict(mapping)
                     swapped_mapping[ch1] = mapping[ch2]
                     swapped_mapping[ch2] = mapping[ch1]
-                    score = self.lDDTFromFlatMap(swapped_mapping)
+                    score = self.FromFlatMapping(swapped_mapping)
                     if score > current_lddt:
                         something_happened = True
                         mapping = swapped_mapping
                         current_lddt = score
                         break        
-
         return mapping
 
 
@@ -2416,7 +2278,7 @@ def _lDDTGreedyFast(the_greed):
         n_best = 0
         best_seed = None
         for seed in seeds:
-            n = the_greed.SCCounts(seed[0], seed[1])
+            n = the_greed._NSCConserved(seed[0], seed[1]).sum()
             if n > n_best:
                 n_best = n
                 best_seed = seed
@@ -2470,7 +2332,7 @@ def _lDDTGreedyFull(the_greed):
                     tmp_mapping = dict(mapping)
                     tmp_mapping[remnant_seed[0]] = remnant_seed[1]
                     tmp_mapping = the_greed.ExtendMapping(tmp_mapping)
-                    score = the_greed.lDDTFromFlatMap(tmp_mapping)
+                    score = the_greed.FromFlatMapping(tmp_mapping)
                     if score > best_score:
                         best_score = score
                         best_mapping = tmp_mapping
@@ -2478,7 +2340,7 @@ def _lDDTGreedyFull(the_greed):
                     something_happened = True
                     mapping = best_mapping
 
-        score = the_greed.lDDTFromFlatMap(mapping)
+        score = the_greed.FromFlatMapping(mapping)
         if score > best_overall_score:
             best_overall_score = score
             best_overall_mapping = mapping
@@ -2542,7 +2404,7 @@ def _lDDTGreedyBlock(the_greed, seed_size, blocks_per_chem_group):
                     seed = dict(mapping)
                     seed.update({s[0]: s[1]})  
                     seed = the_greed.ExtendMapping(seed, max_ext = max_ext)
-                    seed_lddt = the_greed.lDDTFromFlatMap(seed)
+                    seed_lddt = the_greed.FromFlatMapping(seed)
                     if seed_lddt > best_score:
                         best_score = seed_lddt
                         best_mapping = seed
@@ -2558,7 +2420,7 @@ def _lDDTGreedyBlock(the_greed, seed_size, blocks_per_chem_group):
         best_mapping = None
         for seed in starting_blocks:
             seed = the_greed.ExtendMapping(seed)
-            seed_lddt = the_greed.lDDTFromFlatMap(seed)
+            seed_lddt = the_greed.FromFlatMapping(seed)
             if seed_lddt > best_lddt:
                 best_lddt = seed_lddt
                 best_mapping = seed

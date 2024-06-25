@@ -47,10 +47,23 @@ options, this is a dictionary with three keys:
    content of the JSON output will be \"status\" set to FAILURE and an
    additional key: "traceback".
 
-Each score is opt-in and must be enabled with optional arguments. The scores
-perform a model/reference ligand assignment and report a score for each assigned
-model ligand. Optionally, unassigned model ligands are reported with a null
-score and a reason why no assignment has been performed (--unassigned/-u).
+Each score is opt-in and the respective results are available in two keys:
+
+ * "model_ligands": Model ligand centric scoring based on model/reference
+   ligand assignment. A score including meta data is reported for each assigned
+   model ligand given the assigned target ligand. Unassigned model ligands are
+   reported with a null score and a reason why no assignment has been performed.
+
+ * "full": The full all vs. all scoring results. Yet another dictionary with
+   keys:
+
+   * "assignment": List of pairs in form (ref_lig_idx, mdl_lig_idx) specifying
+     the ligands in "reference_ligands"/"model_ligands".
+   * "scores": A dictionary with key in form (ref_lig_idx, mdl_lig_idx) and
+     value yet another dict with score information for each possible
+     reference/model ligand pair. The respective score is None if no score could
+     be computed. This can simply be a mismatch between the two ligands. This or
+     other reasons are reported.  
 """
 
 import argparse
@@ -190,16 +203,6 @@ def _ParseArgs():
         dest="coverage_delta",
         default=0.2,
         help=("Coverage delta for partial ligand assignment."))
-
-    parser.add_argument(
-        "-u",
-        "--unassigned",
-        dest="unassigned",
-        default=False,
-        action="store_true",
-        help=("Report unassigned model ligands in the output together with "
-              "assigned ligands, with a null score, and reason for not being "
-              "assigned."))
 
     parser.add_argument(
         '-v',
@@ -511,31 +514,48 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
 
     if args.lddt_pli:
         out["lddt_pli"] = dict()
+        out["lddt_pli"]["model_ligands"] = dict()
+        out["lddt_pli"]["full"] = dict()
         for lig_pair in lddtpli_scorer.assignment:
             score = float(lddtpli_scorer.score_matrix[lig_pair[0], lig_pair[1]])
             coverage = float(lddtpli_scorer.coverage_matrix[lig_pair[0], lig_pair[1]])
             aux_data = lddtpli_scorer.aux_matrix[lig_pair[0], lig_pair[1]]
             target_key = out["reference_ligands"][lig_pair[0]]
             model_key = out["model_ligands"][lig_pair[1]]
-            out["lddt_pli"][model_key] = {"lddt_pli": score,
-                                          "coverage": coverage,
-                                          "lddt_pli_n_contacts": aux_data["lddt_pli_n_contacts"],
-                                          "model_ligand": model_key,
-                                          "reference_ligand": target_key,
-                                          "bs_ref_res": [_QualifiedResidueNotation(r) for r in
-                                                         aux_data["bs_ref_res"]],
-                                          "bs_mdl_res": [_QualifiedResidueNotation(r) for r in
-                                                         aux_data["bs_mdl_res"]]}
-        if args.unassigned:
-            for i in lddtpli_scorer.unassigned_model_ligands:
-                model_key = out["model_ligands"][i]
-                reason = lddtpli_scorer.guess_model_ligand_unassigned_reason(i)
-                out["lddt_pli"][model_key] = {"lddt_pli": None,
-                                              "unassigned_reason": reason}
+            out["lddt_pli"]["model_ligands"][model_key] = {"lddt_pli": score,
+                                                           "coverage": coverage,
+                                                           "lddt_pli_n_contacts": aux_data["lddt_pli_n_contacts"],
+                                                           "model_ligand": model_key,
+                                                           "reference_ligand": target_key,
+                                                           "bs_ref_res": [_QualifiedResidueNotation(r) for r in
+                                                                          aux_data["bs_ref_res"]],
+                                                           "bs_mdl_res": [_QualifiedResidueNotation(r) for r in
+                                                                          aux_data["bs_mdl_res"]]}
+        
+        for i in lddtpli_scorer.unassigned_model_ligands:
+            model_key = out["model_ligands"][i]
+            reason = lddtpli_scorer.guess_model_ligand_unassigned_reason(i)
+            out["lddt_pli"]["model_ligands"][model_key] = {"lddt_pli": None,
+                                                           "unassigned_reason": reason}
+
+        out["lddt_pli"]["full"]["assignment"] = lddtpli_scorer.assignment
+        out["lddt_pli"]["full"]["scores"] = dict()
+
+        shape = lddtpli_scorer.score_matrix.shape
+        for ref_lig_idx in range(shape[0]):
+            for mdl_lig_idx in range(shape[1]):
+                score = float(lddtpli_scorer.score_matrix[(ref_lig_idx, mdl_lig_idx)])
+                state = int(lddtpli_scorer.state_matrix[(ref_lig_idx, mdl_lig_idx)])
+                desc = lddtpli_scorer.state_decoding[state]
+                pair_key = [ref_lig_idx, mdl_lig_idx]
+                out["lddt_pli"]["full"]["scores"][pair_key] = {"score": score,
+                                                               "state": desc}
 
 
     if args.rmsd:
         out["rmsd"] = dict()
+        out["rmsd"]["model_ligands"] = dict()
+        out["rmsd"]["full"] = dict()
         for lig_pair in scrmsd_scorer.assignment:
             score = float(scrmsd_scorer.score_matrix[lig_pair[0], lig_pair[1]])
             coverage = float(scrmsd_scorer.coverage_matrix[lig_pair[0], lig_pair[1]])
@@ -543,29 +563,42 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
             target_key = out["reference_ligands"][lig_pair[0]]
             model_key = out["model_ligands"][lig_pair[1]]
             transform_data = aux_data["transform"].data
-            out["rmsd"][model_key] = {"rmsd": score,
-                                      "coverage": coverage,
-                                      "lddt_lp": aux_data["lddt_lp"],
-                                      "bb_rmsd": aux_data["bb_rmsd"],
-                                      "model_ligand": model_key,
-                                      "reference_ligand": target_key,
-                                      "chain_mapping": aux_data["chain_mapping"],
-                                      "bs_ref_res": [_QualifiedResidueNotation(r) for r in
-                                                         aux_data["bs_ref_res"]],
-                                      "bs_ref_res_mapped": [_QualifiedResidueNotation(r) for r in
-                                                            aux_data["bs_ref_res_mapped"]],
-                                      "bs_mdl_res_mapped": [_QualifiedResidueNotation(r) for r in
-                                                            aux_data["bs_mdl_res_mapped"]],
-                                      "inconsistent_residues": [_QualifiedResidueNotation(r) for r in
-                                                                aux_data["inconsistent_residues"]],
-                                      "transform": [transform_data[i:i + 4]
-                                                    for i in range(0, len(transform_data), 4)]}
-        if args.unassigned:
-            for i in scrmsd_scorer.unassigned_model_ligands:
-                model_key = out["model_ligands"][i]
-                reason = scrmsd_scorer.guess_model_ligand_unassigned_reason(i)
-                out["rmsd"][model_key] = {"rmsd": None,
-                                          "unassigned_reason": reason}
+            out["rmsd"]["model_ligands"][model_key] = {"rmsd": score,
+                                                       "coverage": coverage,
+                                                       "lddt_lp": aux_data["lddt_lp"],
+                                                       "bb_rmsd": aux_data["bb_rmsd"],
+                                                       "model_ligand": model_key,
+                                                       "reference_ligand": target_key,
+                                                       "chain_mapping": aux_data["chain_mapping"],
+                                                       "bs_ref_res": [_QualifiedResidueNotation(r) for r in
+                                                                          aux_data["bs_ref_res"]],
+                                                       "bs_ref_res_mapped": [_QualifiedResidueNotation(r) for r in
+                                                                             aux_data["bs_ref_res_mapped"]],
+                                                       "bs_mdl_res_mapped": [_QualifiedResidueNotation(r) for r in
+                                                                             aux_data["bs_mdl_res_mapped"]],
+                                                       "inconsistent_residues": [_QualifiedResidueNotation(r) for r in
+                                                                                 aux_data["inconsistent_residues"]],
+                                                       "transform": [transform_data[i:i + 4]
+                                                                     for i in range(0, len(transform_data), 4)]}
+        for i in scrmsd_scorer.unassigned_model_ligands:
+            model_key = out["model_ligands"][i]
+            reason = scrmsd_scorer.guess_model_ligand_unassigned_reason(i)
+            out["rmsd"]["model_ligands"][model_key] = {"rmsd": None,
+                                                       "unassigned_reason": reason}
+
+        out["rmsd"]["full"]["assignment"] = scrmsd_scorer.assignment
+        out["rmsd"]["full"]["scores"] = dict()
+
+        shape = scrmsd_scorer.score_matrix.shape
+        for ref_lig_idx in range(shape[0]):
+            for mdl_lig_idx in range(shape[1]):
+                score = float(scrmsd_scorer.score_matrix[(ref_lig_idx, mdl_lig_idx)])
+                state = int(scrmsd_scorer.state_matrix[(ref_lig_idx, mdl_lig_idx)])
+                desc = scrmsd_scorer.state_decoding[state]
+                pair_key = [ref_lig_idx, mdl_lig_idx]
+                out["rmsd"]["full"]["scores"][pair_key] = {"score": score,
+                                                           "state": desc}
+
 
     return out
 
