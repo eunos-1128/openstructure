@@ -4,9 +4,6 @@ Changes in Release x.x.x
  * heavy water (DOD) is now recognised as 'water' instead of 'non-polymer' by
    the compounds library.
  * Added a '--version' argument to the 'ost' executable
- * Changed default value of '--rmsd-assignment' to False for ligand scoring
- * Added 'full_bs_search' argument in ligand scoring to optionally speed up
-   computations in large complexes.
  * SEQRES information is now read from the entity_poly_seq category in mmCIF.
    The canonical as well as semi-canonical (with 3 letter-codes in bracket)
    SEQRES are now available from the MMCifInfo object. The
@@ -18,10 +15,24 @@ Changes in Release x.x.x
    score within 3 GDTTS points when compared to LGA results).
    Oligo/RNA support comes for free when using the ost.mol.alg.scoring.Scorer
    object.
+ * Introduce ilDDT score in scoring.Scorer and compare-structures action.
+   It's an all atom lDDT score which only considers interface contacts.
  * Rigid superposition based scores (RMSD, GDT) in ost.mol.alg.scoring.Scorer
    now use RMSD based chain mapping when scoring oligos.
+ * scoring.Scorer and compare-structures action can now optionally enable
+   peptide specific parameterizations as defined by the CAPRI community for
+   DockQ related scores (fnat, fnonnat, irmsd, lrmsd).
+ * ChainMapper.GetMapping now uses backbone only lDDT with inclusion radius
+   30A as target function if nucleotide chains are present. Protein only
+   structures still use QS-score as target function as before. 
  * Ligand scoring refactoring. lDDT-PLI and symmetry corrected RMSD are now
    completely separated.
+ * Breaking changes in compare-ligand-structures action output - run
+   'ost compare-ligand-structures -h' for more information.
+ * Added 'full_bs_search' argument in ligand scoring. Binding sites for
+   symmetry corrected RMSD computation are now searched by only considering
+   polymer chains in proximity of ligands to speed up computations on large
+   complexes. The old behavior can be restored by enabling this flag.
  * Added model contacts in lDDT. lDDT is not symmetric in a sense that
    added/wrong contacts in the model do not penalize the score. lDDT now comes
    with a flag to add such contacts, i.e. contacts between atom pairs in the
