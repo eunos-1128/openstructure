@@ -110,6 +110,13 @@ def GetDefaultSymmetrySettings():
         "TYR", [("CD1", "CD2"), ("CE1", "CE2")]
     )
 
+    # nucleotides
+    nuc_names = ["A", "C", "G", "U", "DA", "DC", "DG", "DT"]
+    for nuc_name in nuc_names:
+        symmetry_settings.AddSymmetricCompound(
+            nuc_name, [("OP1","OP2")]
+        )
+
     return symmetry_settings
 
 
