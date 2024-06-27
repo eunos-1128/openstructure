@@ -124,7 +124,14 @@ class Scorer:
     :param custom_mapping: Provide custom chain mapping between *model* and
                            *target*. Dictionary with target chain names as key
                            and model chain names as value.
+                           :attr:`~mapping` is constructed from this.
     :type custom_mapping: :class:`dict`
+    :param custom_rigid_mapping: Provide custom chain mapping between *model*
+                                 and *target*. Dictionary with target chain
+                                 names as key and model chain names as value.
+                                 :attr:`~rigid_mapping` is constructed from
+                                 this.
+    :type custom_rigid_mapping: :class:`dict`
     :param usalign_exec: Explicit path to USalign executable used to compute
                          TM-score. If not given, TM-score will be computed
                          with OpenStructure internal copy of USalign code.
@@ -197,10 +204,10 @@ class Scorer:
     """
     def __init__(self, model, target, resnum_alignments=False,
                  molck_settings = None, cad_score_exec = None,
-                 custom_mapping=None, usalign_exec = None,
-                 lddt_no_stereochecks=False, n_max_naive=40320,
-                 oum=False, min_pep_length = 6, min_nuc_length = 4,
-                 lddt_add_mdl_contacts=False,
+                 custom_mapping=None, custom_rigid_mapping=None,
+                 usalign_exec = None, lddt_no_stereochecks=False,
+                 n_max_naive=40320, oum=False, min_pep_length = 6,
+                 min_nuc_length = 4, lddt_add_mdl_contacts=False,
                  dockq_capri_peptide=False):
 
         self._target_orig = target
@@ -393,7 +400,11 @@ class Scorer:
         self._usalign_mapping = None
 
         if custom_mapping is not None:
-            self._set_custom_mapping(custom_mapping)
+            self._mapping = self._construct_custom_mapping(custom_mapping)
+
+        if custom_rigid_mapping is not None:
+            self._rigid_mapping = \
+            self._construct_custom_mapping(custom_rigid_mapping)
         LogDebug("Scorer sucessfully initialized")
 
     @property
@@ -2368,8 +2379,8 @@ class Scorer:
                 ed.InsertAtom(added_r, a.handle)
         return ent
 
-    def _set_custom_mapping(self, mapping):
-        """ sets self._mapping with a full blown MappingResult object
+    def _construct_custom_mapping(self, mapping):
+        """ constructs a full blown MappingResult object from simple dict
 
         :param mapping: mapping with trg chains as key and mdl ch as values
         :type mapping: :class:`dict`
@@ -2458,10 +2469,10 @@ class Scorer:
                     aln.AttachView(1, mdl_view)
                     alns[(ref_ch, mdl_ch)] = aln
 
-        self._mapping = chain_mapping.MappingResult(chain_mapper.target, mdl,
-                                                    chain_mapper.chem_groups,
-                                                    chem_mapping,
-                                                    final_mapping, alns)
+        return chain_mapping.MappingResult(chain_mapper.target, mdl,
+                                           chain_mapper.chem_groups,
+                                           chem_mapping,
+                                           final_mapping, alns)
 
     def _compute_tmscore(self):
         res = None
