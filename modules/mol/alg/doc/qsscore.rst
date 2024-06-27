@@ -1,4 +1,4 @@
-:mod:`qsscore <ost.mol.alg.qsscore>` -- New QS score implementation
+:mod:`mol.alg.qsscore <ost.mol.alg.qsscore>` -- New QS score implementation
 --------------------------------------------------------------------------------
 
 .. note::

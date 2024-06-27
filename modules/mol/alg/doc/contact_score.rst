@@ -1,5 +1,5 @@
-:mod:`contact_score <ost.mol.alg.contact_score>` -- Contact based scores
---------------------------------------------------------------------------------
+:mod:`mol.alg.contact_score <ost.mol.alg.contact_score>` -- Contact based scores
+------------------------------------------------------------------------------------
 
 .. automodule:: ost.mol.alg.contact_score
    :members:

@@ -1,5 +1,5 @@
-:mod:`scoring <ost.mol.alg.scoring>` -- Specialized scoring functions
---------------------------------------------------------------------------------
+:mod:`mol.alg.scoring <ost.mol.alg.scoring>` -- Specialized scoring functions
+---------------------------------------------------------------------------------
 
 .. module:: ost.mol.alg.scoring
    :synopsis: Specialized scoring functions

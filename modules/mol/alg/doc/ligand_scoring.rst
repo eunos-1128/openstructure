@@ -1,5 +1,5 @@
-:mod:`ligand_scoring <ost.mol.alg.ligand_scoring>` -- Ligand scoring functions
------------------------------------------------------------------------------------
+:mod:`mol.alg.ligand_scoring <ost.mol.alg.ligand_scoring>` -- Ligand scoring functions
+------------------------------------------------------------------------------------------
 
 .. module:: ost.mol.alg.ligand_scoring
    :synopsis: Ligand scoring functions

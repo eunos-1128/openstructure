@@ -7,17 +7,16 @@
 Submodules
 --------------------------------------------------------------------------------
 
-* :doc:`chain_mapping`
-* :doc:`contact_score`
-* :doc:`dockq`
-* :doc:`helix_kinks`
-* :doc:`ligand_scoring`
-* :doc:`qsscore`
-* :doc:`scoring`
-* :doc:`stereochemistry`
-* :doc:`structure_analysis`
-* :doc:`trajectory_analysis`
-
+* :doc:`chain_mapping – Chain Mapping <chain_mapping>`
+* :doc:`contact_score – Contact based scores<contact_score>`
+* :doc:`dockq – DockQ implementation<dockq>`
+* :doc:`helix_kinks – Algorithms to calculate Helix Kinks<helix_kinks>`
+* :doc:`ligand_scoring – Ligand scoring functions<ligand_scoring>`
+* :doc:`qsscore – New QS score implementation<qsscore>`
+* :doc:`scoring – Specialized scoring functions<scoring>`
+* :doc:`stereochemistry – Stereochemistry Checks<stereochemistry>`
+* :doc:`structure_analysis – Functions to analyze structures<structure_analysis>`
+* :doc:`trajectory_analysis – DRMSD, pairwise distances and more<trajectory_analysis>`
 
 Local Distance Test scores (lDDT, DRMSD)
 --------------------------------------------------------------------------------

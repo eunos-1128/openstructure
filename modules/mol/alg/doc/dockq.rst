@@ -1,4 +1,4 @@
-:mod:`dockq <ost.mol.alg.dockq>` -- DockQ implementation
+:mod:`mol.alg.dockq <ost.mol.alg.dockq>` -- DockQ implementation
 --------------------------------------------------------------------------------
 
 .. module:: ost.mol.alg.dockq
