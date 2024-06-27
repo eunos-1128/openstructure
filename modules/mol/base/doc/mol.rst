@@ -14,3 +14,14 @@ The mol module implements data structures to work with molecular datasets. At it
   query
   surface
   traj
+  ../alg/molalg
+  ../alg/chain_mapping
+  ../alg/contact_score
+  ../alg/dockq
+  ../alg/helix_kinks
+  ../alg/ligand_scoring
+  ../alg/qsscore
+  ../alg/scoring
+  ../alg/stereochemistry
+  ../alg/structure_analysis
+  ../alg/trajectory_analysis

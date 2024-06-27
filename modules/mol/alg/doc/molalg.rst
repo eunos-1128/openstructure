@@ -4,6 +4,21 @@
 .. module:: ost.mol.alg
    :synopsis: Algorithms operating on molecular structures
 
+Submodules
+--------------------------------------------------------------------------------
+
+* :doc:`chain_mapping`
+* :doc:`contact_score`
+* :doc:`dockq`
+* :doc:`helix_kinks`
+* :doc:`ligand_scoring`
+* :doc:`qsscore`
+* :doc:`scoring`
+* :doc:`stereochemistry`
+* :doc:`structure_analysis`
+* :doc:`trajectory_analysis`
+
+
 Local Distance Test scores (lDDT, DRMSD)
 --------------------------------------------------------------------------------
 
@@ -81,106 +96,6 @@ Local Distance Test scores (lDDT, DRMSD)
 
     :return: String representation of the lDDTSettings object.
     :rtype:  :class:`str`
-
-
-:mod:`stereochemistry <ost.mol.alg.stereochemistry>` -- Stereochemistry Checks
---------------------------------------------------------------------------------
-
-.. warning::
-
-  Stereochemistry checks described in
-  `Mariani et al. <https://dx.doi.org/10.1093/bioinformatics/btt473>`_ are
-  considered deprecated. They have been re-implemented and now support
-  nucleotides. The old code is still available and documented
-  :doc:`here <stereochemistry_deprecated>`.
-
-.. automodule:: ost.mol.alg.stereochemistry
-   :members:
-   :member-order: bysource
-   :synopsis: Stereochemistry checks
-
-.. currentmodule:: ost.mol.alg
-
-
-:mod:`scoring <ost.mol.alg.scoring>` -- Specialized scoring functions
---------------------------------------------------------------------------------
-
-.. autoclass:: ost.mol.alg.scoring.lDDTBSScorer
-   :members:
-
-.. autoclass:: ost.mol.alg.scoring.Scorer
-   :members:
-   :member-order: bysource
-
-.. currentmodule:: ost.mol.alg
-
-
-:mod:`ligand_scoring <ost.mol.alg.ligand_scoring_base>` -- Ligand scoring functions
------------------------------------------------------------------------------------
-
-.. automodule:: ost.mol.alg.ligand_scoring_base
-   :members:
-   :member-order: bysource
-   :synopsis: Scoring of ligands
-
-.. automodule:: ost.mol.alg.ligand_scoring_lddtpli
-   :members:
-   :member-order: bysource
-   :synopsis: Scoring of ligands
-
-.. automodule:: ost.mol.alg.ligand_scoring_scrmsd
-   :members:
-   :member-order: bysource
-   :synopsis: Scoring of ligands
-
-
-:mod:`chain_mapping <ost.mol.alg.chain_mapping>` -- Chain Mapping
---------------------------------------------------------------------------------
-
-.. automodule:: ost.mol.alg.chain_mapping
-   :members:
-   :member-order: bysource
-   :synopsis: Chain mapping in assemblies
-
-.. currentmodule:: ost.mol.alg
-
-
-:mod:`qsscore <ost.mol.alg.qsscore>` -- New QS score implementation
---------------------------------------------------------------------------------
-
-.. note::
-
-  This is a new implementation of QS Score, introduced in OpenStructure 2.4 and
-  tightly integrated with the chain mapping algorithms.
-  The :doc:`previous qsscoring code <qsscoring_deprecated>` that comes with
-  `Bertoni et al. <https://www.nature.com/articles/s41598-017-09654-8>`_ is
-  considered deprecated.
-
-.. automodule:: ost.mol.alg.qsscore
-   :members:
-   :member-order: bysource
-   :synopsis: QS Score implementation
-
-.. currentmodule:: ost.mol.alg
-
-
-:mod:`DockQ <ost.mol.alg.dockq>` -- DockQ implementation
---------------------------------------------------------------------------------
-
-.. autofunction:: ost.mol.alg.dockq.DockQ
-
-.. currentmodule:: ost.mol.alg
-
-
-:mod:`Contact Scores <ost.mol.alg.contact_scores>` -- Contact based scores
---------------------------------------------------------------------------------
-
-.. automodule:: ost.mol.alg.contact_score
-   :members:
-   :member-order: bysource
-   :synopsis: Contact Scores
-
-.. currentmodule:: ost.mol.alg
 
 
 GDT - Global Distance Test
@@ -1153,34 +1068,13 @@ used to skip frames in the analysis.
   :param view_ring2: Second group of atoms
   :type view_ring2: :class:`~ost.mol.EntityView`.
   :param stride: Size of the increment of the frame's index between two 
-     consecutive frames analyzed.  
-
-
-:mod:`helix_kinks <ost.mol.alg.helix_kinks>` -- Algorithms to calculate Helix Kinks
----------------------------------------------------------------------------------------------------------------
-
-.. automodule:: ost.mol.alg.helix_kinks
-   :members:
-
-:mod:`trajectory_analysis <ost.mol.alg.trajectory_analysis>` -- DRMSD, pairwise distances and more
----------------------------------------------------------------------------------------------------------------
-
-.. automodule:: ost.mol.alg.trajectory_analysis
-   :members:
-
-:mod:`structure_analysis <ost.mol.alg.structure_analysis>` -- Functions to analyze structures
----------------------------------------------------------------------------------------------------------------
-
-.. automodule:: ost.mol.alg.structure_analysis
-   :members:
+     consecutive frames analyzed.
 
 
 .. _mapping-functions:
 
 Mapping functions
 --------------------------------------------------------------------------------
-
-.. currentmodule:: ost.mol.alg
 
 The following functions help to convert one residue into another by reusing as
 much as possible from the present atoms. They are mainly meant to map from
