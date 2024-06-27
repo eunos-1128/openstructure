@@ -1,7 +1,7 @@
-:mod:`mol.alg.contact_score <ost.mol.alg.contact_score>` -- Contact based scores
+:mod:`~ost.mol.alg.contact_score` -- Contact-Based Scores
 ------------------------------------------------------------------------------------
 
 .. automodule:: ost.mol.alg.contact_score
    :members:
    :member-order: bysource
-   :synopsis: Contact based scores
+   :synopsis: Contact-based scores

@@ -1,4 +1,4 @@
-:mod:`mol.alg.stereochemistry <ost.mol.alg.stereochemistry>` -- Stereochemistry Checks
+:mod:`~ost.mol.alg.stereochemistry` -- Stereochemistry Checks
 --------------------------------------------------------------------------------------
 
 .. warning::

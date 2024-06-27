@@ -1,4 +1,4 @@
-:mod:`seq.alg.aaindex <ost.seq.alg.aaindex>` -- AAIndex annotations
+:mod:`~ost.seq.alg.aaindex` -- AAIndex annotations
 --------------------------------------------------------------------------------
 
 .. module:: ost.seq.alg.aaindex

@@ -5,6 +5,7 @@
   :hidden:
 
   point-size-extent
+  ../alg/alg
 
 .. module:: ost.img
    :synopsis: Images and density maps

@@ -1,4 +1,4 @@
-:mod:`seq.alg <ost.seq.alg>` -- Algorithms for Sequences
+:mod:`~ost.seq.alg` -- Algorithms for Sequences
 ================================================================================
 
 .. module:: ost.seq.alg
@@ -7,8 +7,11 @@
 Submodules
 --------------------------------------------------------------------------------
 
-* :doc:`aaindex – AAIndex annotations <aaindex>`
-* :doc:`renumber – Renumber entities <renumber>`
+.. toctree::
+  :maxdepth: 1
+
+  aaindex
+  renumber
 
 Algorithms for Alignments
 --------------------------------------------------------------------------------

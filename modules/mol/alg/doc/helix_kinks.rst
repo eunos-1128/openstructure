@@ -1,4 +1,4 @@
-:mod:`mol.alg.helix_kinks <ost.mol.alg.helix_kinks>` -- Algorithms to calculate Helix Kinks
+:mod:`~ost.mol.alg.helix_kinks` -- Algorithms to Calculate Helix Kinks
 ---------------------------------------------------------------------------------------------------------------
 
 .. automodule:: ost.mol.alg.helix_kinks

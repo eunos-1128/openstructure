@@ -1,4 +1,4 @@
-:mod:`mol.alg <ost.mol.alg>` -- Algorithms for Structures
+:mod:`~ost.mol.alg` -- Algorithms for Structures
 ================================================================================
 
 .. module:: ost.mol.alg
@@ -7,16 +7,19 @@
 Submodules
 --------------------------------------------------------------------------------
 
-* :doc:`chain_mapping – Chain Mapping <chain_mapping>`
-* :doc:`contact_score – Contact based scores<contact_score>`
-* :doc:`dockq – DockQ implementation<dockq>`
-* :doc:`helix_kinks – Algorithms to calculate Helix Kinks<helix_kinks>`
-* :doc:`ligand_scoring – Ligand scoring functions<ligand_scoring>`
-* :doc:`qsscore – New QS score implementation<qsscore>`
-* :doc:`scoring – Specialized scoring functions<scoring>`
-* :doc:`stereochemistry – Stereochemistry Checks<stereochemistry>`
-* :doc:`structure_analysis – Functions to analyze structures<structure_analysis>`
-* :doc:`trajectory_analysis – DRMSD, pairwise distances and more<trajectory_analysis>`
+.. toctree::
+  :maxdepth: 1
+
+  chain_mapping
+  contact_score
+  dockq
+  helix_kinks
+  ligand_scoring
+  qsscore
+  scoring
+  stereochemistry
+  structure_analysis
+  trajectory_analysis
 
 Local Distance Test scores (lDDT, DRMSD)
 --------------------------------------------------------------------------------
@@ -1451,4 +1454,3 @@ from a :class:`ost.io.MMCifInfoBioUnit` or the derived
   :param bu_info: Info object
   :type bu_info: :class:`MMCifInfoBioUnit`/:class:`BUInfo`
   :returns: A :class:`ost.mol.EntityHandle` of the requested biounit
-

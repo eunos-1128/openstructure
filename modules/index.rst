@@ -8,40 +8,10 @@ OpenStructure documentation
   install
   intro
   users
-  base/generic
   base/base
-  geom/geom
-  mol/base/mol
-  mol/alg/molalg
-  mol/alg/chain_mapping
-  mol/alg/contact_score
-  mol/alg/dockq
-  mol/alg/helix_kinks
-  mol/alg/ligand_scoring
-  mol/alg/qsscore
-  mol/alg/scoring
-  mol/alg/stereochemistry
-  mol/alg/structure_analysis
-  mol/alg/trajectory_analysis
-  mol/mm/molmm
-  conop/conop
-  img/base/img
-  img/alg/alg
-  seq/base/seq
-  seq/alg/seqalg
-  seq/alg/renumber
-  seq/alg/aaindex
-  db/db
-  bindings/bindings
-  io/io
-  gfx/gfx
-  gui/gui
   newmodule
   external
   contributing
-  table
-  mol/alg/lddt
-  mol/alg/molck
   actions
 
 For Starters
@@ -108,7 +78,7 @@ Graphical User Interface
 Varia
 --------------------------------------------------------------------------------
 
-**Datasets**: :doc:`tabular data <table>`
+**Datasets**: :doc:`tabular data <base/table>`
 
 **Supported File Formats**: :doc:`structure formats<io/structure_formats>` | :doc:`sequence formats <io/sequence_formats>` | :doc:`sequence profile formats <io/sequence_profile_formats>` | :doc:`image formats <io/image_formats>`
 

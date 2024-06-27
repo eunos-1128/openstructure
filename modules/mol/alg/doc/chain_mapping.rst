@@ -1,4 +1,4 @@
-:mod:`mol.alg.chain_mapping <ost.mol.alg.chain_mapping>` -- Chain Mapping
+:mod:`~ost.mol.alg.chain_mapping` -- Chain Mapping
 --------------------------------------------------------------------------------
 
 .. automodule:: ost.mol.alg.chain_mapping

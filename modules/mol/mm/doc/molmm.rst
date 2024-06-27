@@ -1,4 +1,4 @@
-The mm Module
+:mod:`~ost.mol.mm` - The mm Module
 ================================================================================
 
 .. module:: ost.mol.mm
@@ -79,6 +79,7 @@ Documentation
   interaction
   buildingblock
   forcefield
+  antechamber
   settings
   topology
   observers

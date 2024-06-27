@@ -1,4 +1,4 @@
-Linear Database
+:mod:`~ost.db` - Linear Database
 ===============================================================================
 
 .. currentmodule:: ost.db

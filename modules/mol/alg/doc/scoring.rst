@@ -1,4 +1,4 @@
-:mod:`mol.alg.scoring <ost.mol.alg.scoring>` -- Specialized scoring functions
+:mod:`~ost.mol.alg.scoring` -- Specialized Scoring Functions
 ---------------------------------------------------------------------------------
 
 .. module:: ost.mol.alg.scoring

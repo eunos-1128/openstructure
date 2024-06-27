@@ -1,9 +1,10 @@
+:orphan:
+
 ..  Note on large code blocks: keep max. width to 100 or it will look bad
                                on webpage!
 
-=========================
-Molecular Checker (Molck)
-=========================
+Molck - the Molecular Checker binary (deprecated)
+=================================================
 
 --------------------------------------
 Where can I find the Molck executable? 

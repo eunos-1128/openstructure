@@ -863,3 +863,9 @@ probabilities between Match, Insertion or Deletion states or neff values
 
     :returns: A nonsorted list of the names of all :class:`ProfileHandle`
               objects in the database
+
+.. toctree::
+  :maxdepth: 2
+  :hidden:
+
+  ../alg/seqalg

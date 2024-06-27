@@ -1,4 +1,4 @@
-:mod:`seq.alg.renumber <ost.seq.alg.renumber>` -- Renumber entities
+:mod:`~ost.seq.alg.renumber` -- Renumber entities
 --------------------------------------------------------------------
 
 .. module:: ost.seq.alg.renumber

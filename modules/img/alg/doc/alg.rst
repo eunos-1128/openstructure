@@ -1,4 +1,4 @@
-:mod:`img.alg <ost.img.alg>` - Image Processing Algorithms
+:mod:`~ost.img.alg` - Image Processing Algorithms
 ================================================================================
 
 .. module:: ost.img.alg

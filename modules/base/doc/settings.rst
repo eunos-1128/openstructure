@@ -1,4 +1,4 @@
-:mod:`ost.settings` - Locate Files and Retrieve Preferences
+:mod:`~ost.settings` - Locate Files and Retrieve Preferences
 ================================================================================
 
 .. automodule:: ost.settings

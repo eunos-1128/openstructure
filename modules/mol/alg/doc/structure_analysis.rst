@@ -1,4 +1,4 @@
-:mod:`mol.alg.structure_analysis <ost.mol.alg.structure_analysis>` -- Functions to analyze structures
+:mod:`~ost.mol.alg.structure_analysis` -- Functions to Analyze Structures
 ---------------------------------------------------------------------------------------------------------------
 
 .. automodule:: ost.mol.alg.structure_analysis
