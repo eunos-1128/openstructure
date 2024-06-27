@@ -2212,40 +2212,15 @@ def _lDDTNaive(trg, mdl, inclusion_radius, thresholds, chem_groups,
     best_mapping = None
     best_lddt = -1.0
 
-    # Benchmarks on homo-oligomers indicate that full blown lDDT
-    # computation is faster up to tetramers => 4!=24 possible mappings.
-    # For stuff bigger than that, the decomposer approach should be used
-    if _NMappingsWithin(chem_groups, chem_mapping, 24):
-        # Setup scoring
-        lddt_scorer = lddt.lDDTScorer(trg, bb_only = True)
-        for mapping in _ChainMappings(chem_groups, chem_mapping, n_max_naive):
-            # chain_mapping and alns as input for lDDT computation
-            lddt_chain_mapping = dict()
-            lddt_alns = dict()
-            for ref_chem_group, mdl_chem_group in zip(chem_groups, mapping):
-                for ref_ch, mdl_ch in zip(ref_chem_group, mdl_chem_group):
-                    # some mdl chains can be None
-                    if mdl_ch is not None:
-                        lddt_chain_mapping[mdl_ch] = ref_ch
-                        lddt_alns[mdl_ch] = ref_mdl_alns[(ref_ch, mdl_ch)]
-            lDDT, _ = lddt_scorer.lDDT(mdl, thresholds=thresholds,
-                                       chain_mapping=lddt_chain_mapping,
-                                       residue_mapping = lddt_alns,
-                                       check_resnames = False)
-            if lDDT > best_lddt:
-                best_mapping = mapping
-                best_lddt = lDDT
-
-    else:
-        # Setup scoring
-        lddt_scorer = _lDDTDecomposer(trg, mdl, ref_mdl_alns,
-                                      inclusion_radius=inclusion_radius,
-                                      thresholds = thresholds)
-        for mapping in _ChainMappings(chem_groups, chem_mapping, n_max_naive):
-            lDDT = lddt_scorer.lDDT(chem_groups, mapping)
-            if lDDT > best_lddt:
-                best_mapping = mapping
-                best_lddt = lDDT
+    # Setup scoring
+    lddt_scorer = bb_lddt.BBlDDTScorer(trg, chem_groups, mdl, ref_mdl_alns,
+                                       dist_thresh=inclusion_radius,
+                                       dist_diff_thresholds=thresholds)
+    for mapping in _ChainMappings(chem_groups, chem_mapping, n_max_naive):
+        lDDT = lddt_scorer.Score(mapping, check=False)
+        if lDDT > best_lddt:
+            best_mapping = mapping
+            best_lddt = lDDT
 
     return (best_mapping, best_lddt)
 
