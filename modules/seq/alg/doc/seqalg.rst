@@ -4,6 +4,12 @@
 .. module:: ost.seq.alg
   :synopsis: Algorithms for sequences
 
+Submodules
+--------------------------------------------------------------------------------
+
+* :doc:`aaindex – AAIndex annotations <aaindex>`
+* :doc:`renumber – Renumber entities <renumber>`
+
 Algorithms for Alignments
 --------------------------------------------------------------------------------
 
@@ -122,8 +128,6 @@ Algorithms for Alignments
   :type ignore_gaps: bool
 
   :returns: List of column entropies
-
-.. autofunction:: ost.seq.alg.renumber.Renumber
 
 .. function:: SequenceIdentity(aln, ref_mode=seq.alg.RefMode.ALIGNMENT, seq_a=0, seq_b=1)
 
@@ -1035,23 +1039,3 @@ etc.) to be set, which is the case if you load a file in hhm format.
 
   :raises:  Exception if profile doesn't have HMM information assigned
 
-
-AAIndex annotations
--------------------
-
-.. autoclass:: ost.seq.alg.aaindex.AAIndex
-  :members:
-  :special-members: __getitem__
-
-The annotations/scores can either refer to single amino acids or represent
-pairwise values. The two types are:
-
-.. autoclass:: ost.seq.alg.aaindex.AnnoType
-  :members:
-  :undoc-members:
-
-The actual data of an entry in the aaindex database is stored in a 
-:class:`aaindex.AAIndexData` object:
-
-.. autoclass:: ost.seq.alg.aaindex.AAIndexData
-  :members:

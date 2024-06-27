@@ -13,16 +13,26 @@ OpenStructure documentation
   geom/geom
   mol/base/mol
   mol/alg/molalg
+  mol/alg/chain_mapping
+  mol/alg/contact_score
+  mol/alg/dockq
+  mol/alg/helix_kinks
+  mol/alg/ligand_scoring
+  mol/alg/qsscore
+  mol/alg/scoring
+  mol/alg/stereochemistry
+  mol/alg/structure_analysis
+  mol/alg/trajectory_analysis
   mol/mm/molmm
   conop/conop
   img/base/img
   img/alg/alg
   seq/base/seq
   seq/alg/seqalg
+  seq/alg/renumber
+  seq/alg/aaindex
   db/db
-
   bindings/bindings
-
   io/io
   gfx/gfx
   gui/gui
