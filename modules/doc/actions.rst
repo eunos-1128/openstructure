@@ -20,13 +20,13 @@ Comparing two structures
 
 You can compare two structures from the command line with the
 ``ost compare-structures`` action. This can be considered a command line
-interface to :class:`ost.mol.alg.scoring.Scorer`
+interface to the :class:`~ost.mol.alg.scoring.Scorer`.
 
-.. warning::
-  ``compare-structures`` underwent a complete rewrite in OpenStructure
-  release 2.4.0. The old version is still available as
-  ``compare-structures-legacy`` with documentation available
-  :doc:`here <deprecated_actions>`.
+.. note::
+
+  This is a new implementation of the ``compare-structures`` action, introduced
+  in OpenStructure 2.4. The old version is still available as
+  :doc:`compare-structures-legacy <deprecated_actions>`.
 
 Details on the usage (output of ``ost compare-structures --help``):
 

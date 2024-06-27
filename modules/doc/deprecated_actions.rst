@@ -10,10 +10,10 @@ Comparing two structures - legacy implementation
 
 .. warning::
 
-  ``compare-structures`` underwent a complete rewrite in OpenStructure
-  release 2.4.0. Here we keep the original documentation. Call with
-  ``compare-structures-legacy`` instead of ``compare-structures`` as documented
-  below.
+  The ``compare-structures-legacy`` is the deprecated, original action to
+  compare structures. Consider using the new
+  :ref:`compare-structures action<ost compare structures>` which utilizes the
+  latest lDDT implementation.
 
 You can compare two structures in terms of quaternary structure score and
 lDDT scores between two complexes from the command line with the
@@ -51,11 +51,11 @@ In summary it performs the following steps:
   same requirements on your OST installation (needs compound library, ClustalW,
   numpy and scipy).
 
-Details on the usage (output of ``ost compare-structures --help``):
+Details on the usage (output of ``ost compare-structures-legacy --help``):
 
 .. code-block:: console
 
-  usage: ost compare-structures [-h] -m MODEL -r REFERENCE [-v VERBOSITY]
+  usage: ost compare-structures-legacy [-h] -m MODEL -r REFERENCE [-v VERBOSITY]
                                 [-o OUTPUT] [-d] [-ds DUMP_SUFFIX]
                                 [-rs REFERENCE_SELECTION] [-ms MODEL_SELECTION]
                                 [-ca] [-ft] [-cl COMPOUND_LIBRARY] [-ml]
@@ -72,7 +72,7 @@ Details on the usage (output of ``ost compare-structures --help``):
 
   eg.
 
-    ost compare-structures \
+    ost compare-structures-legacy \
         --model <MODEL> \
         --reference <REF> \
         --output output.json \
@@ -108,9 +108,9 @@ Details on the usage (output of ``ost compare-structures --help``):
         <FILEPATH>
 
   To be as much compatible with with CAMEO as possible one should call
-  compare-structures as follows:
+  compare-structures-legacy as follows:
 
-    ost compare-structures \
+    ost compare-structures-legacy \
         --model <MODEL> \
         --reference <REF> \
         --output output.json \
@@ -325,7 +325,7 @@ Example usage:
   $ CAMEO_TARGET_URL=https://www.cameo3d.org/static/data/modeling/2019.07.13/6PO4_F
   $ curl $CAMEO_TARGET_URL/bu_target_01.pdb > reference.pdb
   $ curl $CAMEO_TARGET_URL/servers/server20/oligomodel-1/oligomodel-1.pdb > model.pdb
-  $ $OST_ROOT/bin/ost compare-structures \
+  $ $OST_ROOT/bin/ost compare-structures-legacy \
         --model model.pdb --reference reference.pdb --output output.json \
         --qs-score --residue-number-alignment --lddt --structural-checks \
         --consistency-checks --inclusion-radius 15.0 --bond-tolerance 15.0 \
@@ -561,7 +561,7 @@ all the checking steps and calculate scores directly as here:
 
 .. code:: console
 
-  $ $OST_ROOT/bin/ost compare-structures \
+  $ $OST_ROOT/bin/ost compare-structures-legacy \
         --model model.pdb --reference reference.pdb --output output_qs.json \
         --qs-score --residue-number-alignment
 
