@@ -21,12 +21,12 @@ Changes in Release x.x.x
    now use RMSD based chain mapping when scoring oligos.
  * scoring.Scorer and compare-structures action can now optionally enable
    peptide specific parameterizations as defined by the CAPRI community for
-   DockQ related scores (fnat, fnonnat, irmsd, lrmsd).
- * ChainMapper.GetMapping now uses backbone only lDDT with inclusion radius
-   30A as target function if nucleotide chains are present. Protein only
-   structures still use QS-score as target function as before. 
+   DockQ related scores (fnat, fnonnat, irmsd, lrmsd). 
  * Ligand scoring refactoring. lDDT-PLI and symmetry corrected RMSD are now
-   completely separated.
+   completely separated and this comes with API changes. This also affects
+   trg/mdl ligand assignment which now differs between the two. lDDT-PLI
+   definition has been changed and slightly different results can be
+   expected.
  * Breaking changes in compare-ligand-structures action output - run
    'ost compare-ligand-structures -h' for more information.
  * Added 'full_bs_search' argument in ligand scoring. Binding sites for
@@ -45,6 +45,12 @@ Changes in Release x.x.x
  * Enable parasail (https://github.com/jeffdaily/parasail) as drop-in
    replacement for naive LocalAlign/GlobalAlign/SemiGlobalAlign implementations.
    Must be enabled at compile time - see installation instructions.
+ * Alignments in ChainMapper now use SemiGlobalAlign instead of GlobalAlign
+   strategy in order to improve the alignment of terminal regions. 
+ * ChainMapper.GetMapping now uses backbone only lDDT with inclusion radius
+   30A as target function if nucleotide chains are present. Protein only
+   structures still use QS-score as target function as before.
+ * Remove ost.io.IoProfile.quack_mode property
  * Several bug fixes and improvements.
 
 Changes in Release 2.7.0
