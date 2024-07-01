@@ -316,9 +316,9 @@ def _ParseArgs():
         dest="oum",
         default=False,
         action="store_true",
-        help=("Override USalign mapping and inject our own mapping. Only works "
-              "if external usalign executable is provided that is reasonably "
-              "new and contains that feature."))
+        help=("Override USalign mapping and inject our own rigid mapping. Only "
+              "works if external usalign executable is provided that is "
+              "reasonably new and contains that feature."))
     
     parser.add_argument(
         "--qs-score",

@@ -147,9 +147,9 @@ class Scorer:
                         A structure with stoichiometry A6B2 would be
                         6!*2! = 1440 etc.
     :type n_max_naive: :class:`int`
-    :param oum: Override USalign Mapping. Inject mapping of :class:`Scorer`
-                object into USalign to compute TM-score. Experimental feature
-                with limitations.
+    :param oum: Override USalign Mapping. Inject rigid_mapping of
+                :class:`Scorer` object into USalign to compute TM-score.
+                Experimental feature with limitations.
     :type oum: :class:`bool`
     :param min_pep_length: Relevant parameter if short peptides are involved in
                            scoring. Minimum peptide length for a chain in the
@@ -2479,7 +2479,7 @@ class Scorer:
         if self.usalign_exec is None:
             LogScript("Computing patch TM-score with USalign exectuable")
             if self.oum:
-                flat_mapping = self.mapping.GetFlatMapping()
+                flat_mapping = self.rigid_mapping.GetFlatMapping()
                 LogInfo("Overriding TM-score chain mapping")
                 res = res = bindings.WrappedMMAlign(self.model, self.target,
                                                     mapping=flat_mapping)
@@ -2489,7 +2489,7 @@ class Scorer:
             LogScript("Computing patch TM-score with built-in USalign")
             if self.oum:
                 LogInfo("Overriding TM-score chain mapping")
-                flat_mapping = self.mapping.GetFlatMapping()
+                flat_mapping = self.rigid_mapping.GetFlatMapping()
                 res = tmtools.USAlign(self.model, self.target,
                                       usalign = self.usalign_exec,
                                       custom_chain_mapping = flat_mapping)
