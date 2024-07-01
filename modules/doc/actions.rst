@@ -38,25 +38,26 @@ Details on the usage (output of ``ost compare-structures --help``):
                                 [-rna] [-ec] [-d] [-ds DUMP_SUFFIX] [-ft]
                                 [-c CHAIN_MAPPING [CHAIN_MAPPING ...]] [--lddt]
                                 [--local-lddt] [--bb-lddt] [--bb-local-lddt]
-                                [--cad-score] [--local-cad-score]
+                                [--ilddt] [--cad-score] [--local-cad-score]
                                 [--cad-exec CAD_EXEC]
                                 [--usalign-exec USALIGN_EXEC]
                                 [--override-usalign-mapping] [--qs-score]
-                                [--dockq] [--ics] [--ips] [--rigid-scores]
-                                [--patch-scores] [--tm-score]
-                                [--lddt-no-stereochecks]
+                                [--dockq] [--dockq-capri-peptide] [--ics]
+                                [--ips] [--rigid-scores] [--patch-scores]
+                                [--tm-score] [--lddt-no-stereochecks]
                                 [--n-max-naive N_MAX_NAIVE]
                                 [--dump-aligned-residues] [--dump-pepnuc-alns]
                                 [--dump-pepnuc-aligned-residues]
                                 [--min-pep-length MIN_PEP_LENGTH]
-                                [--min-nuc-length MIN_NUC_LENGTH]
-
+                                [--min-nuc-length MIN_NUC_LENGTH] [-v VERBOSITY]
+                                [--lddt-add-mdl-contacts]
+  
   Evaluate model against reference 
-
+  
   Example: ost compare-structures -m model.pdb -r reference.cif
-
+  
   Loads the structures and performs basic cleanup:
-
+  
    * Assign elements according to the PDB Chemical Component Dictionary
    * Map nonstandard residues to their parent residues as defined by the PDB
      Chemical Component Dictionary, e.g. phospho-serine => serine
@@ -65,12 +66,12 @@ Details on the usage (output of ``ost compare-structures --help``):
    * Remove unknown atoms, i.e. atoms that are not expected according to the PDB
      Chemical Component Dictionary
    * Select for peptide/nucleotide residues
-
+  
   The cleaned structures are optionally dumped using -d/--dump-structures
-
+  
   Output is written in JSON format (default: out.json). In case of no additional
   options, this is a dictionary with 8 keys describing model/reference comparison:
-
+  
    * "reference_chains": Chain names of reference
    * "model_chains": Chain names of model
    * "chem_groups": Groups of polypeptides/polynucleotides from reference that
@@ -95,10 +96,10 @@ Details on the usage (output of ``ost compare-structures --help``):
    * "status": SUCCESS if everything ran through. In case of failure, the only
      content of the JSON output will be "status" set to FAILURE and an
      additional key: "traceback".
-
+  
   The following additional keys store relevant input parameters to reproduce
   results:
-
+  
    * "model"
    * "reference"
    * "fault_tolerant"
@@ -111,23 +112,25 @@ Details on the usage (output of ``ost compare-structures --help``):
    * "lddt_no_stereochecks"
    * "min_pep_length"
    * "min_nuc_length"
-
+   * "lddt_add_mdl_contacts"
+   * "dockq_capri_peptide"
+  
   The pairwise sequence alignments are computed with Needleman-Wunsch using
   BLOSUM62 (NUC44 for nucleotides). Many benchmarking scenarios preprocess the
   structures to ensure matching residue numbers (CASP/CAMEO). In these cases,
   enabling -rna/--residue-number-alignment is recommended.
-
+  
   Each score is opt-in and can be enabled with optional arguments.
-
+  
   Example to compute global and per-residue lDDT values as well as QS-score:
-
+  
   ost compare-structures -m model.pdb -r reference.cif --lddt --local-lddt --qs-score
-
+  
   Example to inject custom chain mapping
-
+  
   ost compare-structures -m model.pdb -r reference.cif -c A:B B:A
-
-  optional arguments:
+  
+  options:
     -h, --help            show this help message and exit
     -m MODEL, --model MODEL
                           Path to model file.
@@ -148,13 +151,13 @@ Details on the usage (output of ``ost compare-structures --help``):
                           Only has an effect if model is in mmcif format. By
                           default, the asymmetric unit (AU) is used for scoring.
                           If there are biounits defined in the mmcif file, you
-                          can specify the (0-based) index of the one which
+                          can specify the ID (as a string) of the one which
                           should be used.
     -rb REFERENCE_BIOUNIT, --reference-biounit REFERENCE_BIOUNIT
                           Only has an effect if reference is in mmcif format. By
                           default, the asymmetric unit (AU) is used for scoring.
                           If there are biounits defined in the mmcif file, you
-                          can specify the (0-based) index of the one which
+                          can specify the ID (as a string) of the one which
                           should be used.
     -rna, --residue-number-alignment
                           Make alignment based on residue number instead of
@@ -167,11 +170,12 @@ Details on the usage (output of ``ost compare-structures --help``):
                           the program fails for these cases.
     -d, --dump-structures
                           Dump cleaned structures used to calculate all the
-                          scores as PDB files using specified suffix. Files will
-                          be dumped to the same location as original files.
+                          scores as PDB or mmCIF files using specified suffix.
+                          Files will be dumped to the same location and in the
+                          same format as original files.
     -ds DUMP_SUFFIX, --dump-suffix DUMP_SUFFIX
                           Use this suffix to dump structures. Defaults to
-                          .compare.structures.pdb.
+                          _compare_structures
     -ft, --fault-tolerant
                           Fault tolerant parsing.
     -c CHAIN_MAPPING [CHAIN_MAPPING ...], --chain-mapping CHAIN_MAPPING [CHAIN_MAPPING ...]
@@ -207,6 +211,9 @@ Details on the usage (output of ``ost compare-structures --help``):
                           lDDT in this case is only computed on backbone atoms:
                           CA for peptides and C3' for nucleotides. Per-residue
                           scores are accessible as described for local_lddt.
+    --ilddt               Compute global lDDT score which is solely based on
+                          inter-chain contacts and store as key "ilddt". Same
+                          stereochemical irregularities as for lddt apply.
     --cad-score           Compute global CAD's atom-atom (AA) score and store as
                           key "cad_score". --residue-number-alignment must be
                           enabled to compute this score. Requires
@@ -225,6 +232,11 @@ Details on the usage (output of ``ost compare-structures --help``):
                           Path to USalign executable to compute TM-score. If not
                           given, an OpenStructure internal copy of USalign code
                           is used.
+    --override-usalign-mapping
+                          Override USalign mapping and inject our own rigid
+                          mapping. Only works if external usalign executable is
+                          provided that is reasonably new and contains that
+                          feature.
     --qs-score            Compute QS-score, stored as key "qs_global", and the
                           QS-best variant, stored as key "qs_best". Interfaces
                           in the reference with non-zero contribution to QS-
@@ -262,6 +274,23 @@ Details on the usage (output of ``ost compare-structures --help``):
                           and "dockq_wave_full" add zeros in the average
                           computation for each interface that is only present in
                           the reference but not in the model.
+    --dockq-capri-peptide
+                          Flag that changes two things in the way DockQ and its
+                          underlying scores are computed which is proposed by
+                          the CAPRI community when scoring peptides (PMID:
+                          31886916). ONE: Two residues are considered in contact
+                          if any of their atoms is within 5A. This is relevant
+                          for fnat and fnonat scores. CAPRI suggests to lower
+                          this threshold to 4A for protein-peptide interactions.
+                          TWO: irmsd is computed on interface residues. A
+                          residue is defined as interface residue if any of its
+                          atoms is within 10A of another chain. CAPRI suggests
+                          to lower the default of 10A to 8A in combination with
+                          only considering CB atoms for protein-peptide
+                          interactions. Note that the resulting DockQ is not
+                          evaluated for these slightly updated fnat and irmsd
+                          (lrmsd stays the same).This flag has no influence on
+                          patch_dockq scores.
     --ics                 Computes interface contact similarity (ICS) related
                           scores. A contact between two residues of different
                           chains is defined as having at least one heavy atom
@@ -378,7 +407,17 @@ Details on the usage (output of ``ost compare-structures --help``):
                           We go for simple sequence identity there. Short
                           sequences can be problematic as they may produce high
                           sequence identity alignments by pure chance.
-
+    -v VERBOSITY, --verbosity VERBOSITY
+                          Set verbosity level. Defaults to 3 (Script).
+    --lddt-add-mdl-contacts
+                          Only using contacts in lDDT thatare within a certain
+                          distance threshold in the reference does not penalize
+                          for added model contacts. If set to True, this flag
+                          will also consider reference contacts that are within
+                          the specified distance threshold in the model but not
+                          necessarily in the reference. No contact will be added
+                          if the respective atom pair is not resolved in the
+                          reference.
 
 .. _ost compare ligand structures:
 
@@ -401,24 +440,24 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
                                        [-mf {pdb,cif,mmcif}]
                                        [-rf {pdb,cif,mmcif}] [-mb MODEL_BIOUNIT]
                                        [-rb REFERENCE_BIOUNIT] [-ft] [-rna]
-                                       [-sm] [-cd COVERAGE_DELTA] [-u]
-                                       [-v VERBOSITY] [--lddt-pli]
+                                       [-sm] [-cd COVERAGE_DELTA] [-v VERBOSITY]
+                                       [--full-results] [--lddt-pli]
                                        [--lddt-pli-radius LDDT_PLI_RADIUS]
                                        [--lddt-pli-amc] [--rmsd]
                                        [--radius RADIUS]
                                        [--lddt-lp-radius LDDT_LP_RADIUS] [-fbs]
-
+  
   Evaluate model with non-polymer/small molecule ligands against reference.
-
+  
   Example: ost compare-ligand-structures \
       -m model.pdb \
       -ml ligand.sdf \
       -r reference.cif \
       --lddt-pli --rmsd
-
+  
   Structures of polymer entities (proteins and nucleotides) can be given in PDB
   or mmCIF format.
-
+  
   Ligands can be given as path to SDF files containing the ligand for both model
   (--model-ligands/-ml) and reference (--reference-ligands/-rl). If omitted,
   ligands will be detected in the model and reference structures. For structures
@@ -428,22 +467,22 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
   which is usually only set properly on files downloaded from the PDB (and even
   then, this is not always the case). This is normally not what you want. You
   should always give ligands as SDF for structures in legacy PDB format.
-
+  
   Polymer/oligomeric ligands (saccharides, peptides, nucleotides) are not
   supported.
-
+  
   Only minimal cleanup steps are performed (remove hydrogens and deuteriums,
   and for structures of polymers only, remove unknown atoms and cleanup element
   column).
-
+  
   Ligands in mmCIF and PDB files must comply with the PDB component dictionary
   definition, and have properly named residues and atoms, in order for
   ligand connectivity to be loaded correctly. Ligands loaded from SDF files
   are exempt from this restriction, meaning any arbitrary ligand can be assessed.
-
+  
   Output is written in JSON format (default: out.json). In case of no additional
   options, this is a dictionary with three keys:
-
+  
    * "model_ligands": A list of ligands in the model. If ligands were provided
      explicitly with --model-ligands, elements of the list will be the paths to
      the ligand SDF file(s). Otherwise, they will be the chain name, residue
@@ -455,12 +494,31 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
    * "status": SUCCESS if everything ran through. In case of failure, the only
      content of the JSON output will be "status" set to FAILURE and an
      additional key: "traceback".
-
-  Each score is opt-in and must be enabled with optional arguments. The scores
-  perform a model/reference ligand assignment and report a score for each assigned
-  model ligand. Optionally, unassigned model ligands are reported with a null
-  score and a reason why no assignment has been performed (--unassigned/-u).
-
+  
+  Each score is opt-in and the respective results are available in three keys:
+  
+   * "assigned_scores": A list with data for each pair of assigned ligands.
+     Data is yet another dict containing score specific information for that
+     ligand pair. The following keys are there in any case:
+  
+      * "model_ligand": The model ligand
+      * "reference_ligand": The target ligand to which model ligand is assigned to
+      * "score": The score
+      * "coverage": Fraction of model ligand atoms which are covered by target
+        ligand. Will only deviate from 1.0 if --substructure-match is enabled.
+  
+   * "model_ligand_unassigned_reason": Dictionary with unassigned model ligands
+     as key and an educated guess why this happened.
+  
+   * "reference_ligand_unassigned_reason": Dictionary with unassigned target ligands
+     as key and an educated guess why this happened.
+  
+  If --full-results is enabled, another element with key "full_results" is added.
+  This is a list of data items for each pair of model/reference ligands. The data
+  items follow the same structure as in "assigned_scores". If no score for a
+  specific pair of ligands could be computed, "score" and "coverage" are set to
+  null and a key "reason" is added giving an educated guess why this happened.
+  
   options:
     -h, --help            show this help message and exit
     -m MODEL, --mdl MODEL, --model MODEL
@@ -505,16 +563,15 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
                           ligands.
     -cd COVERAGE_DELTA, --coverage-delta COVERAGE_DELTA
                           Coverage delta for partial ligand assignment.
-    -u, --unassigned      Report unassigned model ligands in the output together
-                          with assigned ligands, with a null score, and reason
-                          for not being assigned.
     -v VERBOSITY, --verbosity VERBOSITY
                           Set verbosity level. Defaults to 3 (INFO).
-    --lddt-pli            Compute lDDT-PLI score and store as key "lddt-pli".
+    --full-results        Outputs scoring results for all model/reference ligand
+                          pairs and store as key "full_results"
+    --lddt-pli            Compute lDDT-PLI scores and store as key "lddt_pli".
     --lddt-pli-radius LDDT_PLI_RADIUS
                           lDDT inclusion radius for lDDT-PLI.
     --lddt-pli-amc        Add model contacts (amc) when computing lDDT-PLI.
-    --rmsd                Compute RMSD score and store as key "rmsd".
+    --rmsd                Compute RMSD scores and store as key "rmsd".
     --radius RADIUS       Inclusion radius to extract reference binding site
                           that is used for RMSD computation. Any residue with
                           atoms within this distance of the ligand will be
