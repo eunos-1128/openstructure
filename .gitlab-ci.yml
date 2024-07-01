@@ -14,6 +14,7 @@ test:ubuntu22.04:
     entrypoint: [ '/bin/bash', '-c', 'ln -snf /bin/bash /bin/sh && /bin/bash -c $0' ]
   before_script:
     - echo "Running ubuntu22.04 'before_script'..."
+    - ls -l /etc/apt/trusted.gpg.d/
     - apt-get update -y
     - apt-get install -y debian-archive-keyring
     - apt-get install -y ubuntu-keyring
