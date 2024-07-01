@@ -14,7 +14,7 @@ test:ubuntu22.04:
     entrypoint: [ '/bin/bash', '-c', 'ln -snf /bin/bash /bin/sh && /bin/bash -c $0' ]
   before_script:
     - echo "Running ubuntu22.04 'before_script'..."
-    - ll /usr/share/keyrings/
+    - ls -l /usr/share/keyrings/
     - apt-get update -y
     - apt-get install -y cmake
     - apt-get install -y g++
