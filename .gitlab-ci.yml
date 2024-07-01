@@ -9,9 +9,12 @@ stages:
 # Ubuntu22.04 STAGE
 test:ubuntu22.04:
   stage: test
-  image: ubuntu:24.04
+  image:
+    name: ubuntu:22.04
+    entrypoint: [ '/bin/bash', '-c', 'ln -snf /bin/bash /bin/sh && /bin/bash -c $0' ]
   before_script:
     - echo "Running ubuntu22.04 'before_script'..."
+    - ll /usr/share/keyrings/
     - apt-get update -y
     - apt-get install -y cmake
     - apt-get install -y g++
