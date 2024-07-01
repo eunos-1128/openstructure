@@ -1,4 +1,4 @@
-:mod:`~ost.conop.cleanup>` -- Sanitize structures
+:mod:`~ost.conop.cleanup` -- Sanitize structures
 ================================================================================
 
 .. module:: ost.conop.cleanup
