@@ -1,15 +1,15 @@
 :mod:`~ost.img` - Images and Density Maps
 ================================================================================
 
+.. module:: ost.img
+   :synopsis: Images and density maps
+
 .. toctree::
   :hidden:
 
   point-size-extent
   ../alg/alg
 
-.. module:: ost.img
-   :synopsis: Images and density maps
-              
 Introduction : The ImageHandle
 --------------------------------------------------------------------------------
 

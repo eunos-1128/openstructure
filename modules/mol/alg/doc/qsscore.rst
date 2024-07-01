@@ -1,6 +1,9 @@
 :mod:`~ost.mol.alg.qsscore` -- New QS Score Implementation
 --------------------------------------------------------------------------------
 
+.. module:: ost.mol.alg.qsscore
+   :synopsis: New QS score implementation
+
 .. note::
 
   This is a new implementation of QS Score, introduced in OpenStructure 2.4 and

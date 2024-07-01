@@ -1,6 +1,9 @@
 :mod:`~ost.io` - Input and Output of Sequences, Structures and Maps
 ================================================================================
 
+.. module:: ost.io
+  :synopsis: Input and output of sequences, alignments, structures, images and density maps.
+
 .. toctree::
   :hidden:
   
@@ -11,10 +14,7 @@
   mmcif
   profile
 
-.. module:: ost.io
-  :synopsis: Input and output of sequences, alignments, structures, images and density maps.
-
-The io module deals with the input and output of :class:`entities 
+The io module deals with the input and output of :class:`entities
 <ost.mol.EntityHandle>`, :class:`alignments <ost.seq.AlignmentHandle>`, 
 :class:`sequences <ost.seq.SequenceHandle>`, :class:`images 
 <ost.img.ImageHandle>`. Importers for common file formats containing molecules 

@@ -1,8 +1,8 @@
 :mod:`~ost.db` - Linear Database
 ===============================================================================
 
-.. currentmodule:: ost.db
-
+.. module:: ost.db
+  :synopsis: Linear database.
 
 Many applications require to load lots of structures. Expecially on distributed
 file systems, io becomes a problem.
