@@ -10,12 +10,10 @@ stages:
 test:ubuntu22.04:
   stage: test
   image:
-    name: ubuntu:22.04
+    name: ubuntu:24.04
     entrypoint: [ '/bin/bash', '-c', 'ln -snf /bin/bash /bin/sh && /bin/bash -c $0' ]
   before_script:
     - echo "Running ubuntu22.04 'before_script'..."
-    - gpg --keyserver keyserver.ubuntu.com --recv-keys 871920D1991BC93C
-    - gpg --export --armor 871920D1991BC93C | apt-key add -
     - apt-get update -y
     - echo "... done running ubuntu22.04 'before_script'."
   script:
