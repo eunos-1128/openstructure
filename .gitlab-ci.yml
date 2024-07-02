@@ -15,7 +15,7 @@ test:ubuntu22.04:
   before_script:
     - echo "Running ubuntu22.04 'before_script'..."
     - ls /etc/apt/sources.list.d/
-    - apt-get update -y
+    # - apt-get update -y
     - echo "... done running ubuntu22.04 'before_script'."
   script:
   - echo "Testing on Ubuntu 22.04..."
