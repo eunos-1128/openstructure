@@ -14,7 +14,7 @@ test:ubuntu22.04:
     entrypoint: [ '/bin/bash', '-c', 'ln -snf /bin/bash /bin/sh && /bin/bash -c $0' ]
   before_script:
     - echo "Running ubuntu22.04 'before_script'..."
-    - ls /etc/apt/sources.list.d/
+    - for i in `ls /etc/apt/sources.list.d/`; do echo $i; done
     # - apt-get update -y
     - echo "... done running ubuntu22.04 'before_script'."
   script:
