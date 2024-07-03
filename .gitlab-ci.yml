@@ -9,9 +9,7 @@ stages:
 # Ubuntu22.04 STAGE
 test:ubuntu22.04:
   stage: test
-  image:
-    name: ubuntu:22.04
-    entrypoint: [ '/bin/bash', '-c', 'ln -snf /bin/bash /bin/sh && /bin/bash -c $0' ]
+  image: ubuntu:22.04
   before_script:
     - echo "Running ubuntu22.04 'before_script'..."
     - apt-get update -y
