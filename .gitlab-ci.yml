@@ -13,6 +13,27 @@ test:ubuntu22.04:
   before_script:
     - echo "Running ubuntu22.04 'before_script'..."
     - apt-get update -y
+    - apt-get install -y cmake
+    - apt-get install -y g++
+    - apt-get install -y gfortran
+    - apt-get install -y wget
+    - apt-get install -y tar
+    - apt-get install -y libsqlite3-dev
+    - apt-get install -y sip-dev
+    - apt-get install -y libtiff-dev
+    - apt-get install -y libfftw3-dev
+    - apt-get install -y libeigen3-dev
+    - apt-get install -y libboost-all-dev
+    - apt-get install -y libpng-dev
+    - apt-get install -y python3-all
+    - apt-get install -y python3-numpy
+    - apt-get install -y python3-scipy
+    - apt-get install -y python3-networkx
+    - apt-get install -y clustalw
+    - apt-get install -y cython3
+    - apt-get install -y voronota
+    - apt-get install -y libopenmm-dev
+    - apt-get install -y libparasail-dev
     - echo "... done running ubuntu22.04 'before_script'."
   script:
   - echo "Testing on Ubuntu 22.04..."
