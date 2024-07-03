@@ -88,7 +88,8 @@ TopologyPtr TopologyCreator::Create(ost::mol::EntityHandle& ent,
   //this should be enough for most needs
 
   ost::mol::ResidueHandle next,prev;
-  bool n_ter,c_ter; 
+  bool n_ter, c_ter;
+  std::set<unsigned long> n_ter_residues, c_ter_residues;
   ost::mol::AtomHandle peptide_n,peptide_c,nucleotide_p,nucleotide_o; 
 
   for(ost::mol::ResidueHandleList::iterator i = res_list.begin(); 
@@ -133,8 +134,8 @@ TopologyPtr TopologyCreator::Create(ost::mol::EntityHandle& ent,
       }
     }
 
-    if(n_ter) i->SetBoolProp("n_ter",true);
-    if(c_ter) i->SetBoolProp("c_ter",true);
+    if(n_ter) n_ter_residues.insert(i->GetHashCode());
+    if(c_ter) c_ter_residues.insert(i->GetHashCode());
   }
 
 
@@ -181,7 +182,7 @@ TopologyPtr TopologyCreator::Create(ost::mol::EntityHandle& ent,
       }
     }
     //check for n terminus
-    if(i->HasProp("n_ter")){
+    if(n_ter_residues.find(i->GetHashCode()) != n_ter_residues.end()){
       String exception_name = "";
       if(settings->termini_exceptions->HasException(*i)){
         exception_name = settings->termini_exceptions->GetException(*i);
@@ -193,7 +194,7 @@ TopologyPtr TopologyCreator::Create(ost::mol::EntityHandle& ent,
         block->RemoveInteractionsToPrev();
       }
     }
-    if(i->HasProp("c_ter")){
+    if(c_ter_residues.find(i->GetHashCode()) != c_ter_residues.end()){
       String exception_name = "";
       if(settings->termini_exceptions->HasException(*i)){
         exception_name = settings->termini_exceptions->GetException(*i);
