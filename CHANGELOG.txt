@@ -1,4 +1,4 @@
-Changes in Release x.x.x
+Changes in Release 2.8.0
 --------------------------------------------------------------------------------
 
  * heavy water (DOD) is now recognised as 'water' instead of 'non-polymer' by
