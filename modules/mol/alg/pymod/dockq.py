@@ -44,11 +44,11 @@ def _PreprocessStructures(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2,
         tmp = ch1_aln.GetSequence(0)
         ref_s1 = seq.CreateSequence(tmp.GetName(), str(tmp))
         ref_s1.SetOffset(tmp.GetOffset())
-        ref_s1.AttachView(ref.Select(f"cname={ref_ch1}"))
+        ref_s1.AttachView(ref.Select(f"cname={mol.QueryQuoteName(ref_ch1)}"))
         tmp = ch1_aln.GetSequence(1)
         mdl_s1 = seq.CreateSequence(tmp.GetName(), str(tmp))
         mdl_s1.SetOffset(tmp.GetOffset())
-        mdl_s1.AttachView(mdl.Select(f"cname={mdl_ch1}"))
+        mdl_s1.AttachView(mdl.Select(f"cname={mol.QueryQuoteName(mdl_ch1)}"))
         new_ch1_aln = seq.CreateAlignment(ref_s1, mdl_s1)
         for col in new_ch1_aln:
             if col[0] != '-' and col[1] != '-':
@@ -69,11 +69,11 @@ def _PreprocessStructures(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2,
         tmp = ch2_aln.GetSequence(0)
         ref_s2 = seq.CreateSequence(tmp.GetName(), str(tmp))
         ref_s2.SetOffset(tmp.GetOffset())
-        ref_s2.AttachView(ref.Select(f"cname={ref_ch2}"))
+        ref_s2.AttachView(ref.Select(f"cname={mol.QueryQuoteName(ref_ch2)}"))
         tmp = ch2_aln.GetSequence(1)
         mdl_s2 = seq.CreateSequence(tmp.GetName(), str(tmp))
         mdl_s2.SetOffset(tmp.GetOffset())
-        mdl_s2.AttachView(mdl.Select(f"cname={mdl_ch2}"))
+        mdl_s2.AttachView(mdl.Select(f"cname={mol.QueryQuoteName(mdl_ch2)}"))
         new_ch2_aln = seq.CreateAlignment(ref_s2, mdl_s2)
         for col in new_ch2_aln:
             if col[0] != '-' and col[1] != '-':
@@ -92,7 +92,7 @@ def _PreprocessStructures(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2,
                 dockq_idx += 1
     else:
         # go by residue numbers
-        for mdl_r in mdl.Select(f"cname={mdl_ch1}").residues:
+        for mdl_r in mdl.Select(f"cname={mol.QueryQuoteName(mdl_ch1)}").residues:
             ref_r = ref.FindResidue(ref_ch1, mdl_r.GetNumber())
             if ref_r.IsValid():
                 ref_r.SetIntProp("dockq_idx", dockq_idx)
@@ -100,7 +100,7 @@ def _PreprocessStructures(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2,
                 ref_r.SetIntProp("dockq_mapped", 1)
                 mdl_r.SetIntProp("dockq_mapped", 1)
                 dockq_idx += 1
-        for mdl_r in mdl.Select(f"cname={mdl_ch2}").residues:
+        for mdl_r in mdl.Select(f"cname={mol.QueryQuoteName(mdl_ch2)}").residues:
             ref_r = ref.FindResidue(ref_ch2, mdl_r.GetNumber())
             if ref_r.IsValid():
                 ref_r.SetIntProp("dockq_idx", dockq_idx)
@@ -124,8 +124,8 @@ def _PreprocessStructures(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2,
                 dockq_idx += 1
 
 def _GetContacts(ent, ch1, ch2, dist_thresh):
-    int1 = ent.Select(f"cname={ch1} and {dist_thresh} <> [cname={ch2}]")
-    int2 = ent.Select(f"cname={ch2} and {dist_thresh} <> [cname={ch1}]")
+    int1 = ent.Select(f"cname={mol.QueryQuoteName(ch1)} and {dist_thresh} <> [cname={mol.QueryQuoteName(ch2)}]")
+    int2 = ent.Select(f"cname={mol.QueryQuoteName(ch2)} and {dist_thresh} <> [cname={mol.QueryQuoteName(ch1)}]")
     contacts = set()
     int1_p = [geom.Vec3List([a.pos for a in r.atoms]) for r in int1.residues]
     int2_p = [geom.Vec3List([a.pos for a in r.atoms]) for r in int2.residues]
@@ -154,14 +154,15 @@ def _ContactScores(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2,
 
     return (nnat, nmdl, fnat, fnonnat)
 
-def _RMSDScores(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2, dist_thresh=10.0):
+def _RMSDScores(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2, dist_thresh=10.0,
+                cb_mode=False):
 
     # backbone atoms used for superposition
     sup_atoms = ['CA','C','N','O']
 
     # make mapped residues accessible by the dockq_idx property
-    mapped_mdl = mdl.Select(f"cname={mdl_ch1},{mdl_ch2} and grdockq_mapped=1")
-    mapped_ref = ref.Select(f"cname={ref_ch1},{ref_ch2} and grdockq_mapped=1")
+    mapped_mdl = mdl.Select(f"cname={mol.QueryQuoteName(mdl_ch1)},{mol.QueryQuoteName(mdl_ch2)} and grdockq_mapped=1")
+    mapped_ref = ref.Select(f"cname={mol.QueryQuoteName(ref_ch1)},{mol.QueryQuoteName(ref_ch2)} and grdockq_mapped=1")
     ch = mapped_mdl.FindChain(mdl_ch1)
     mdl_ch1_residues = {r.GetIntProp("dockq_idx"): r for r in ch.residues}
     ch = mapped_mdl.FindChain(mdl_ch2)
@@ -173,8 +174,11 @@ def _RMSDScores(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2, dist_thresh=10.0):
 
     # iRMSD
     #######
-    int1 = ref.Select(f"cname={ref_ch1} and {dist_thresh} <> [cname={ref_ch2}]")
-    int2 = ref.Select(f"cname={ref_ch2} and {dist_thresh} <> [cname={ref_ch1}]")
+    i_ref = ref
+    if cb_mode:
+        i_ref = ref.Select("aname=CB or (rname=GLY and aname=CA)")
+    int1 = i_ref.Select(f"cname={mol.QueryQuoteName(ref_ch1)} and {dist_thresh} <> [cname={mol.QueryQuoteName(ref_ch2)}]")
+    int2 = i_ref.Select(f"cname={mol.QueryQuoteName(ref_ch2)} and {dist_thresh} <> [cname={mol.QueryQuoteName(ref_ch1)}]")
     ref_pos = geom.Vec3List()
     mdl_pos = geom.Vec3List()
     for r in int1.residues:
@@ -263,7 +267,8 @@ def _DockQ(fnat, lrmsd, irmsd, d1, d2):
     return (fnat + _ScaleRMSD(lrmsd, d1) + _ScaleRMSD(irmsd, d2))/3
 
 def DockQ(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2,
-          ch1_aln=None, ch2_aln=None):
+          ch1_aln=None, ch2_aln=None, contact_dist_thresh = 5.0,
+          interface_dist_thresh = 10.0, interface_cb = False):
     """ Computes DockQ for specified interface
 
     DockQ is described in: Sankar Basu and Bjoern Wallner (2016), "DockQ: A
@@ -294,6 +299,25 @@ def DockQ(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2,
                     The first sequence must match the sequence in *ref_ch2* and
                     the second to *mdl_ch2*.
     :type ch2_aln: :class:`ost.seq.AlignmentHandle`
+    :param contact_dist_thresh: Residues with any atom within this threshold
+                                are considered to be in contact. Affects contact
+                                based scores fnat and fnonnat. CAPRI suggests
+                                to lower the default of 5.0 to 4.0 for
+                                protein-peptide interactions.
+    :type contact_dist_thresh: :class:`float`
+    :param interface_dist_thresh: Residues with any atom within this threshold
+                                  to another chain are considered interface
+                                  residues. Affects irmsd. CAPRI suggests to
+                                  lower the default of 10.0 to 8.0 in
+                                  combination with interface_cb=True for
+                                  protein-peptide interactions.
+    :type interface_dist_thresh: :class:`float`
+    :param interface_cb: Only use CB atoms (CA for GLY) to identify interface
+                         residues for irmsd. CAPRI suggests to enable this
+                         flag in combination with lowering
+                         *interface_dist_thresh* to 8.0 for protein-peptide
+                         interactions.
+    :type interface_cb: :class:`bool`
     :returns: :class:`dict` with keys nnat, nmdl, fnat, fnonnat, irmsd, lrmsd,
               DockQ which corresponds to the equivalent values in the original
               DockQ implementation.
@@ -301,8 +325,11 @@ def DockQ(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2,
     _PreprocessStructures(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2,
                           ch1_aln = ch1_aln, ch2_aln = ch2_aln)
     nnat, nmdl, fnat, fnonnat = _ContactScores(mdl, ref, mdl_ch1, mdl_ch2,
-                                               ref_ch1, ref_ch2)
-    irmsd, lrmsd = _RMSDScores(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2)
+                                               ref_ch1, ref_ch2,
+                                               dist_thresh = contact_dist_thresh)
+    irmsd, lrmsd = _RMSDScores(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2,
+                               dist_thresh = interface_dist_thresh,
+                               cb_mode = interface_cb)
     return {"nnat": nnat,
             "nmdl": nmdl,
             "fnat": fnat,

@@ -35,18 +35,6 @@ using namespace ost::mol;
 
 #include <ost/export_helper/generic_property_def.hh>
 
-/* Including NumPy headers produces compiler warnings. The ones about "Using
-   deprecated NumPy API..." we can not get rid of. The highest NumPy version we
-   support is 1.6 while the non-deprecated API starts with version 1.7.
-   Also see the comment in modules/gfx/pymod/export_primlist.cc for further
-   information.
-*/
-#if OST_NUMPY_SUPPORT_ENABLED
-#include <numpy/numpyconfig.h>
-#define NPY_NO_DEPRECATED_API NPY_1_6_API_VERSION
-#include <numpy/arrayobject.h>
-#endif
-
 namespace {
 EntityHandle create1() {  return CreateEntity(); }
 
@@ -76,53 +64,6 @@ ICSEditor depr_request_ics_editor(EntityHandle e, EditMode m)
   return e.EditICS(m);
 }
 
-
-#if OST_NUMPY_SUPPORT_ENABLED
-
-bool less_index(const mol::AtomHandle& a1, const mol::AtomHandle& a2)
-{
-  return a1.GetIndex()<a2.GetIndex();
-}
-PyObject* get_pos2(EntityHandle& entity, bool id_sorted)
-{
-  npy_intp dims[]={entity.GetAtomCount(),3};
-  PyObject* na = PyArray_SimpleNew(2,dims,NPY_FLOAT);
-  npy_float* nad = reinterpret_cast<npy_float*>(PyArray_DATA(na));
-  if(id_sorted) {
-    AtomHandleList alist = entity.GetAtomList();
-    std::sort(alist.begin(),alist.end(),less_index);
-    for(AtomHandleList::const_iterator it=alist.begin();it!=alist.end();++it,nad+=3) {
-      geom::Vec3 pos=(*it).GetPos();
-      nad[0]=static_cast<npy_float>(pos[0]);
-      nad[1]=static_cast<npy_float>(pos[1]);
-      nad[2]=static_cast<npy_float>(pos[2]);
-    }
-  } else {
-    impl::EntityImplPtr ei=entity.Impl();
-    for(impl::ChainImplList::iterator cit=ei->GetChainList().begin();
-        cit!=ei->GetChainList().end();++cit) {
-      for (impl::ResidueImplList::iterator rit = (*cit)->GetResidueList().begin(),
-          ret = (*cit)->GetResidueList().end(); rit != ret; ++rit) {
-            
-        for (impl::AtomImplList::iterator ait = (*rit)->GetAtomList().begin(), 
-            aet = (*rit)->GetAtomList().end(); ait != aet; ++ait, nad+=3) {
-
-          geom::Vec3 pos=(*ait)->TransformedPos();
-          nad[0]=static_cast<npy_float>(pos[0]);
-          nad[1]=static_cast<npy_float>(pos[1]);
-          nad[2]=static_cast<npy_float>(pos[2]);
-    }}}
-  }
-  return na;
-}
-
-PyObject* get_pos1(EntityHandle& entity)
-{
-  return get_pos2(entity,true);
-}
-
-#endif
-
 geom::Mat4 depr_get_transformation_matrix(const EntityHandle& eh)
 {
   return eh.GetTransformationMatrix();
@@ -137,13 +78,6 @@ bool depr_is_transformation_identity(const EntityHandle& eh)
 
 void export_Entity()
 {
-#if OST_NUMPY_SUPPORT_ENABLED
-  // The following define enforces no return value when calling import_array
-  #undef NUMPY_IMPORT_ARRAY_RETVAL
-  #define NUMPY_IMPORT_ARRAY_RETVAL
-  import_array();
-#endif
-
   class_<EntityBase> ent_base("EntityBase", no_init);
   ent_base
     .def(self_ns::str(self))
@@ -229,11 +163,6 @@ void export_Entity()
     .def("GetHashCode", &EntityHandle::GetHashCode) 
     .def(self==self)
     .def(self!=self)
-#if OST_NUMPY_SUPPORT_ENABLED
-    .def("GetPositions",get_pos1)
-    .def("GetPositions",get_pos2)
-    .add_property("positions",get_pos1)
-#endif
   ;
 
   def("CreateEntity",create1);

@@ -17,10 +17,6 @@ set(OST_MOL_BASE_UNIT_TESTS
   test_invalid.py
 )
 
-if (USE_NUMPY)
-  list(APPEND OST_MOL_BASE_UNIT_TESTS test_numpy.py)
-endif (USE_NUMPY)
-
 ost_unittest(MODULE mol SOURCES "${OST_MOL_BASE_UNIT_TESTS}")
 
 # for valgrind debugging

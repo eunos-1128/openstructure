@@ -1,3 +1,58 @@
+Changes in Release 2.8.0
+--------------------------------------------------------------------------------
+
+ * heavy water (DOD) is now recognised as 'water' instead of 'non-polymer' by
+   the compounds library.
+ * Added a '--version' argument to the 'ost' executable
+ * SEQRES information is now read from the entity_poly_seq category in mmCIF.
+   The canonical as well as semi-canonical (with 3 letter-codes in bracket)
+   SEQRES are now available from the MMCifInfo object. The
+   (Get|Set)ReadCanonicalSeqRes (Get|Set)ReadSeqRes methods no longer exist.
+ * Disabled numpy support in C++ layer to simplify build system. Some exotic
+   OST functionality directly accessed Python numpy arrays from the C++ layer
+   which required to compile against numpy headers.
+ * Introduce GDT score which is equivalent to LGA (99.2% of CASP15 TS models
+   score within 3 GDTTS points when compared to LGA results).
+   Oligo/RNA support comes for free when using the ost.mol.alg.scoring.Scorer
+   object.
+ * Introduce ilDDT score in scoring.Scorer and compare-structures action.
+   It's an all atom lDDT score which only considers interface contacts.
+ * Rigid superposition based scores (RMSD, GDT) in ost.mol.alg.scoring.Scorer
+   now use RMSD based chain mapping when scoring oligos.
+ * scoring.Scorer and compare-structures action can now optionally enable
+   peptide specific parameterizations as defined by the CAPRI community for
+   DockQ related scores (fnat, fnonnat, irmsd, lrmsd). 
+ * Ligand scoring refactoring. lDDT-PLI and symmetry corrected RMSD are now
+   completely separated and this comes with API changes. This also affects
+   trg/mdl ligand assignment which now differs between the two. lDDT-PLI
+   definition has been changed and slightly different results can be
+   expected.
+ * Breaking changes in compare-ligand-structures action output - run
+   'ost compare-ligand-structures -h' for more information.
+ * Added 'full_bs_search' argument in ligand scoring. Binding sites for
+   symmetry corrected RMSD computation are now searched by only considering
+   polymer chains in proximity of ligands to speed up computations on large
+   complexes. The old behavior can be restored by enabling this flag.
+ * Added model contacts in lDDT. lDDT is not symmetric in a sense that
+   added/wrong contacts in the model do not penalize the score. lDDT now comes
+   with a flag to add such contacts, i.e. contacts between atom pairs in the
+   model that are within the specified lDDT threshold (usually 15A), IF the
+   respective atom pair is also present in the target.
+ * lDDT-PLI can optionally use the new added mdl contacts feature. Think of
+   nasty loops that interact with the ligand in the model which would not be
+   penalized by classic lDDT!
+ * Remove seq.alg.MATCH and seq.alg.IDENTITY preset substitution matrices
+ * Enable parasail (https://github.com/jeffdaily/parasail) as drop-in
+   replacement for naive LocalAlign/GlobalAlign/SemiGlobalAlign implementations.
+   Must be enabled at compile time - see installation instructions.
+ * Alignments in ChainMapper now use SemiGlobalAlign instead of GlobalAlign
+   strategy in order to improve the alignment of terminal regions. 
+ * ChainMapper.GetMapping now uses backbone only lDDT with inclusion radius
+   30A as target function if nucleotide chains are present. Protein only
+   structures still use QS-score as target function as before.
+ * Remove ost.io.IoProfile.quack_mode property
+ * Several bug fixes and improvements.
+
 Changes in Release 2.7.0
 --------------------------------------------------------------------------------
 

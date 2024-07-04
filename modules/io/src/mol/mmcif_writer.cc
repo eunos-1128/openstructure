@@ -24,52 +24,6 @@
 
 namespace {
 
-  // generates as many chain names as you want (potentially multiple characters)
-  struct ChainNameGenerator{
-    ChainNameGenerator() { 
-      chain_names = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz";
-      n_chain_names = chain_names.size();
-      indices.push_back(-1);
-    }
-
-    String Get() {
-      int idx = indices.size() - 1;
-      indices[idx] += 1;
-      bool more_digits = false;
-      while(idx >= 0) {
-        if(indices[idx] >= n_chain_names) {
-          indices[idx] = 0;
-          if(idx>0) {
-            indices[idx-1] += 1;
-            --idx;
-          } else {
-            more_digits = true;
-            break;
-          }
-        } else {
-          break;
-        }
-      }
-      if(more_digits) {
-        indices.insert(indices.begin(), 0);
-      }
-      String ch_name(indices.size(), 'X');
-      for(uint i = 0; i < indices.size(); ++i) {
-        ch_name[i] = chain_names[indices[i]];
-      }
-      return ch_name;
-    }
-
-    void Reset() {
-      indices.clear();
-      indices.push_back(-1);
-    }
-
-    String chain_names;
-    int n_chain_names;
-    std::vector<int> indices;
-  };
-
   void CheckValidEntityPolyType(const String& entity_poly_type) {
     std::unordered_set<std::string> s = {"cyclic-pseudo-peptide",
                                          "other",
@@ -742,6 +696,7 @@ namespace {
     ost::io::StarWriterLoopDesc desc("_chem_comp");
     desc.Add("id");
     desc.Add("type");
+    desc.Add("name");
     ost::io::StarWriterLoopPtr sl(new ost::io::StarWriterLoop(desc));
     return sl;    
   }
@@ -878,9 +833,10 @@ namespace {
         }
       }
 
+      bool all_hetatm = entity_info.type != "polymer";
       for(auto at: at_list) {
         // group_PDB
-        if(at.IsHetAtom()) {
+        if(at.IsHetAtom() || all_hetatm) {
           at_data[0] = ost::io::StarWriterValue::FromString("HETATM");
         } else {
           at_data[0] = ost::io::StarWriterValue::FromString("ATOM");
@@ -1023,7 +979,7 @@ namespace {
         unique_compounds.insert(het_it.second.begin(), het_it.second.end());
       }
     }
-    std::vector<ost::io::StarWriterValue> comp_data(2);
+    std::vector<ost::io::StarWriterValue> comp_data(3);
     for(auto mon_id: unique_compounds) {
       comp_data[0] = ost::io::StarWriterValue::FromString(mon_id);
       ost::conop::CompoundPtr comp = compound_lib->FindCompound(mon_id,
@@ -1031,9 +987,11 @@ namespace {
       if(comp) {
         String type = ChemClassToChemCompType(comp->GetChemClass());
         comp_data[1] = ost::io::StarWriterValue::FromString(type);
+        comp_data[2] = ost::io::StarWriterValue::FromString(comp->GetName());
       } else {
         String type = ChemClassToChemCompType(ost::mol::ChemClass::UNKNOWN);
         comp_data[1] = ost::io::StarWriterValue::FromString(type);
+        comp_data[2] = ost::io::StarWriterValue::FromString("");
       }
       chem_comp_ptr->AddData(comp_data);
     }
@@ -1065,7 +1023,7 @@ namespace {
                                  "is not mmcif_conform");
     }
 
-    ChainNameGenerator chain_name_gen;
+    ost::io::ChainNameGenerator chain_name_gen;
 
     std::set<String> unique_compounds;
     for(auto res_list: res_lists) {
@@ -1182,8 +1140,25 @@ namespace {
           String poly_type = poly_types[i];
           if(poly_chains[i]->size() <= 2) {
             // must have length of at least 3 to be polymer
+            // feed them as separate non-polymers
             type = "non-polymer";
             poly_type = "";
+            String branch_type = "";
+            for(auto r: *poly_chains[i]) {
+              T tmp;
+              tmp.push_back(r);
+              String chain_name = chain_name_gen.Get();
+              int entity_id = SetupEntity(chain_name,
+                                          type,
+                                          poly_type,
+                                          branch_type,
+                                          tmp,
+                                          false,
+                                          entity_info);
+              Feed_atom_site(atom_site, chain_name, entity_id+1, entity_info[entity_id],
+                             tmp);
+            }
+            continue;
           }
           String branch_type = "";
           String chain_name = chain_name_gen.Get();
@@ -1446,6 +1421,45 @@ namespace {
 } // ns
 
 namespace ost { namespace io {
+
+ChainNameGenerator::ChainNameGenerator() {
+  chain_names = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz";
+  n_chain_names = chain_names.size();
+  indices.push_back(-1);
+}
+
+String ChainNameGenerator::Get() {
+  int idx = indices.size() - 1;
+  indices[idx] += 1;
+  bool more_digits = false;
+  while(idx >= 0) {
+    if(indices[idx] >= n_chain_names) {
+      indices[idx] = 0;
+      if(idx>0) {
+        indices[idx-1] += 1;
+        --idx;
+      } else {
+        more_digits = true;
+        break;
+      }
+    } else {
+      break;
+    }
+  }
+  if(more_digits) {
+    indices.insert(indices.begin(), 0);
+  }
+  String ch_name(indices.size(), 'X');
+  for(uint i = 0; i < indices.size(); ++i) {
+    ch_name[i] = chain_names[indices[i]];
+  }
+  return ch_name;
+}
+
+void ChainNameGenerator::Reset() {
+  indices.clear();
+  indices.push_back(-1);
+}
 
 MMCifWriterEntity MMCifWriterEntity::FromPolymer(const String& entity_poly_type,
                                                  const std::vector<String>& mon_ids,

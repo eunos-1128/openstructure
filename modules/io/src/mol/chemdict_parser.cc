@@ -101,7 +101,7 @@ void ChemdictParser::OnDataItem(const StarDataItem& item)
         *i=toupper(*i);
       }
       // The type of water is set to "?". let's change it to water...
-      if (compound_->GetID()=="HOH") {
+      if ((compound_->GetID()=="HOH") || (compound_->GetID()=="DOD")) {
         compound_->SetChemClass(mol::ChemClass(mol::ChemClass::WATER));
         compound_->SetOneLetterCode('.');
       } else {

@@ -33,9 +33,12 @@ class TestContactScore(unittest.TestCase):
         self.assertEqual(cent.GetSequence("D"), "ATCCATTTGCCTTTCAAATGTGG")
         self.assertEqual(cent.contact_mode, "aa")
         self.assertEqual(cent.contact_d, 5.0)
-        self.assertEqual(cent.interacting_chains, [('A', 'B'), ('A', 'D'),
-                                                   ('A', 'C'), ('B', 'C'),
-                                                   ('B', 'D'), ('C', 'D')])
+        self.assertEqual(sorted(cent.interacting_chains), [('A', 'B'),
+                                                           ('A', 'C'),
+                                                           ('A', 'D'),
+                                                           ('B', 'C'),
+                                                           ('B', 'D'),
+                                                           ('C', 'D')])
         exp_contacts = sorted(list(cent.contacts[('A', 'C')]))
         self.assertEqual(exp_contacts, [(40, 9), (41, 8), (41, 9), (42, 8),
                                         (42, 9), (42, 10), (43, 12), (44, 9),
@@ -54,7 +57,7 @@ class TestContactScore(unittest.TestCase):
 
         # we need to derive a chain mapping prior to scoring
         mapper = ChainMapper(target)
-        res = mapper.GetRigidMapping(model, strategy="greedy_iterative_rmsd")
+        res = mapper.GetRMSDMapping(model, strategy="greedy_iterative")
         contact_scorer = ContactScorer.FromMappingResult(res)
         score_result = contact_scorer.ScoreICS(res.mapping)
         self.assertAlmostEqual(score_result.precision, 0.583, places=2)

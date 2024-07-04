@@ -23,14 +23,22 @@
 
 namespace ost { namespace io {
 
-void MMCifInfo::AddMMCifPDBChainTr(String cif, String pdb)
+void MMCifInfo::AddMMCifPDBChainTr(String cif, String pdb, bool fault_tolerant)
 {
   std::map<String, String>::iterator tr_it = cif_2_pdb_chain_id_.find(cif);
   if (tr_it != cif_2_pdb_chain_id_.end()) {
-    throw IOException("mmCIF chain id '"+ cif +"' is already mapped to '"+
-                      tr_it->second+"'.");
+    std::stringstream msg;
+    msg << "mmCIF chain id '" <<  cif << "' is already mapped to '" <<
+           tr_it->second << "'. Cannot map it to '" <<  pdb << "'." ;
+    if(fault_tolerant) {
+      LOG_WARNING(msg.str());
+      return;
+    } else {
+      throw IOException(msg.str());
+    }
+  } else {
+    cif_2_pdb_chain_id_.insert(std::pair<String, String>(cif, pdb));
   }
-  cif_2_pdb_chain_id_.insert(std::pair<String, String>(cif, pdb));
 }
 
 String MMCifInfo::GetMMCifPDBChainTr(String cif) const
@@ -41,14 +49,22 @@ String MMCifInfo::GetMMCifPDBChainTr(String cif) const
   return tr_it->second;
 }
 
-void MMCifInfo::AddPDBMMCifChainTr(String pdb, String cif)
+void MMCifInfo::AddPDBMMCifChainTr(String pdb, String cif, bool fault_tolerant)
 {
   std::map<String, String>::iterator tr_it = pdb_2_cif_chain_id_.find(pdb);
   if (tr_it != pdb_2_cif_chain_id_.end()) {
-    throw IOException("PDB chain id '"+ pdb +"' is already mapped to '"+
-                      tr_it->second+"'.");
+    std::stringstream msg;
+    msg << "PDB chain id '" <<  pdb << "' is already mapped to '" <<
+           tr_it->second << "'. Cannot map it to '" <<  cif << "'." ;
+    if(fault_tolerant) {
+      LOG_WARNING(msg.str());
+      return;
+    } else {
+      throw IOException(msg.str());
+    }
+  } else {
+    pdb_2_cif_chain_id_.insert(std::pair<String, String>(pdb, cif));
   }
-  pdb_2_cif_chain_id_.insert(std::pair<String, String>(pdb, cif));
 }
 
 String MMCifInfo::GetPDBMMCifChainTr(String pdb) const
@@ -59,14 +75,23 @@ String MMCifInfo::GetPDBMMCifChainTr(String pdb) const
   return tr_it->second;
 }
 
-void MMCifInfo::AddMMCifEntityIdTr(String cif, String ent_id)
+void MMCifInfo::AddMMCifEntityIdTr(String cif, String ent_id, bool fault_tolerant)
 {
   std::map<String, String>::iterator tr_it = cif_2_entity_id_.find(cif);
   if (tr_it != cif_2_entity_id_.end()) {
-    throw IOException("mmCIF chain id '" + cif + "' is already mapped to "
-                      "entity id '" + tr_it->second + "'.");
+    std::stringstream msg;
+    msg << "mmCIF chain id '" <<  cif << "' is already mapped to " <<
+           "entity id '" << tr_it->second << "'. Cannot map it to '" <<
+           ent_id << "'." ;
+    if(fault_tolerant) {
+      LOG_WARNING(msg.str());
+      return;
+    } else {
+      throw IOException(msg.str());
+    }
+  } else {
+    cif_2_entity_id_.insert(std::pair<String, String>(cif, ent_id));
   }
-  cif_2_entity_id_.insert(std::pair<String, String>(cif, ent_id));
 }
 
 String MMCifInfo::GetMMCifEntityIdTr(String cif) const
@@ -170,18 +195,18 @@ void MMCifInfoBioUnit::Merge(MMCifInfoBioUnit& from)
 
 MMCifInfoStructRefSeqPtr 
 MMCifInfoStructRef::AddAlignedSeq(const String& aid, const String& chain_name, 
-		                              int seq_begin, int seq_end, int db_begin, 
-		                              int db_end)
+                                  int seq_begin, int seq_end, int db_begin, 
+                                  int db_end)
 {
-	std::map<String, MMCifInfoStructRefSeqPtr>::const_iterator i=seqs_.find(aid);
-	if (i!=seqs_.end()) {
-		throw IOException("duplicate align_id for struct_ref '"+id_+"'");
-	}
-	MMCifInfoStructRefSeqPtr p(new MMCifInfoStructRefSeq(aid, chain_name,
-				                                               seq_begin, seq_end, 
-				                                               db_begin, db_end));
-	seqs_[aid]=p;
-	return p;
+  std::map<String, MMCifInfoStructRefSeqPtr>::const_iterator i=seqs_.find(aid);
+  if (i!=seqs_.end()) {
+    throw IOException("duplicate align_id for struct_ref '"+id_+"'");
+  }
+  MMCifInfoStructRefSeqPtr p(new MMCifInfoStructRefSeq(aid, chain_name,
+                                                       seq_begin, seq_end, 
+                                                       db_begin, db_end));
+  seqs_[aid]=p;
+  return p;
 }
 
 
@@ -196,48 +221,21 @@ MMCifInfoStructRef::GetAlignedSeq(const String& aid) const
 MMCifInfoStructRefSeqDifPtr 
 MMCifInfoStructRefSeq::AddDif(int seq_rnum, const String& db_rnum, const String& details)
 {
-	MMCifInfoStructRefSeqDifPtr d(new MMCifInfoStructRefSeqDif(seq_rnum, db_rnum,
-				                                                     details));
-	difs_.push_back(d);
-	return d;
+  MMCifInfoStructRefSeqDifPtr d(new MMCifInfoStructRefSeqDif(seq_rnum, db_rnum,
+                                                             details));
+  difs_.push_back(d);
+  return d;
 }
 
 void MMCifInfo::AddEntityBranchLink(String chain_name,
-                                    mol::AtomHandle atom1,
-                                    mol::AtomHandle atom2,
-                                    unsigned char bond_order)
-{
-  if (!atom1.IsValid() || !atom2.IsValid()) {
-    /* Would love to give details about the atoms... but atom names are not
-       available at this point. */
-    LOG_WARNING("Invalid branch link found in chain '"+chain_name+"'.");
-    return;
-  }
-  // check if element already exists
-  MMCifInfoEntityBranchLinkMap::iterator blm_it =
-                                               entity_branches_.find(chain_name);
-  if (blm_it == entity_branches_.end()) {
-    // `find` points to the end of the map so chain_name was not found
-    std::pair<MMCifInfoEntityBranchLinkMap::iterator, bool> rit =
-     entity_branches_.insert(MMCifInfoEntityBranchLinkMap::value_type(chain_name,
-                                      std::vector<MMCifInfoEntityBranchLink>()));
-    // let blm_it point to the new element so we can add to the vector
-    blm_it = rit.first;
-  }
-  // add new branch element
-  blm_it->second.push_back(MMCifInfoEntityBranchLink(atom1, atom2, bond_order));
-}
-
-const std::vector<MMCifInfoEntityBranchLink> MMCifInfo::GetEntityBranchLinks() const
-{
-  std::vector<MMCifInfoEntityBranchLink> all_links;
-  MMCifInfoEntityBranchLinkMap::const_iterator blm_it;
-  for (blm_it = entity_branches_.begin();
-       blm_it != entity_branches_.end(); ++blm_it) {
-    std::copy(blm_it->second.begin(), blm_it->second.end(),
-              std::back_inserter(all_links));
-  }
-  return all_links;
+                                    int rnum1, int rnum2,
+                                    const String& aname1,
+                                    const String& aname2,
+                                    unsigned char bond_order) {
+  // [] operator creates new value if no such element exists for key
+  entity_branches_[chain_name].push_back(MMCifInfoEntityBranchLink(rnum1, rnum2,
+                                                                   aname1, aname2,
+                                                                   bond_order));
 }
 
 const std::vector<MMCifInfoEntityBranchLink> MMCifInfo::GetEntityBranchByChain(
@@ -261,36 +259,6 @@ const std::vector<String> MMCifInfo::GetEntityBranchChainNames() const
     chain_names.push_back(blm_it->first);
   }
   return chain_names;
-}
-
-const mol::ChainHandleList MMCifInfo::GetEntityBranchChains() const
-{
-  std::vector<mol::ChainHandle> chains;
-  MMCifInfoEntityBranchLinkMap::const_iterator blm_it;
-  for (blm_it = entity_branches_.begin();
-       blm_it != entity_branches_.end(); ++blm_it) {
-    chains.push_back(blm_it->second[0].GetAtom1().GetResidue().GetChain());
-  }
-
-  return chains;
-}
-
-void MMCifInfo::ConnectBranchLinks()
-{
-  MMCifInfoEntityBranchLinkMap::iterator blm_it;
-  for (blm_it = entity_branches_.begin();
-       blm_it != entity_branches_.end(); ++blm_it) {
-    // We assume that one chain only comes from one entity, so we go with one
-    // editor per chain
-    std::vector<MMCifInfoEntityBranchLink>::iterator blv_it =
-                                                          blm_it->second.begin();
-    if (blv_it != blm_it->second.end()) {
-      mol::XCSEditor editor = blv_it->GetAtom1().GetEntity().EditXCS();
-      for (; blv_it != blm_it->second.end(); ++blv_it) {
-        blv_it->ConnectBranchLink(editor);
-      }
-    }
-  }
 }
 
 const MMCifEntityDesc& MMCifInfo::GetEntityDesc(const String& entity_id) const {
@@ -330,8 +298,9 @@ std::vector<String> MMCifInfo::GetEntityIdsOfType(const String& entity_type) con
 
 std::ostream& operator<<(std::ostream& os, const MMCifInfoEntityBranchLink& eb)
 {
-  os << "<MMCifInfoEntityBranchLink atom1:" << eb.GetAtom1() << " atom2:"
-     << eb.GetAtom2() << ">";
+  os << "<MMCifInfoEntityBranchLink rnum1:" << eb.rnum1 <<
+     " rnum2: " << eb.rnum2 << " aname1: " << eb.aname1 <<
+     " aname2: " << eb.aname2 << "bond_order: " << eb.bond_order << '>';
   return os;
 }
 
@@ -341,8 +310,7 @@ std::ostream& operator<<(std::ostream& os,
   os << "<MMCifInfoEntityBranchLinkList";
   std::vector<MMCifInfoEntityBranchLink>::const_iterator bl_it;
   for (bl_it = eb_list.begin(); bl_it != eb_list.end(); ++bl_it) {
-    os << " <atom1:" << bl_it->GetAtom1() << " atom2:"
-       << bl_it->GetAtom2() << ">";
+    os << *bl_it;
   }
   os << ">";
   return os;

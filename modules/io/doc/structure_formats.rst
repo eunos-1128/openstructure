@@ -36,7 +36,7 @@ the .gz file extension.
   .cif, .cif.gz
 
 *Format Name*
-  mmcif
+  cif
 
 PQR
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

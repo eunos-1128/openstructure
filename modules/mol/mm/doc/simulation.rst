@@ -32,6 +32,7 @@ mapped back to the attached structure at any time.
                         :class:`Topology` fails
 
 .. class:: Simulation(topology,entity,settings)
+  :noindex:
 
   Second constructor that takes a :class:`Topology`, a consistent
   :class:`ost.mol.EntityHandle` and a :class:`Settings` as input.

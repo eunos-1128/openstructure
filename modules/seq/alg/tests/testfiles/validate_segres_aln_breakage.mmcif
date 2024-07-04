@@ -19,7 +19,86 @@ _entity_poly.nstd_linkage                   no
 _entity_poly.nstd_monomer                   no 
 _entity_poly.pdbx_seq_one_letter_code       MYTNSDFVVIKALEDGVNVIGLTRGADTRFHHSEKLDKGEVLIAQFTEHTSAIKVRGKAYIQTRHGVIESEKK 
 _entity_poly.pdbx_seq_one_letter_code_can   MYTNSDFVVIKALEDGVNVIGLTRGADTRFHHSEKLDKGEVLIAQFTEHTSAIKVRGKAYIQTRHGVIESEKK 
-_entity_poly.pdbx_strand_id                 A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V 
+_entity_poly.pdbx_strand_id                 A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V
+#
+loop_
+_entity_poly_seq.entity_id
+_entity_poly_seq.num
+_entity_poly_seq.mon_id
+_entity_poly_seq.hetero
+1 1  MET n
+1 2  TYR n
+1 3  THR n
+1 4  ASN n
+1 5  SER n
+1 6  ASP n
+1 7  PHE n
+1 8  VAL n
+1 9  VAL n
+1 10 ILE n
+1 11 LYS n
+1 12 ALA n
+1 13 LEU n
+1 14 GLU n
+1 15 ASP n
+1 16 GLY n
+1 17 VAL n
+1 18 ASN n
+1 19 VAL n
+1 20 ILE n
+1 21 GLY n
+1 22 LEU n
+1 23 THR n
+1 24 ARG n
+1 25 GLY n
+1 26 ALA n
+1 27 ASP n
+1 28 THR n
+1 29 ARG n
+1 30 PHE n
+1 31 HIS n
+1 32 HIS n
+1 33 SER n
+1 34 GLU n
+1 35 LYS n
+1 36 LEU n
+1 37 ASP n
+1 38 LYS n
+1 39 GLY n
+1 40 GLU n
+1 41 VAL n
+1 42 LEU n
+1 43 ILE n
+1 44 ALA n
+1 45 GLN n
+1 46 PHE n
+1 47 THR n
+1 48 GLU n
+1 49 HIS n
+1 50 THR n
+1 51 SER n
+1 52 ALA n
+1 53 ILE n
+1 54 LYS n
+1 55 VAL n
+1 56 ARG n
+1 57 GLY n
+1 58 LYS n
+1 59 ALA n
+1 60 TYR n
+1 61 ILE n
+1 62 GLN n
+1 63 THR n
+1 64 ARG n
+1 65 HIS n
+1 66 GLY n
+1 67 VAL n
+1 68 ILE n
+1 69 GLU n
+1 70 SER n
+1 71 GLU n
+1 72 LYS n
+1 73 LYS n
 # 
 loop_
 _atom_site.group_PDB 

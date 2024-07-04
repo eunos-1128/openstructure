@@ -30,20 +30,19 @@ namespace ost { namespace io {
 
 struct DLLEXPORT IOProfile {
 public:
-  IOProfile(String d, bool qm, bool ft, bool js, bool nh, 
+  IOProfile(String d, bool ft, bool js, bool nh, 
             bool co, bool rc, conop::ProcessorPtr proc=conop::ProcessorPtr()):
-    dialect(d), quack_mode(qm), fault_tolerant(ft), join_spread_atom_records(js), 
+    dialect(d), fault_tolerant(ft), join_spread_atom_records(js), 
     no_hetatms(nh), calpha_only(co), read_conect(rc),  processor(proc)
   {
   }
 
-  IOProfile(): dialect("PDB"), quack_mode(false), fault_tolerant(false), 
+  IOProfile(): dialect("PDB"), fault_tolerant(false), 
     join_spread_atom_records(false), no_hetatms(false),
     calpha_only(false), read_conect(false), processor()
   { }
 
   String              dialect;
-  bool                quack_mode;
   bool                fault_tolerant;
   bool                join_spread_atom_records;
   bool                no_hetatms;
@@ -52,7 +51,7 @@ public:
   conop::ProcessorPtr processor;
   IOProfile Copy()
   {
-    return IOProfile(dialect, quack_mode, fault_tolerant, join_spread_atom_records, 
+    return IOProfile(dialect, fault_tolerant, join_spread_atom_records, 
                      no_hetatms, calpha_only, read_conect,  
                      processor ? processor->Copy() : conop::ProcessorPtr());
   }
@@ -61,8 +60,7 @@ public:
 
 inline  std::ostream& operator<<(std::ostream& stream, const IOProfile& p)
 {
-  stream << "IOProfile(dialect='" << p.dialect
-         << "', quack_mode=" << (p.quack_mode ? "True" : "False") << ", "
+  stream << "IOProfile(dialect='" << p.dialect << ", "
          << "join_spread_atom_records=" << (p.join_spread_atom_records ? "True" : "False") << ", "
          << "calpha_only=" << (p.calpha_only ? "True" : "False") << ", "
          << "fault_tolerant=" << (p.fault_tolerant ? "True" : "False") << ", "

@@ -30,11 +30,11 @@ class IOProfiles:
     else:
       processor = conop.HeuristicProcessor()
     self['STRICT'] = IOProfile(dialect='PDB', fault_tolerant=False,
-                               quack_mode=False, processor=processor.Copy())
+                               processor=processor.Copy())
     self['SLOPPY'] = IOProfile(dialect='PDB', fault_tolerant=True,
-                               quack_mode=True, processor=processor.Copy())
+                               processor=processor.Copy())
     self['CHARMM'] = IOProfile(dialect='CHARMM', fault_tolerant=True,
-                               quack_mode=False, processor=processor.Copy())
+                               processor=processor.Copy())
     self['DEFAULT'] = 'STRICT'
 
   def __getitem__(self, key):
@@ -80,7 +80,7 @@ def _override(val1, val2):
     return val1
 
 def LoadPDB(filename, restrict_chains="", no_hetatms=None,
-            fault_tolerant=None, load_multi=False, quack_mode=None,
+            fault_tolerant=None, load_multi=False,
             join_spread_atom_records=None, calpha_only=None,
             profile='DEFAULT', remote=False, remote_repo='pdb',
             dialect=None, seqres=False, bond_feasibility_check=None,
@@ -111,11 +111,6 @@ def LoadPDB(filename, restrict_chains="", no_hetatms=None,
                      of only the first. This is useful when dealing with
                      multi-PDB files.
   :type load_multi: :class:`bool`
-
-  :param quack_mode: Guess the chemical class for unknown residues based on its
-                     atoms and connectivity. If set, overrides the value of
-                     :attr:`IOProfile.quack_mode`.
-  :type quack_mode: :class:`bool`
 
   :param join_spread_atom_records: If set, overrides the value of 
                                    :attr:`IOProfile.join_spread_atom_records`.
@@ -206,7 +201,6 @@ def LoadPDB(filename, restrict_chains="", no_hetatms=None,
   prof.calpha_only=_override(prof.calpha_only, calpha_only)
   prof.no_hetatms=_override(prof.no_hetatms, no_hetatms)
   prof.dialect=_override(prof.dialect, dialect)
-  prof.quack_mode=_override(prof.quack_mode, quack_mode)
   prof.read_conect=_override(prof.read_conect, read_conect)
   if prof.processor:
     prof.processor.check_bond_feasibility=_override(prof.processor.check_bond_feasibility, 
@@ -436,16 +430,15 @@ def LoadMMCIF(filename, fault_tolerant=None, calpha_only=None,
   try:
     ent = mol.CreateEntity()
     reader = MMCifReader(filename, ent, prof)
-    
+
     # NOTE: to speed up things, we could introduce a restrict_chains parameter
     #       similar to the one in LoadPDB. Here, it would have to be a list/set
     #       of chain-name-strings.
 
     #if reader.HasNext():
-    reader.Parse()
+    reader.Parse() # branch links are connected in here
     if prof.processor:
       prof.processor.Process(ent)
-      reader.info.ConnectBranchLinks()
     #else:
     #  raise IOError("File doesn't contain any entities")
     if seqres and info:

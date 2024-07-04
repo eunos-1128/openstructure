@@ -526,6 +526,7 @@ an alignment:
     :rtype:  :class:`AlignedColumn`
 
   .. method:: __getitem__(slice)
+    :noindex:
 
     :return: Columns defined by by pythonic slicing.
     :rtype:  :class:`AlignedRegion`
@@ -862,3 +863,9 @@ probabilities between Match, Insertion or Deletion states or neff values
 
     :returns: A nonsorted list of the names of all :class:`ProfileHandle`
               objects in the database
+
+.. toctree::
+  :maxdepth: 2
+  :hidden:
+
+  ../alg/seqalg

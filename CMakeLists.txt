@@ -14,7 +14,7 @@ cmake_policy(SET CMP0060 NEW)
 project(OpenStructure CXX C)
 set (CMAKE_EXPORT_COMPILE_COMMANDS 1)
 set (OST_VERSION_MAJOR 2)
-set (OST_VERSION_MINOR 7)
+set (OST_VERSION_MINOR 8)
 set (OST_VERSION_PATCH 0)
 set (OST_VERSION_STRING ${OST_VERSION_MAJOR}.${OST_VERSION_MINOR}.${OST_VERSION_PATCH} )
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake_support)
@@ -36,8 +36,6 @@ option(OPENGLPREFERENCE_LEGACY "whether to use the OpenGL Legacy GL implementati
        OFF)
 option(ENABLE_INFO "whether openstructure should be compiled with support for the info library"
        ON)
-option(USE_NUMPY "whether numpy support is added"
-      OFF)
 option(USE_DOUBLE_PRECISION "whether to compile in double precision" 
        OFF)
 option(ENABLE_SPNAV "whether 3DConnexion devices should be supported"
@@ -48,6 +46,7 @@ option(ENABLE_STATIC "whether static libraries should be compiled" OFF)
 option(UBUNTU_LAYOUT "whether Debian/Ubuntu's lib and libexec directory layout should be used" OFF)
 option(HIDDEN_VISIBILITY "on gcc, use -fvisibility=hidden" OFF)
 option(ENABLE_MM "whether openmm support is added" OFF)
+option(ENABLE_PARASAIL, "whether parasail alignment library should be included" OFF)
 
 if (CXX)
   set(CMAKE_CXX_COMPILER ${CXX})
@@ -117,11 +116,6 @@ if (USE_SHADER)
 else()
   set(_SHADER OFF)
 endif()
-if (USE_NUMPY)
-  set(_NUMPY ON)
-else()
-  set(_NUMPY OFF)
-endif()
 if (COMPILE_TMTOOLS)
   set(_TM_TOOLS ON)
 else()
@@ -136,6 +130,11 @@ if(ENABLE_MM)
   set(_OPENMM ON)
 else()
   set(_OPENMM OFF)
+endif()
+if(ENABLE_PARASAIL)
+  set(_PARASAIL ON)
+else()
+  set(_PARASAIL OFF)
 endif()
 
 
@@ -228,16 +227,16 @@ find_package(PNG REQUIRED)
 find_package(FFTW REQUIRED)
 find_package(TIFF REQUIRED)
 
-if(USE_NUMPY)
-  find_package(Numpy REQUIRED)
-endif()
-
 if(ENABLE_MM)
   find_package(OpenMM REQUIRED)
   set(_OPENMM_PLUGINS "${OPEN_MM_PLUGIN_DIR}")
 else(ENABLE_MM)
   set(_OPENMM_PLUGINS "NONE")
 endif(ENABLE_MM)
+
+if(ENABLE_PARASAIL)
+  find_package(Parasail REQUIRED)
+endif(ENABLE_PARASAIL)
 
 if (ENABLE_STATIC)
   set(Boost_LIBRARIES)
@@ -301,10 +300,7 @@ include_directories(${Boost_INCLUDE_DIRS}
                     ${PNG_INCLUDE_DIRS}
                     ${OPEN_MM_INCLUDE_DIRS}
                     ${SQLITE3_INCLUDE_DIRS}
-                    )
-if(USE_NUMPY)
-include_directories(${PYTHON_NUMPY_INCLUDE_DIR})
-endif()
+                    ${PARASAIL_INCLUDE_DIR})
 
 if (UNIX)
   SET(CMAKE_SKIP_BUILD_RPATH  FALSE)
@@ -353,10 +349,10 @@ message(STATUS
         "   Graphical interface               (-DENABLE_GUI) : ${_UI}\n"
         "   OpenGL support                    (-DENABLE_GFX) : ${_OPENGL}\n"
         "   Shader support                    (-DUSE_SHADER) : ${_SHADER}\n"
-        "   Numpy support                      (-DUSE_NUMPY) : ${_NUMPY}\n"
         "   SpaceNav Device support         (-DENABLE_SPNAV) : ${_SPNAV}\n"
         "   OpenMM support                     (-DENABLE_MM) : ${_OPENMM}\n"
         "   OpenMM plugins            (-DOPEN_MM_PLUGIN_DIR) : ${_OPENMM_PLUGINS}\n"
+        "   Parasail alignment library   (-DENABLE_PARASAIL) : ${_PARASAIL}\n"
         "   Optimize                            (-DOPTIMIZE) : ${_OPT}\n"
         "   Profiling support                    (-DPROFILE) : ${_PROFILE}\n"
         "   Double Precision        (-DUSE_DOUBLE_PRECISION) : ${_DOUBLE_PREC}\n"

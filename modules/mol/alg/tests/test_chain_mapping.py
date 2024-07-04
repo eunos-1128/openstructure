@@ -261,6 +261,9 @@ class TestChainMapper(unittest.TestCase):
     greedy_lddt_res = mapper.GetlDDTMapping(mdl, strategy="greedy_block")
     self.assertEqual(greedy_lddt_res.mapping, [['X', 'Y'],[None],['Z']])
 
+    heuristic_lddt_res = mapper.GetlDDTMapping(mdl, strategy="heuristic")
+    self.assertEqual(heuristic_lddt_res.mapping, [['X', 'Y'],[None],['Z']])
+
 
     # QS score based chain mappings
     naive_qsscore_res = mapper.GetQSScoreMapping(mdl, strategy="naive")
@@ -275,19 +278,22 @@ class TestChainMapper(unittest.TestCase):
     greedy_qsscore_res = mapper.GetQSScoreMapping(mdl, strategy="greedy_block")
     self.assertEqual(naive_qsscore_res.mapping, [['X', 'Y'],[None],['Z']])
 
+    heuristic_qsscore_res = mapper.GetQSScoreMapping(mdl, strategy="heuristic")
+    self.assertEqual(heuristic_qsscore_res.mapping, [['X', 'Y'],[None],['Z']])
+
 
     # rigid chain mappings
-    greedy_rigid_res = mapper.GetRigidMapping(mdl, strategy="greedy_single_gdtts")
+    greedy_rigid_res = mapper.GetRMSDMapping(mdl, strategy="naive")
     self.assertEqual(greedy_rigid_res.mapping, [['X', 'Y'],[None],['Z']])
 
-    greedy_rigid_res = mapper.GetRigidMapping(mdl, strategy="greedy_iterative_gdtts")
+    greedy_rigid_res = mapper.GetRMSDMapping(mdl, strategy="greedy_iterative")
     self.assertEqual(greedy_rigid_res.mapping, [['X', 'Y'],[None],['Z']])
 
-    greedy_rigid_res = mapper.GetRigidMapping(mdl, strategy="greedy_single_rmsd")
+    greedy_rigid_res = mapper.GetRMSDMapping(mdl, strategy="greedy_single")
     self.assertEqual(greedy_rigid_res.mapping, [['X', 'Y'],[None],['Z']])
 
-    greedy_rigid_res = mapper.GetRigidMapping(mdl, strategy="greedy_iterative_rmsd")
-    self.assertEqual(greedy_rigid_res.mapping, [['X', 'Y'],[None],['Z']])
+    heuristic_rigid_res = mapper.GetRMSDMapping(mdl, strategy="heuristic")
+    self.assertEqual(heuristic_rigid_res.mapping, [['X', 'Y'],[None],['Z']])
 
     # the default chain mapping
     default_res = mapper.GetMapping(mdl)

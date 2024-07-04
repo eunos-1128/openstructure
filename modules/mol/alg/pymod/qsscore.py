@@ -213,11 +213,12 @@ class QSScorerResult:
       from `Xu et al. 2009 <https://dx.doi.org/10.1016%2Fj.jmb.2008.06.002>`_.
     """
     def __init__(self, weighted_scores, weight_sum, weight_extra_mapped,
-                 weight_extra_all):
+                 weight_extra_all, complete_mapping):
         self._weighted_scores = weighted_scores
         self._weight_sum = weight_sum
         self._weight_extra_mapped = weight_extra_mapped
         self._weight_extra_all = weight_extra_all
+        self._complete_mapping = complete_mapping
 
     @property
     def weighted_scores(self):
@@ -252,8 +253,29 @@ class QSScorerResult:
         return self._weight_extra_all
 
     @property
+    def complete_mapping(self):
+        """ Whether the underlying mapping of the scored assemblies is complete
+
+        In other words: If they have the same stoichiometry. This is relevant
+        for :attr:`~QS_best` and :attr:`~QS_global` in case of no contacts in
+        any of the scored entities.
+
+        :type: :class:`bool`
+        """
+        return self._complete_mapping
+
+    @property
     def QS_best(self):
         """ QS_best - the actual score as described in formula section above
+
+        If there are no contacts observed in any of the scored entities this
+        score is 1.0 if we're comparing structures with
+        :attr:`~complete_mapping`, 0.0 otherwise. In the example of two
+        monomers, no contacts can be observed but they exactly match in terms
+        of quaternary structure. Thus a perfect score. In terms of higher order
+        structure that becomes a bit more abstract but in principle they still
+        have the exact same quaternary structure if they match in stoichiometry
+        but have no single contact.
 
         :type: :class:`float`
         """
@@ -261,6 +283,8 @@ class QSScorerResult:
         denominator = self.weight_sum + self.weight_extra_mapped
         if denominator != 0.0:
             return nominator/denominator
+        elif self.complete_mapping:
+            return 1.0
         else:
             return 0.0
 
@@ -268,12 +292,23 @@ class QSScorerResult:
     def QS_global(self):
         """ QS_global - the actual score as described in formula section above
 
+        If there are no contacts observed in any of the scored entities this
+        score is 1.0 if we're comparing structures with
+        :attr:`~complete_mapping`, 0.0 otherwise. In the example of two
+        monomers, no contacts can be observed but they exactly match in terms
+        of quaternary structure. Thus a perfect score. In terms of higher order
+        structure that becomes a bit more abstract but in principle they still
+        have the exact same quaternary structure if they match in stoichiometry
+        but have no single contact.
+
         :type: :class:`float`
         """
         nominator = self.weighted_scores
         denominator = self.weight_sum + self.weight_extra_all
         if denominator != 0.0:
             return nominator/denominator
+        elif self.complete_mapping:
+            return 1.0
         else:
             return 0.0
 
@@ -453,6 +488,11 @@ class QSScorer:
         This only works for interfaces that are computed in :func:`Score`, i.e.
         interfaces for which the alignments are set up correctly.
 
+        As all specified chains must be present, the mapping is considered
+        complete which affects
+        :attr:`QSScorerResult.QS_global`/:attr:`QSScorerResult.QS_best` in
+        edge cases of no observed contacts.
+
         :param trg_ch1: Name of first interface chain in target
         :type trg_ch1: :class:`str`
         :param trg_ch2: Name of second interface chain in target
@@ -480,7 +520,10 @@ class QSScorer:
         trg_int = (trg_ch1, trg_ch2)
         mdl_int = (mdl_ch1, mdl_ch2)
         a, b, c, d = self._MappedInterfaceScores(trg_int, mdl_int)
-        return QSScorerResult(a, b, c, d)
+
+        # complete_mapping is True by definition, as the requested chain pairs
+        # are both present
+        return QSScorerResult(a, b, c, d, True)
 
     def FromFlatMapping(self, flat_mapping):
         """ Same as :func:`Score` but with flat mapping
@@ -526,8 +569,16 @@ class QSScorer:
                 else:
                     weight_extra_all += self._InterfacePenalty2(int2)
 
+        trg_chains = sorted(self.qsent1.chain_names) # should be sorted already
+        mdl_chains = sorted(self.qsent2.chain_names) # should be sorted already
+        mapped_trg_chains = sorted(flat_mapping.keys())
+        mapped_mdl_chains = sorted(flat_mapping.values())
+        trg_complete = trg_chains == mapped_trg_chains
+        mdl_complete = mdl_chains == mapped_mdl_chains
+        complete_mapping = trg_complete and mdl_complete
+
         return QSScorerResult(weighted_scores, weight_sum, weight_extra_mapped,
-                              weight_extra_all)
+                              weight_extra_all, complete_mapping)
 
     def _MappedInterfaceScores(self, int1, int2):
         key_one = (int1, int2)
@@ -700,4 +751,4 @@ class QSScorer:
         return penalty
 
 # specify public interface
-__all__ = ('QSEntity', 'QSScorer')
+__all__ = ('QSEntity', 'QSScorer', 'QSScorerResult')

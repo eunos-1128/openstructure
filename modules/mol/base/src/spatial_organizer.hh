@@ -113,6 +113,23 @@ public:
     }
   }
 
+  void Remove(const ITEM& item, const VEC& pos) {
+    // variation of the above, first try in organizer bucket
+    // for which you give a hint with pos. If this is successful,
+    // return. Call naive Remove otherwise
+    Index indx=gen_index(pos);
+    typename ItemMap::iterator i = map_.find(indx);
+    if(i != map_.end()) {
+      for (size_t j=0; j<i->second.size(); ++j) {
+        if (i->second[j].item==item) {
+          i->second.erase(i->second.begin()+j);
+          return;
+        }
+      }
+    }
+    Remove(item);
+  }
+
   bool HasWithin(const VEC& pos, Real dist) const {
     Real dist2=dist*dist;
     Index imin = Index::Max(min_, gen_index(pos-VEC(dist,dist,dist)));

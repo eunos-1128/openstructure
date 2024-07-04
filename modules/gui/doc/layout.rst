@@ -112,6 +112,7 @@ how to add a  widget to the MDI area:
     :type  name: :class:`QWindowState`
 
   .. method:: AddPersistentWidget(title, name, widget, width, height, x, y)
+    :noindex:
 
      Add a widget whose geometry is preserved across application relaunches
      For widgets that are volatile, use #AddWidget()
@@ -258,6 +259,7 @@ and finally display it in the right side bar:
     :type  limit: :class:`int`
 
   .. method:: AddWidgetToPool(name, widget)
+    :noindex:
 
      Add a widget to the widget pool. Same as :meth:`AddWidgetToPool`
      

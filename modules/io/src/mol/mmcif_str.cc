@@ -50,7 +50,6 @@ MMCifStringToEntity(const String& mmcif, const IOProfile& profile, bool process)
   std::stringstream stream(mmcif);
   mol::EntityHandle ent = mol::CreateEntity();
   MMCifReader reader(stream, ent, profile);
-  reader.SetReadSeqRes(true);
   reader.Parse();
   if(profile.processor && process) {
     profile.processor->Process(ent);

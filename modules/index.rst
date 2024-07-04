@@ -8,30 +8,10 @@ OpenStructure documentation
   install
   intro
   users
-  base/generic
   base/base
-  geom/geom
-  mol/base/mol
-  mol/alg/molalg
-  mol/mm/molmm
-  conop/conop
-  img/base/img
-  img/alg/alg
-  seq/base/seq
-  seq/alg/seqalg
-  db/db
-
-  bindings/bindings
-
-  io/io
-  gfx/gfx
-  gui/gui
   newmodule
   external
   contributing
-  table
-  mol/alg/lddt
-  mol/alg/molck
   actions
 
 For Starters
@@ -98,7 +78,7 @@ Graphical User Interface
 Varia
 --------------------------------------------------------------------------------
 
-**Datasets**: :doc:`tabular data <table>`
+**Datasets**: :doc:`tabular data <base/table>`
 
 **Supported File Formats**: :doc:`structure formats<io/structure_formats>` | :doc:`sequence formats <io/sequence_formats>` | :doc:`sequence profile formats <io/sequence_profile_formats>` | :doc:`image formats <io/image_formats>`
 

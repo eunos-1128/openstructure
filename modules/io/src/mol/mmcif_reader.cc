@@ -33,7 +33,7 @@ namespace ost { namespace io {
 
 bool is_undef(StringRef value)
 {
-	return value.size()==1 && (value[0]=='?' || value[0]=='.');
+  return value.size()==1 && (value[0]=='?' || value[0]=='.');
 }
 
 MMCifReader::MMCifReader(std::istream& stream, mol::EntityHandle& ent_handle,
@@ -59,15 +59,11 @@ void MMCifReader::Init()
   atom_count_           = 0;
   residue_count_        = 0;
   auth_chain_id_        = false;
-  seqres_can_           = false;
   has_model_            = false;
   restrict_chains_      = "";
   subst_res_id_         = "";
   curr_chain_           = mol::ChainHandle();
   curr_residue_         = mol::ResidueHandle();
-  seqres_               = seq::CreateSequenceList();
-  read_seqres_          = true;
-  warned_rule_based_    = false;
   info_                 = MMCifInfo();
 }
 
@@ -80,7 +76,6 @@ void MMCifReader::ClearState()
   atom_count_           = 0;
   category_             = DONT_KNOW;
   warned_name_mismatch_ = false;
-  seqres_               = seq::CreateSequenceList();
   info_                 = MMCifInfo();
   entity_desc_map_.clear();
   authors_map_.clear();
@@ -306,27 +301,33 @@ bool MMCifReader::OnBeginLoop(const StarLoopDesc& header)
     cat_available = true;
   } else if (header.GetCategory() == "struct_ref") {
     category_ = STRUCT_REF;
+    // mandatory items
     this->TryStoreIdx(SR_ENTITY_ID, "entity_id", header);
     this->TryStoreIdx(SR_ID, "id", header);
     this->TryStoreIdx(SR_DB_NAME, "db_name", header);
     this->TryStoreIdx(SR_DB_CODE, "db_code", header);
+    // optional items
     indices_[SR_DB_ACCESS]=header.GetIndex("pdbx_db_accession");
     cat_available = true;
   } else if (header.GetCategory() == "struct_ref_seq") {
-    category_ = STRUCT_REF_SEQ;	
+    category_ = STRUCT_REF_SEQ;
+    // mandatory items
     this->TryStoreIdx(SRS_ALIGN_ID, "align_id", header);
     this->TryStoreIdx(SRS_STRUCT_REF_ID, "ref_id", header);
     this->TryStoreIdx(SRS_ENT_ALIGN_BEG, "seq_align_beg", header);
     this->TryStoreIdx(SRS_ENT_ALIGN_END, "seq_align_end", header);
     this->TryStoreIdx(SRS_DB_ALIGN_BEG, "db_align_beg", header);
     this->TryStoreIdx(SRS_DB_ALIGN_END, "db_align_end", header);
+    // optional items
     indices_[SRS_PDBX_STRAND_ID]=header.GetIndex("pdbx_strand_id");
     cat_available = true;
   } else if (header.GetCategory()=="struct_ref_seq_dif") {
     category_ = STRUCT_REF_SEQ_DIF;
+    // mandatory items
     this->TryStoreIdx(SRSD_ALIGN_ID, "align_id", header);
-    this->TryStoreIdx(SRSD_SEQ_RNUM, "seq_num", header);
-    this->TryStoreIdx(SRSD_DB_RNUM, "pdbx_seq_db_seq_num", header);
+    // optional items
+    indices_[SRSD_SEQ_RNUM]=header.GetIndex("seq_num");
+    indices_[SRSD_DB_RNUM]=header.GetIndex("pdbx_seq_db_seq_num");
     indices_[SRSD_DETAILS]=header.GetIndex("details");
     cat_available = true;
   } else if (header.GetCategory()=="database_PDB_rev") {
@@ -516,7 +517,10 @@ void MMCifReader::ParseAndAddAtom(const std::vector<StringRef>& columns)
   }
 
   if (indices_[OCCUPANCY] != -1) { // unit test
-    occ = this->TryGetReal(columns[indices_[OCCUPANCY]], "atom_site.occupancy");
+    occ = this->GetRealOrDefault(columns[indices_[OCCUPANCY]],
+                                 "atom_site.occupancy",
+                                 1.0,
+                                 is_undef);
   }
   if (indices_[B_ISO_OR_EQUIV] != -1) {
     if (!is_undef(columns[indices_[B_ISO_OR_EQUIV]])) {
@@ -613,7 +617,7 @@ void MMCifReader::ParseAndAddAtom(const std::vector<StringRef>& columns)
       curr_chain_.SetStringProp("entity_id", ent_id);
       chain_id_pairs_.push_back(std::pair<mol::ChainHandle,String>(curr_chain_,
                                                                    ent_id));
-      info_.AddMMCifEntityIdTr(cif_chain_name, ent_id);
+      info_.AddMMCifEntityIdTr(cif_chain_name, ent_id, profile_.fault_tolerant);
     }
     assert(curr_chain_.IsValid());
   } else if (chain_id_pairs_.back().second != // unit test
@@ -700,10 +704,10 @@ void MMCifReader::ParseAndAddAtom(const std::vector<StringRef>& columns)
       }
   } else {
     mol::AtomHandle atom=curr_residue_.FindAtom(aname);
-    if (atom.IsValid() && !profile_.quack_mode) { // unit test
+    if (atom.IsValid()) { // unit test
       if (profile_.fault_tolerant) { // unit test
         LOG_WARNING("duplicate atom '" << aname << "' in residue " 
-                    << curr_residue_);
+                    << curr_residue_ << " only first atom added");
         return;
       }
       throw IOException(this->FormatDiagnostic(STAR_DIAG_ERROR,
@@ -737,7 +741,8 @@ MMCifEntityDescMap::iterator MMCifReader::GetEntityDescMapIterator(
                             .entity_poly_type = "",
                             .branched_type = "",
                             .details="",
-                            .seqres="",
+                            .seqres_canonical="",
+                            .seqres_pdbx="",
                             .mon_ids=std::vector<String>(),
                             .hetero_num=std::vector<int>(),
                             .hetero_ids=std::vector<String>()};
@@ -785,93 +790,17 @@ void MMCifReader::ParseEntityPoly(const std::vector<StringRef>& columns)
     edm_it->second.entity_poly_type = columns[indices_[EP_TYPE]].str();
   }
 
-  // store seqres
-  if (edm_it->second.seqres.length() > 0) {
-    throw IOException(this->FormatDiagnostic(STAR_DIAG_ERROR,
-     "entity_poly.pdbx_seq_one_letter_code[_can] clash: sequence for entry '" +
-                                            columns[indices_[ENTITY_ID]].str() +
-                                             "' is already set to '" +
-                                             edm_it->second.seqres + "'.",
-                                             this->GetCurrentLinenum()));
+  // store canonical seqres
+  if (indices_[PDBX_SEQ_ONE_LETTER_CODE_CAN] != -1) {
+    StringRef seqres_can=columns[indices_[PDBX_SEQ_ONE_LETTER_CODE_CAN]];
+    edm_it->second.seqres_canonical = seqres_can.str_no_whitespace();
   }
-  if (read_seqres_) {
-    StringRef seqres;
-    if (seqres_can_) {
-      if (indices_[PDBX_SEQ_ONE_LETTER_CODE_CAN] != -1) {
-        seqres=columns[indices_[PDBX_SEQ_ONE_LETTER_CODE_CAN]];
-        edm_it->second.seqres = seqres.str_no_whitespace();        
-      } else {
-        throw IOException(this->FormatDiagnostic(STAR_DIAG_ERROR,
-                   "'entity_poly.pdbx_seq_one_letter_code_can' not available.'",
-                                                 this->GetCurrentLinenum()));
-      }
-    } else if (indices_[PDBX_SEQ_ONE_LETTER_CODE] != -1) {
-      seqres=columns[indices_[PDBX_SEQ_ONE_LETTER_CODE]];
 
-      conop::CompoundLibBasePtr comp_lib=conop::Conopology::Instance()
-                                                .GetDefaultLib();
-      if (!comp_lib) {
-        if (!warned_rule_based_) {
-          LOG_WARNING("SEQRES import requires a valid compound library to "
-                       "handle non standard compounds. Their One letter "
-                       "codes will be set to X.");      
-        }
-        warned_rule_based_=true;
-        comp_lib = conop::CompoundLibBasePtr(new ost::conop::MinimalCompoundLib);
-      }
-      edm_it->second.seqres = this->ConvertSEQRES(seqres.str_no_whitespace(),
-                                                  comp_lib);
-    } else {
-      throw IOException(this->FormatDiagnostic(STAR_DIAG_ERROR,
-                       "'entity_poly.pdbx_seq_one_letter_code' not available.'",
-                                               this->GetCurrentLinenum()));
+  // store non canonical seqres
+  if (indices_[PDBX_SEQ_ONE_LETTER_CODE] != -1) {
+    StringRef seqres_pdbx=columns[indices_[PDBX_SEQ_ONE_LETTER_CODE]];
+    edm_it->second.seqres_pdbx = seqres_pdbx.str_no_whitespace();
     }
-  }
-}
-
-String MMCifReader::ConvertSEQRES(const String& seqres, 
-                                  conop::CompoundLibBasePtr comp_lib)
-{
-  String can_seqres;
-  for (String::const_iterator i=seqres.begin(), e=seqres.end(); i!=e; ++i) {
-    if (*i=='(') {
-      bool found_end_paren=false;
-      String tlc;
-      tlc.reserve(3);
-      while ((++i)!=seqres.end()) {
-        if (*i==')') {
-          found_end_paren=true;
-          break;
-        }
-        tlc.push_back(*i);
-      }
-      if (!found_end_paren) {
-        throw IOException(this->FormatDiagnostic(STAR_DIAG_ERROR,
-                          "'entity_poly.pdbx_seq_one_letter_code' contains "
-                          "unmatched '('", this->GetCurrentLinenum()));
-      }
-      conop::CompoundPtr compound=comp_lib->FindCompound(tlc, 
-                                                         conop::Compound::PDB);
-      if (!compound) {
-        if (tlc!="UNK") {
-
-          LOG_WARNING("unknown residue '" << tlc << "' in SEQRES record. "
-                      "Setting one-letter-code to 'X'");
-        }
-        can_seqres.push_back('X');
-        continue;
-      }
-      if (compound->GetOneLetterCode()=='?') {
-        can_seqres.push_back('X');
-      } else {
-        can_seqres.push_back(compound->GetOneLetterCode());
-      }
-
-    } else {
-      can_seqres.push_back(*i);
-    }
-  }
-  return can_seqres;
 }
 
 void MMCifReader::ParseCitation(const std::vector<StringRef>& columns)
@@ -1710,17 +1639,17 @@ void MMCifReader::AssignSecStructure(mol::EntityHandle ent)
 
 void MMCifReader::ParseStructRef(const std::vector<StringRef>& columns)
 {
-	String ent_id=columns[indices_[SR_ENTITY_ID]].str();
-	String db_name=columns[indices_[SR_DB_NAME]].str();
-	String db_code=columns[indices_[SR_DB_CODE]].str();
-	String id=columns[indices_[SR_ID]].str();
-	String db_access;
-	if (indices_[SR_DB_ACCESS]!=-1) {
-		db_access=columns[indices_[SR_DB_ACCESS]].str();
-	}
-	MMCifInfoStructRefPtr sr(new MMCifInfoStructRef(id, ent_id, db_name, 
-				                                          db_code, db_access));
-	struct_refs_.push_back(sr);
+  String ent_id=columns[indices_[SR_ENTITY_ID]].str();
+  String db_name=columns[indices_[SR_DB_NAME]].str();
+  String db_code=columns[indices_[SR_DB_CODE]].str();
+  String id=columns[indices_[SR_ID]].str();
+  String db_access;
+  if (indices_[SR_DB_ACCESS]!=-1) {
+    db_access=columns[indices_[SR_DB_ACCESS]].str();
+  }
+  MMCifInfoStructRefPtr sr(new MMCifInfoStructRef(id, ent_id, db_name, 
+                                                  db_code, db_access));
+  struct_refs_.push_back(sr);
 }
 
 void MMCifReader::ParseStructRefSeq(const std::vector<StringRef>& columns)
@@ -1729,43 +1658,43 @@ void MMCifReader::ParseStructRefSeq(const std::vector<StringRef>& columns)
  String sr_id=columns[indices_[SRS_STRUCT_REF_ID]].str();
  String chain_name;
  if (indices_[SRS_PDBX_STRAND_ID]!=-1) {
- 	 chain_name=columns[indices_[SRS_PDBX_STRAND_ID]].str();
+    chain_name=columns[indices_[SRS_PDBX_STRAND_ID]].str();
  }
  std::pair<bool,int> dbbeg=this->TryGetInt(columns[indices_[SRS_DB_ALIGN_BEG]], 
- 		                                        "_struct_ref_seq.db_align_beg",
- 		                                        profile_.fault_tolerant);
+                                             "_struct_ref_seq.db_align_beg",
+                                             profile_.fault_tolerant);
  std::pair<bool,int> dbend=this->TryGetInt(columns[indices_[SRS_DB_ALIGN_END]], 
- 		                                       "_struct_ref_seq.db_align_end",
- 		                                       profile_.fault_tolerant);
+                                            "_struct_ref_seq.db_align_end",
+                                            profile_.fault_tolerant);
  std::pair<bool,int> entbeg=this->TryGetInt(columns[indices_[SRS_ENT_ALIGN_BEG]], 
- 		                                        "_struct_ref_seq.seq_align_beg",
- 		                                        profile_.fault_tolerant);
+                                             "_struct_ref_seq.seq_align_beg",
+                                             profile_.fault_tolerant);
  std::pair<bool,int> entend=this->TryGetInt(columns[indices_[SRS_ENT_ALIGN_END]], 
- 		                                        "_struct_ref_seq.seq_align_END",
- 		                                        profile_.fault_tolerant);
+                                             "_struct_ref_seq.seq_align_END",
+                                             profile_.fault_tolerant);
  if (!(dbbeg.first && dbend.first && entbeg.first && entend.first)) {
- 	 return;
+    return;
  }
  bool found=false;
  for (MMCifInfoStructRefs::iterator i=struct_refs_.begin(), 
- 		  e=struct_refs_.end(); i!=e; ++i) { 
- 	 if ((*i)->GetID()==sr_id) {
-		 (*i)->AddAlignedSeq(aln_id, chain_name, entbeg.second, entend.second, 
-		 		                 dbbeg.second, dbend.second);
-		 found=true;
- 	 	 break;
- 	 }
+       e=struct_refs_.end(); i!=e; ++i) { 
+    if ((*i)->GetID()==sr_id) {
+     (*i)->AddAlignedSeq(aln_id, chain_name, entbeg.second, entend.second, 
+                          dbbeg.second, dbend.second);
+     found=true;
+       break;
+    }
  }
  if (!found) {
- 	 if (profile_.fault_tolerant) {
- 	 	 LOG_ERROR("struct_ref_seq.ref_id points to inexistent struct_ref '"
- 	 	 		       << sr_id <<  "'");
- 	 	 return;
- 	 }
-	 std::stringstream ss;
-	 ss << "struct_ref_seq.ref_id points to inexistent struct_ref '";
-	 ss << sr_id << "'";
-	 throw IOException(ss.str());
+    if (profile_.fault_tolerant) {
+       LOG_ERROR("struct_ref_seq.ref_id points to inexistent struct_ref '"
+                  << sr_id <<  "'");
+       return;
+    }
+   std::stringstream ss;
+   ss << "struct_ref_seq.ref_id points to inexistent struct_ref '";
+   ss << sr_id << "'";
+   throw IOException(ss.str());
  }
 }
 
@@ -1773,42 +1702,48 @@ void MMCifReader::ParseStructRefSeqDif(const std::vector<StringRef>& columns)
 {
   String aln_id=columns[indices_[SRSD_ALIGN_ID]].str();
   String db_rnum;
-  if (!is_undef(columns[indices_[SRSD_DB_RNUM]])) {
+  if (indices_[SRSD_DB_RNUM] != -1) {
     db_rnum=columns[indices_[SRSD_DB_RNUM]].str();
+  } else {
+    db_rnum="?";
+    LOG_INFO("Setting missing struct_ref_seq_dif.pdbx_seq_db_seq_num to '?");
   }
-  std::pair<bool,int> seq_rnum(true, -1);
-  if (!is_undef(columns[indices_[SRSD_SEQ_RNUM]])) {
-    seq_rnum=this->TryGetInt(columns[indices_[SRSD_SEQ_RNUM]],
-                             "_struct_ref_seq_dif.seq_num",
-                             profile_.fault_tolerant);
-    
+
+  std::pair<bool,int> seq_rnum;
+  if (indices_[SRSD_SEQ_RNUM] != -1) {
+    if (!is_undef(columns[indices_[SRSD_SEQ_RNUM]])) {
+      seq_rnum=this->TryGetInt(columns[indices_[SRSD_SEQ_RNUM]],
+                               "_struct_ref_seq_dif.seq_num",
+                               profile_.fault_tolerant);
+    }
   }
   if (!seq_rnum.first) {
+    LOG_WARNING("Ignoring struct_ref_seq_dif with missing data item seq_num");
     return;
   }
   String details;
   if (indices_[SRSD_DETAILS]!=-1) {
-	  details=columns[indices_[SRSD_DETAILS]].str();
+    details=columns[indices_[SRSD_DETAILS]].str();
   }
   bool found=false;
   for (MMCifInfoStructRefs::iterator i=struct_refs_.begin(), 
- 		  e=struct_refs_.end(); i!=e; ++i) { 
- 	 if (MMCifInfoStructRefSeqPtr s=(*i)->GetAlignedSeq(aln_id)) {
-		 s->AddDif(seq_rnum.second, db_rnum, details); 
-		 found=true;
- 	 	 break;
- 	 }
+       e=struct_refs_.end(); i!=e; ++i) { 
+    if (MMCifInfoStructRefSeqPtr s=(*i)->GetAlignedSeq(aln_id)) {
+     s->AddDif(seq_rnum.second, db_rnum, details); 
+     found=true;
+       break;
+    }
  }
  if (!found) {
- 	 if (profile_.fault_tolerant) {
- 	 	 LOG_ERROR("struct_ref_seq_dif.align_id points to inexistent "
- 	 	 		       "struct_ref_seq '" << aln_id <<  "'");
- 	 	 return;
- 	 }
-	 std::stringstream ss;
-	 ss << "struct_ref_seq.ref_id points to inexistent struct_ref '";
-	 ss << aln_id << "'";
-	 throw IOException(ss.str());
+    if (profile_.fault_tolerant) {
+       LOG_ERROR("struct_ref_seq_dif.align_id points to inexistent "
+                  "struct_ref_seq '" << aln_id <<  "'");
+       return;
+    }
+   std::stringstream ss;
+   ss << "struct_ref_seq.ref_id points to inexistent struct_ref '";
+   ss << aln_id << "'";
+   throw IOException(ss.str());
  }
 }
 
@@ -1943,15 +1878,17 @@ void MMCifReader::OnEndData()
     if (edm_it != entity_desc_map_.end()) {
       editor.SetChainType(css->first, edm_it->second.type);
       editor.SetChainDescription(css->first, edm_it->second.details);
-      if (edm_it->second.seqres.length() > 0) {
-        seqres_.AddSequence(seq::CreateSequence(css->first.GetName(),
-                                                edm_it->second.seqres));
-        pdb_auth_chain_name = css->first.GetStringProp("pdb_auth_chain_name");
-        info_.AddMMCifPDBChainTr(css->first.GetName(), pdb_auth_chain_name);
-        info_.AddPDBMMCifChainTr(pdb_auth_chain_name, css->first.GetName());
-      } else if (edm_it->second.type!=mol::CHAINTYPE_WATER) {
-        // mark everything that doesn't have SEQRES and isn't of type
-        // water as ligand
+      // Add chain mapping for all chains
+      pdb_auth_chain_name = css->first.GetStringProp("pdb_auth_chain_name");
+      info_.AddMMCifPDBChainTr(css->first.GetName(), pdb_auth_chain_name,
+                               profile_.fault_tolerant);
+
+      if (edm_it->second.entity_type=="polymer") {
+        // PDB -> mmCIF chain mapping only for polymers
+        // This is not a 1:1 mapping because of ligands
+        info_.AddPDBMMCifChainTr(pdb_auth_chain_name, css->first.GetName(),
+                                 profile_.fault_tolerant);
+      } else if (edm_it->second.entity_type=="non-polymer") {
         mol::ChainHandle chain=css->first;
         mol::ResidueHandleList residues=chain.GetResidueList();
         for (mol::ResidueHandleList::iterator 
@@ -1961,7 +1898,8 @@ void MMCifReader::OnEndData()
       }
     } else {
       LOG_WARNING("No entity description found for atom_site.label_entity_id '"
-                  << css->second << "'");
+                  << css->second << "'. SEQRES, chain mapping and ligand "
+                  << " annotation will be missing.");
     }
     // find
     blm_it = entity_branch_link_map_.find(css->second);
@@ -1969,14 +1907,23 @@ void MMCifReader::OnEndData()
     if (blm_it != entity_branch_link_map_.end()) {
       for (bl_it = blm_it->second.begin(); bl_it != blm_it->second.end();
            ++bl_it) {
+        info_.AddEntityBranchLink(css->second,
+                                  bl_it->res_num_1, bl_it->res_num_2,
+                                  bl_it->atm_nm_1, bl_it->atm_nm_2,
+                                  bl_it->bond_order);
+
+        // and directly connect if respective atoms are available...
         mol::ResidueHandle res1 = css->first.FindResidue(to_res_num(
                                                          bl_it->res_num_1, ' '));
         mol::ResidueHandle res2 = css->first.FindResidue(to_res_num(
                                                          bl_it->res_num_2, ' '));
-        info_.AddEntityBranchLink(css->first.GetName(),
-                                  res1.FindAtom(bl_it->atm_nm_1),
-                                  res2.FindAtom(bl_it->atm_nm_2),
-                                  bl_it->bond_order);
+        if(res1.IsValid() && res2.IsValid()) {
+          mol::AtomHandle a1 = res1.FindAtom(bl_it->atm_nm_1);
+          mol::AtomHandle a2 = res2.FindAtom(bl_it->atm_nm_2);
+          if(a1.IsValid() && a2.IsValid()) {
+            editor.Connect(a1, a2, bl_it->bond_order);
+          }
+        }
       }
     }
   }
@@ -2067,19 +2014,19 @@ void MMCifReader::OnEndData()
   }
 
   // conclude EntityDesc (add entity_poly_seq if present) and add to MMCifInfo
-  for(auto entity_it: entity_desc_map_) {
+  for(auto &entity_it: entity_desc_map_) {
     if(entity_poly_seq_map_.find(entity_it.first) != entity_poly_seq_map_.end()) {
       int max_num = 1;
-      for(auto seqres_it: entity_poly_seq_map_[entity_it.first]) {
+      for(auto &seqres_it: entity_poly_seq_map_[entity_it.first]) {
         max_num = std::max(max_num, seqres_it.first);
       }
       entity_it.second.mon_ids.assign(max_num, "?");
-      for(auto seqres_it: entity_poly_seq_map_[entity_it.first]) {
+      for(auto &seqres_it: entity_poly_seq_map_[entity_it.first]) {
         entity_it.second.mon_ids[seqres_it.first-1] = seqres_it.second;
       }
     }
     if(entity_poly_seq_h_map_.find(entity_it.first) != entity_poly_seq_h_map_.end()) {
-      for(auto hetero_it: entity_poly_seq_h_map_[entity_it.first]) {
+      for(auto &hetero_it: entity_poly_seq_h_map_[entity_it.first]) {
         entity_it.second.hetero_num.push_back(hetero_it.first);
         entity_it.second.hetero_ids.push_back(hetero_it.second);
       }
@@ -2153,6 +2100,70 @@ String OSTBondOrderToMMCifValueOrder(const unsigned char bond_order)
   }
   LOG_WARNING("Unknow bond order found: '" << (int)bond_order << "'");
   return String("");
+}
+
+seq::SequenceList MMCifReader::GetSeqRes() const {
+  std::map<String, String> entity_seqres_map; // Map entity_id -> seqres
+  seq::SequenceList seqres_list = seq::CreateSequenceList();
+
+  // We need a compound lib for the conversion
+  conop::CompoundLibBasePtr comp_lib=conop::Conopology::Instance()
+                                            .GetDefaultLib();
+  if (!comp_lib) {
+    LOG_WARNING("SEQRES requires a valid compound library to "
+                 "handle non standard compounds. Their One letter "
+                 "codes will be set to X.");
+    comp_lib = conop::CompoundLibBasePtr(new ost::conop::MinimalCompoundLib);
+  }
+
+  // Generate the SEQRES for every entity
+  for(auto const &entity_it: entity_desc_map_) {
+    if (entity_it.second.entity_type == "polymer") {
+      entity_seqres_map[entity_it.first] = "";
+      auto mon_ids = entity_it.second.mon_ids;
+//      if (mon_ids.size() == 0) {
+//        // We hit this if there was an _entity_poly category but no _entity_poly_seq
+//        LOG_WARNING("No SEQRES found for entity '"
+//                    << entity_it.first << "'.");
+//      }
+      entity_seqres_map[entity_it.first].reserve(mon_ids.size());
+      for (auto const &mon_id: mon_ids) {
+        conop::CompoundPtr compound=comp_lib->FindCompound(mon_id, conop::Compound::PDB);
+        if (!compound) {
+          if (mon_id != "UNK") {
+            LOG_WARNING("unknown residue '" << mon_id << "' in SEQRES record. "
+                        "Setting one-letter-code to 'X'");
+          }
+          entity_seqres_map[entity_it.first].push_back('X');
+          continue;
+        }
+        if (compound->GetOneLetterCode()=='?') {
+          entity_seqres_map[entity_it.first].push_back('X');
+        } else {
+          entity_seqres_map[entity_it.first].push_back(compound->GetOneLetterCode());
+        }
+      }
+    }
+  }
+
+  // Assign
+  for (auto const &css: chain_id_pairs_) {
+    auto entity_seqres_map_it = entity_seqres_map.find(css.second);
+    if (entity_seqres_map_it != entity_seqres_map.end()) {
+      if (entity_seqres_map_it->second == "") {
+        // We hit this if there was an _entity_poly category but no _entity_poly_seq
+        LOG_WARNING("No SEQRES found for chain '"
+                    << css.first << "'. Most likely the entity_poly_seq "
+                    << "category was missing from the input file.");
+      } else {
+        seqres_list.AddSequence(seq::CreateSequence(css.first.GetName(),
+                                                    entity_seqres_map_it->second));
+      }
+    }
+    // else: either non polymer chain, or no entity_poly was available (this
+    // triggered a warning before)
+  }
+  return seqres_list;
 }
 
 }}

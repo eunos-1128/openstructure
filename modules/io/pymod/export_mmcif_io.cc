@@ -107,7 +107,6 @@ void export_mmcif_io()
   class_<MMCifReader, boost::noncopyable>("MMCifReader", init<const String&, EntityHandle&, const IOProfile&>())
     .def("Parse", &MMCifReader::Parse)
     .def("SetRestrictChains", &MMCifReader::SetRestrictChains)
-    .def("SetReadCanonicalSeqRes", &MMCifReader::SetReadCanonicalSeqRes)
     .def("GetSeqRes", &MMCifReader::GetSeqRes)
     .def("GetInfo", make_function(&MMCifReader::GetInfo,
                                   return_value_policy<copy_const_reference>()))
@@ -116,8 +115,6 @@ void export_mmcif_io()
                                 return_value_policy<copy_const_reference>()),
                   &MMCifReader::SetRestrictChains)
     .add_property("seqres", &MMCifReader::GetSeqRes)
-    .add_property("read_seqres", &MMCifReader::GetReadSeqRes, 
-                  &MMCifReader::SetReadSeqRes)
     .add_property("info", make_function(&MMCifReader::GetInfo,
                                    return_value_policy<copy_const_reference>()))
     ;
@@ -154,6 +151,11 @@ void export_mmcif_io()
     .def("Push", &StarWriter::Push, arg("star_writer_object"))
     .def("Write", &WrapStarWriterWrite, (arg("data_name"), arg("filename")))
   ;
+
+  class_<ChainNameGenerator>("ChainNameGenerator", init<>())
+    .def("Get", &ChainNameGenerator::Get)
+    .def("Reset", &ChainNameGenerator::Reset)
+    ;
 
   class_<MMCifWriterEntity>("MMCifWriterEntity", no_init)
     .def("FromPolymer", &MMCifWriterEntity::FromPolymer).staticmethod("FromPolymer")
@@ -297,37 +299,37 @@ void export_mmcif_io()
     .def(vector_indexing_suite<std::vector<MMCifInfoTransOpPtrList >, true >())
   ;
   class_<MMCifInfoStructRef, MMCifInfoStructRefPtr>("MMCifInfoStructRef", no_init)
-  	.add_property("id", make_function(&MMCifInfoStructRef::GetID, 
-  				        return_value_policy<copy_const_reference>()))
-  	.add_property("db_name", make_function(&MMCifInfoStructRef::GetDBName, 
-  				        return_value_policy<copy_const_reference>()))
-  	.add_property("db_id", make_function(&MMCifInfoStructRef::GetDBID, 
-  				        return_value_policy<copy_const_reference>()))
-  	.add_property("entity_id", make_function(&MMCifInfoStructRef::GetEntityID, 
-  				        return_value_policy<copy_const_reference>()))
-  	.add_property("db_access", make_function(&MMCifInfoStructRef::GetDBAccess, 
-  				        return_value_policy<copy_const_reference>()))
-  	.def("GetAlignedSeq", &MMCifInfoStructRef::GetAlignedSeq, arg("align_id"))
-  	.def("GetAlignedSeqs", &MMCifInfoStructRef::GetAlignedSeqs)
-  	.add_property("aligned_seqs", &MMCifInfoStructRef::GetAlignedSeqs)
+    .add_property("id", make_function(&MMCifInfoStructRef::GetID, 
+                  return_value_policy<copy_const_reference>()))
+    .add_property("db_name", make_function(&MMCifInfoStructRef::GetDBName, 
+                  return_value_policy<copy_const_reference>()))
+    .add_property("db_id", make_function(&MMCifInfoStructRef::GetDBID, 
+                  return_value_policy<copy_const_reference>()))
+    .add_property("entity_id", make_function(&MMCifInfoStructRef::GetEntityID, 
+                  return_value_policy<copy_const_reference>()))
+    .add_property("db_access", make_function(&MMCifInfoStructRef::GetDBAccess, 
+                  return_value_policy<copy_const_reference>()))
+    .def("GetAlignedSeq", &MMCifInfoStructRef::GetAlignedSeq, arg("align_id"))
+    .def("GetAlignedSeqs", &MMCifInfoStructRef::GetAlignedSeqs)
+    .add_property("aligned_seqs", &MMCifInfoStructRef::GetAlignedSeqs)
  ; 
   class_<MMCifInfoStructRefSeq, MMCifInfoStructRefSeqPtr>("MMCifInfoStructRefSeq", no_init)
-  	.add_property("align_id", make_function(&MMCifInfoStructRefSeq::GetID, 
-  				        return_value_policy<copy_const_reference>()))
-  	.add_property("chain_name", make_function(&MMCifInfoStructRefSeq::GetChainName, 
-  				        return_value_policy<copy_const_reference>()))
-  	.add_property("seq_begin", &MMCifInfoStructRefSeq::GetSeqBegin)
-  	.add_property("seq_end", &MMCifInfoStructRefSeq::GetSeqEnd)
-  	.add_property("db_begin", &MMCifInfoStructRefSeq::GetDBBegin)
-  	.add_property("db_end", &MMCifInfoStructRefSeq::GetDBEnd)
-  	.add_property("difs", make_function(&MMCifInfoStructRefSeq::GetDifs,
-  				        return_value_policy<copy_const_reference>()))
+    .add_property("align_id", make_function(&MMCifInfoStructRefSeq::GetID, 
+                  return_value_policy<copy_const_reference>()))
+    .add_property("chain_name", make_function(&MMCifInfoStructRefSeq::GetChainName, 
+                  return_value_policy<copy_const_reference>()))
+    .add_property("seq_begin", &MMCifInfoStructRefSeq::GetSeqBegin)
+    .add_property("seq_end", &MMCifInfoStructRefSeq::GetSeqEnd)
+    .add_property("db_begin", &MMCifInfoStructRefSeq::GetDBBegin)
+    .add_property("db_end", &MMCifInfoStructRefSeq::GetDBEnd)
+    .add_property("difs", make_function(&MMCifInfoStructRefSeq::GetDifs,
+                  return_value_policy<copy_const_reference>()))
   ;
   class_<MMCifInfoStructRefSeqDif, 
-  	     MMCifInfoStructRefSeqDifPtr>("MMCifInfoStructRefSeqDif", no_init)
-  	.add_property("details", make_function(&MMCifInfoStructRefSeqDif::GetDetails, 
-  				        return_value_policy<copy_const_reference>()))
-  	.add_property("seq_rnum", &MMCifInfoStructRefSeqDif::GetSeqRNum)
+         MMCifInfoStructRefSeqDifPtr>("MMCifInfoStructRefSeqDif", no_init)
+    .add_property("details", make_function(&MMCifInfoStructRefSeqDif::GetDetails, 
+                  return_value_policy<copy_const_reference>()))
+    .add_property("seq_rnum", &MMCifInfoStructRefSeqDif::GetSeqRNum)
     .add_property("db_rnum", make_function(&MMCifInfoStructRefSeqDif::GetDBRNum,
                                            return_value_policy<copy_const_reference>()))
   ;
@@ -377,13 +379,13 @@ void export_mmcif_io()
   ;
 
   class_<MMCifInfoStructRefs>("MMCifInfoStructRefs", init<>())
-  	.def(vector_indexing_suite<MMCifInfoStructRefs, true>())
+    .def(vector_indexing_suite<MMCifInfoStructRefs, true>())
   ;
   class_<MMCifInfoStructRefSeqs>("MMCifInfoStructRefSeqs", init<>())
-  	.def(vector_indexing_suite<MMCifInfoStructRefSeqs, true>())
+    .def(vector_indexing_suite<MMCifInfoStructRefSeqs, true>())
   ;
   class_<MMCifInfoStructRefSeqDifs>("MMCifInfoStructRefSeqDifs", init<>())
-  	.def(vector_indexing_suite<MMCifInfoStructRefSeqDifs, true>())
+    .def(vector_indexing_suite<MMCifInfoStructRefSeqDifs, true>())
   ;
   class_<std::vector<MMCifInfoBioUnit> >("MMCifInfoBioUnitList", init<>())
     .def(vector_indexing_suite<std::vector<MMCifInfoBioUnit> >())
@@ -466,22 +468,14 @@ void export_mmcif_io()
   ;
 
   class_<MMCifInfoEntityBranchLink>("MMCifInfoEntityBranchLink",
-                                    init<mol::AtomHandle,
-                                    mol::AtomHandle, unsigned char>())
-    .def("GetAtom1", &MMCifInfoEntityBranchLink::GetAtom1)
-    .def("GetAtom2", &MMCifInfoEntityBranchLink::GetAtom2)
-    .def("GetBondOrder", &MMCifInfoEntityBranchLink::GetBondOrder)
-    .def("ConnectBranchLink", &MMCifInfoEntityBranchLink::ConnectBranchLink)
-    .def("SetAtom1", &MMCifInfoEntityBranchLink::SetAtom1)
-    .def("SetAtom2", &MMCifInfoEntityBranchLink::SetAtom2)
-    .def("SetBondOrder", &MMCifInfoEntityBranchLink::SetBondOrder)
-    .def(self_ns::str(self))
-    .add_property("atom1", &MMCifInfoEntityBranchLink::GetAtom1,
-                  &MMCifInfoEntityBranchLink::SetAtom1)
-    .add_property("atom2", &MMCifInfoEntityBranchLink::GetAtom2,
-                  &MMCifInfoEntityBranchLink::SetAtom2)
-    .add_property("bond_order", &MMCifInfoEntityBranchLink::GetBondOrder,
-                  &MMCifInfoEntityBranchLink::SetBondOrder)
+                                    init<int, int, const String&,
+                                         const String&,
+                                         unsigned char>())
+    .add_property("rnum1", &MMCifInfoEntityBranchLink::rnum1)
+    .add_property("rnum2", &MMCifInfoEntityBranchLink::rnum2)
+    .add_property("aname1", &MMCifInfoEntityBranchLink::aname1)
+    .add_property("aname2", &MMCifInfoEntityBranchLink::aname2)
+    .add_property("bond_order", &MMCifInfoEntityBranchLink::bond_order)
   ;
 
   class_<MMCifInfoEntityBranchLinkMap>("MMCifInfoEntityBranchLinkMap", init<>())
@@ -501,7 +495,8 @@ void export_mmcif_io()
    .add_property("entity_poly_type", &MMCifEntityDesc::entity_poly_type)
    .add_property("branched_type", &MMCifEntityDesc::branched_type)
    .add_property("details", &MMCifEntityDesc::details)
-   .add_property("seqres", &MMCifEntityDesc::seqres)
+   .add_property("seqres_canonical", &MMCifEntityDesc::seqres_canonical)
+   .add_property("seqres_pdbx", &MMCifEntityDesc::seqres_pdbx)
    .add_property("mon_ids", &MMCifEntityDesc::mon_ids)
    .add_property("hetero_num", &MMCifEntityDesc::hetero_num)
    .add_property("hetero_ids", &MMCifEntityDesc::hetero_ids)
@@ -530,6 +525,10 @@ void export_mmcif_io()
                                    return_value_policy<copy_const_reference>()))
     .def("SetStructDetails", &MMCifInfo::SetStructDetails)
     .def("GetStructDetails", &MMCifInfo::GetStructDetails)
+    .def("SetStructRefs", make_function(&MMCifInfo::SetStructRefs,
+                                   return_value_policy<copy_const_reference>()))
+    .def("GetStructRefs", make_function(&MMCifInfo::GetStructRefs,
+                                   return_value_policy<copy_const_reference>()))
     .def("SetObsoleteInfo", &MMCifInfo::SetObsoleteInfo)
     .def("GetObsoleteInfo", &MMCifInfo::GetObsoleteInfo)
     .def("AddMMCifPDBChainTr", &MMCifInfo::AddMMCifPDBChainTr)
@@ -544,11 +543,8 @@ void export_mmcif_io()
           arg("minor")=-1))
     .def("GetRevisions", &MMCifInfo::GetRevisions)
     .def("AddEntityBranchLink", &MMCifInfo::AddEntityBranchLink)
-    .def("GetEntityBranchLinks", &MMCifInfo::GetEntityBranchLinks)
     .def("GetEntityBranchByChain", &MMCifInfo::GetEntityBranchByChain)
-    .def("ConnectBranchLinks", &MMCifInfo::ConnectBranchLinks)
     .def("GetEntityBranchChainNames", &WrapGetNames)
-    .def("GetEntityBranchChains", &MMCifInfo::GetEntityBranchChains)
     .def("SetEntityDesc", &MMCifInfo::SetEntityDesc)
     .def("GetEntityDesc", &MMCifInfo::GetEntityDesc, return_value_policy<copy_const_reference>())
     .def("GetEntityIds", &MMCifInfo::GetEntityIds)
@@ -569,7 +565,7 @@ void export_mmcif_io()
     .add_property("struct_details", &MMCifInfo::GetStructDetails,
                   &MMCifInfo::SetStructDetails)
     .add_property("struct_refs", make_function(&MMCifInfo::GetStructRefs,
-    			        return_value_policy<copy_const_reference>()))
+                  return_value_policy<copy_const_reference>()))
     .add_property("obsolete", &MMCifInfo::GetObsoleteInfo,
                   &MMCifInfo::SetObsoleteInfo)
     .add_property("revisions", &MMCifInfo::GetRevisions)

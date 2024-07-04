@@ -1,8 +1,8 @@
-Linear Database
+:mod:`~ost.db` - Linear Database
 ===============================================================================
 
-.. currentmodule:: ost.db
-
+.. module:: ost.db
+  :synopsis: Linear database.
 
 Many applications require to load lots of structures. Expecially on distributed
 file systems, io becomes a problem.
@@ -115,6 +115,7 @@ use an indexer to keep track of where to find data for a certain entry.
 
 
   .. method:: GetDataRange(name, chain_name)
+    :noindex:
 
     Get the range for a chain of an assembly
 

@@ -14,12 +14,12 @@ class TestPDB(unittest.TestCase):
 
   def test_properly_assigns_profile_properties(self):
     io.profiles['TEST'] = io.IOProfile()
-    io.profiles['TEST'].quack_mode = False
-    self.assertFalse(io.profiles['TEST'].quack_mode)
-    self.assertFalse(io.profiles['TEST'].Copy().quack_mode)
-    io.profiles['TEST'].quack_mode = True
-    self.assertTrue(io.profiles['TEST'].quack_mode)
-    self.assertTrue(io.profiles['TEST'].Copy().quack_mode)
+    io.profiles['TEST'].fault_tolerant = False
+    self.assertFalse(io.profiles['TEST'].fault_tolerant)
+    self.assertFalse(io.profiles['TEST'].Copy().fault_tolerant)
+    io.profiles['TEST'].fault_tolerant = True
+    self.assertTrue(io.profiles['TEST'].fault_tolerant)
+    self.assertTrue(io.profiles['TEST'].Copy().fault_tolerant)
   def test_no_bond_feasibility(self):
     io.profiles['FEAS_CHECK']=io.IOProfile(processor=conop.HeuristicProcessor(check_bond_feasibility=True))
     io.profiles['NO_FEAS_CHECK']=io.IOProfile(processor=conop.HeuristicProcessor(check_bond_feasibility=False))

@@ -1,6 +1,8 @@
-====
-lDDT
-====
+:orphan:
+
+========================
+lDDT binary (deprecated)
+========================
 
 .. warning::
 

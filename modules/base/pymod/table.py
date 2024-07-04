@@ -2172,6 +2172,7 @@ Statistics for column %(col)s
     """
     try:
       import scipy.stats.mstats
+      import numpy as np
       
       if IsStringLike(col1) and IsStringLike(col2):
         col1 = self.GetColIndex(col1)
@@ -2183,7 +2184,7 @@ Statistics for column %(col)s
           vals2.append(v2)
       try:
         correl = scipy.stats.mstats.spearmanr(vals1, vals2)[0]
-        if scipy.isnan(correl):
+        if np.isnan(correl):
           return None
         return correl
       except:

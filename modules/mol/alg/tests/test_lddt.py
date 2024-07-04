@@ -44,7 +44,11 @@ class TestlDDT(unittest.TestCase):
         for a,b in zip(aws_per_res_scores, classic_per_res_scores):
             if a is None and b is None:
                 continue
-            self.assertAlmostEqual(a, b, places = 5)
+            # only check for 3 places. Reason for that is that the distance
+            # difference between GLN30.CB and TYR35.O is within floating point
+            # accuracy of the 0.5A threshold. So the two involved residues may
+            # have a difference of 1 with respect to conserved distances.
+            self.assertAlmostEqual(a, b, places = 3)
 
         # do 7W1F_B
         model = _LoadFile("7W1F_B_model.pdb")
@@ -216,6 +220,22 @@ class TestlDDT(unittest.TestCase):
 
         # same for the conserved contacts
         self.assertEqual(lDDT_cons_ic + lDDT_cons_sc, lDDT_cons)
+
+    def test_add_mdl_contacts(self):
+        model = _LoadFile("7SGN_C_model.pdb")
+        target = _LoadFile("7SGN_C_target.pdb")
+
+        lddt_scorer = lDDTScorer(target)
+        lDDT, per_res_lDDT, lDDT_tot, lDDT_cons, res_indices, per_res_exp, \
+        per_res_conserved = lddt_scorer.lDDT(model,
+                                             return_dist_test = True,
+                                             add_mdl_contacts=True)
+
+        # this value is just blindly copied in without checking whether it makes
+        # any sense... it's sole purpose is to trigger the respective flag
+        # in lDDT computation
+        self.assertEqual(lDDT, 0.6171511842396518)
+
 
 
 class TestlDDTBS(unittest.TestCase):

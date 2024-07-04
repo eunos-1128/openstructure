@@ -1,8 +1,25 @@
-:mod:`mol.alg <ost.mol.alg>` -- Algorithms for Structures
+:mod:`~ost.mol.alg` -- Algorithms for Structures
 ================================================================================
 
 .. module:: ost.mol.alg
    :synopsis: Algorithms operating on molecular structures
+
+Submodules
+--------------------------------------------------------------------------------
+
+.. toctree::
+  :maxdepth: 1
+
+  chain_mapping
+  contact_score
+  dockq
+  helix_kinks
+  ligand_scoring
+  qsscore
+  scoring
+  stereochemistry
+  structure_analysis
+  trajectory_analysis
 
 Local Distance Test scores (lDDT, DRMSD)
 --------------------------------------------------------------------------------
@@ -83,94 +100,62 @@ Local Distance Test scores (lDDT, DRMSD)
     :rtype:  :class:`str`
 
 
-:mod:`stereochemistry <ost.mol.alg.stereochemistry>` -- Stereochemistry Checks
---------------------------------------------------------------------------------
+GDT - Global Distance Test
+--------------------------
 
-.. warning::
+  Implements the GDT score, i.e. identifies the largest number of positions
+  that can be superposed within a given distance threshold. The final
+  GDT score is then the returned number divided by the total number of
+  reference positioons. The algorithm is similar to what is described for
+  the LGA tool but simpler. Therefore, the fractions reported by OpenStructure
+  tend to be systematically lower. For benchmarking we computed the full GDT_TS,
+  i.e. average GDT for distance thresholds [1, 2, 4, 8], on all CASP15 TS
+  models. 96.5% of differences to the LGA results from the predictioncenter are
+  within 2 GDT points and 99.2% are within 3 GDT points. The max difference
+  is 7.39 GDT points.
 
-  Stereochemistry checks described in
-  `Mariani et al. <https://dx.doi.org/10.1093/bioinformatics/btt473>`_ are
-  considered deprecated. They have been re-implemented and now support
-  nucleotides. The old code is still available and documented
-  :doc:`here <stereochemistry_deprecated>`.
+  The algorithm expects two position lists of same length and applies a sliding
+  window with specified length to define a subset of position pairs as starting
+  point for iterative superposition. Each iterative superposition applies the
+  following steps:
 
-.. automodule:: ost.mol.alg.stereochemistry
-   :members:
-   :member-order: bysource
-   :synopsis: Stereochemistry checks
+  - Compute minimal RMSD superposition on subset of position pairs
+  - Apply superposition on all model positions
+  - Compute pairwise distances of all model positions and reference positions
+  - Define new subset of position pairs: pairs within distance threshold
+  - Stop if subset doesn't change anymore
 
-.. currentmodule:: ost.mol.alg
+  The subset in any of the iterations which is largest is stored.
 
+  This is done for each sliding window position and the largest subset ever
+  observed is reported. To avoid long runtimes for large problem sizes, the
+  sliding window is not applied on each possible position but is capped.
+  If the number of positions is larger than this threshold, the sliding
+  window is only applied on N equidistant locations.
 
-:mod:`scoring <ost.mol.alg.scoring>` -- Specialized scoring functions
---------------------------------------------------------------------------------
+  .. function:: GDT(mdl_pos, ref_pos, window_size, max_windows, distance_thresh)
+  
+      Returns number of positions that can be superposed within
+      *distance_thresh* and the respective transformation matrix.
 
-.. autoclass:: ost.mol.alg.scoring.lDDTBSScorer
-   :members:
-
-.. autoclass:: ost.mol.alg.scoring.Scorer
-   :members:
-   :member-order: bysource
-
-.. currentmodule:: ost.mol.alg
-
-
-:mod:`ligand_scoring <ost.mol.alg.ligand_scoring>` -- Ligand scoring functions
---------------------------------------------------------------------------------
-
-.. automodule:: ost.mol.alg.ligand_scoring
-   :members:
-   :member-order: bysource
-   :synopsis: Scoring of ligands
-
-
-:mod:`chain_mapping <ost.mol.alg.chain_mapping>` -- Chain Mapping
---------------------------------------------------------------------------------
-
-.. automodule:: ost.mol.alg.chain_mapping
-   :members:
-   :member-order: bysource
-   :synopsis: Chain mapping in assemblies
-
-.. currentmodule:: ost.mol.alg
-
-
-:mod:`qsscore <ost.mol.alg.qsscore>` -- New QS score implementation
---------------------------------------------------------------------------------
-
-.. note::
-
-  This is a new implementation of QS Score, introduced in OpenStructure 2.4 and
-  tightly integrated with the chain mapping algorithms.
-  The :doc:`previous qsscoring code <qsscoring_deprecated>` that comes with
-  `Bertoni et al. <https://www.nature.com/articles/s41598-017-09654-8>`_ is
-  considered deprecated.
-
-.. automodule:: ost.mol.alg.qsscore
-   :members:
-   :member-order: bysource
-   :synopsis: QS Score implementation
-
-.. currentmodule:: ost.mol.alg
-
-
-:mod:`DockQ <ost.mol.alg.dockq>` -- DockQ implementation
---------------------------------------------------------------------------------
-
-.. autofunction:: ost.mol.alg.dockq.DockQ
-
-.. currentmodule:: ost.mol.alg
-
-
-:mod:`Contact Scores <ost.mol.alg.contact_scores>` -- Contact based scores
---------------------------------------------------------------------------------
-
-.. automodule:: ost.mol.alg.contact_score
-   :members:
-   :member-order: bysource
-   :synopsis: Contact Scores
-
-.. currentmodule:: ost.mol.alg
+      :param mdl_pos: Positions representing the model, typically alpha-carbon
+                      positions
+      :param ref_pos: Positions representing the reference, typically
+                      alpha-carbon positions
+      :param window_size: Size of the sliding window that is used to serve as
+                          starting point for iterative superposition.
+                          The described benchmark was done with a value of 7.
+      :param max_windows: Cap for number of starting points. The described
+                          benchmark was done with a value of 1000.
+      :param distance_thresh: Distance threshold for GDT algorithm
+      :type mdl_pos: :class:`ost.geom.Vec3List`
+      :type ref_pos: :class:`ost.geom.Vec3List`
+      :type window_size: :class:`int`
+      :type max_windows: :class:`int`
+      :type distance_thresh: :class:`float`
+      :returns: :class:`tuple` with first element being the number of
+                superposable positions (:class:`int`) and the second element the
+                transformation matrix (:class:`ost.geom.Mat4`)
 
 
 .. _steric-clashes:
@@ -1085,34 +1070,13 @@ used to skip frames in the analysis.
   :param view_ring2: Second group of atoms
   :type view_ring2: :class:`~ost.mol.EntityView`.
   :param stride: Size of the increment of the frame's index between two 
-     consecutive frames analyzed.  
-
-
-:mod:`helix_kinks <ost.mol.alg.helix_kinks>` -- Algorithms to calculate Helix Kinks
----------------------------------------------------------------------------------------------------------------
-
-.. automodule:: ost.mol.alg.helix_kinks
-   :members:
-
-:mod:`trajectory_analysis <ost.mol.alg.trajectory_analysis>` -- DRMSD, pairwise distances and more
----------------------------------------------------------------------------------------------------------------
-
-.. automodule:: ost.mol.alg.trajectory_analysis
-   :members:
-
-:mod:`structure_analysis <ost.mol.alg.structure_analysis>` -- Functions to analyze structures
----------------------------------------------------------------------------------------------------------------
-
-.. automodule:: ost.mol.alg.structure_analysis
-   :members:
+     consecutive frames analyzed.
 
 
 .. _mapping-functions:
 
 Mapping functions
 --------------------------------------------------------------------------------
-
-.. currentmodule:: ost.mol.alg
 
 The following functions help to convert one residue into another by reusing as
 much as possible from the present atoms. They are mainly meant to map from
@@ -1490,4 +1454,3 @@ from a :class:`ost.io.MMCifInfoBioUnit` or the derived
   :param bu_info: Info object
   :type bu_info: :class:`MMCifInfoBioUnit`/:class:`BUInfo`
   :returns: A :class:`ost.mol.EntityHandle` of the requested biounit
-

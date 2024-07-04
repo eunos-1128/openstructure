@@ -18,6 +18,7 @@ from ost import mol
 from ost import geom
 
 from ost.mol.alg import lddt
+from ost.mol.alg import bb_lddt
 from ost.mol.alg import qsscore
 
 def _CSel(ent, cnames):
@@ -786,10 +787,11 @@ class ChainMapper:
 
 
     def GetlDDTMapping(self, model, inclusion_radius=15.0,
-                       thresholds=[0.5, 1.0, 2.0, 4.0], strategy="naive",
+                       thresholds=[0.5, 1.0, 2.0, 4.0], strategy="heuristic",
                        steep_opt_rate = None, block_seed_size = 5,
                        block_blocks_per_chem_group = 5,
-                       chem_mapping_result = None):
+                       chem_mapping_result = None,
+                       heuristic_n_max_naive = 40320):
         """ Identify chain mapping by optimizing lDDT score
 
         Maps *model* chain sequences to :attr:`~chem_groups` and find mapping
@@ -821,6 +823,12 @@ class ChainMapper:
           all ref/mdl chain combinations within the respective chem groups and
           extend them to *block_seed_size*. *block_blocks_per_chem_group*
           for each chem group are selected for exhaustive extension.
+
+        * **heuristic**: Uses *naive* strategy if number of possible mappings
+          is within *heuristic_n_max_naive*. The default of 40320 corresponds
+          to an octamer (8!=40320). A structure with stoichiometry A6B2 would be
+          6!*2!=1440 etc. If the number of possible mappings is larger,
+          *greedy_full* is used.
 
         Sets :attr:`MappingResult.opt_score` in case of no trivial one-to-one
         mapping. 
@@ -859,7 +867,8 @@ class ChainMapper:
         :returns: A :class:`MappingResult`
         """
 
-        strategies = ["naive", "greedy_fast", "greedy_full", "greedy_block"]
+        strategies = ["naive", "greedy_fast", "greedy_full", "greedy_block",
+                      "heuristic"]
         if strategy not in strategies:
             raise RuntimeError(f"Strategy must be in {strategies}")
 
@@ -887,6 +896,13 @@ class ChainMapper:
             return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
                                  one_to_one, alns)
 
+        if strategy == "heuristic":
+            if _NMappingsWithin(self.chem_groups, chem_mapping,
+                                heuristic_n_max_naive):
+                strategy = "naive"
+            else:
+                strategy = "greedy_full"
+
         mapping = None
         opt_lddt = None
 
@@ -910,7 +926,7 @@ class ChainMapper:
                 mapping = _lDDTGreedyBlock(the_greed, block_seed_size,
                                            block_blocks_per_chem_group)
             # cached => lDDT computation is fast here
-            opt_lddt = the_greed.lDDT(self.chem_groups, mapping)
+            opt_lddt = the_greed.Score(mapping)
 
         alns = dict()
         for ref_group, mdl_group in zip(self.chem_groups, mapping):
@@ -925,10 +941,11 @@ class ChainMapper:
                              mapping, alns, opt_score = opt_lddt)
 
 
-    def GetQSScoreMapping(self, model, contact_d = 12.0, strategy = "naive",
+    def GetQSScoreMapping(self, model, contact_d = 12.0, strategy = "heuristic",
                           block_seed_size = 5, block_blocks_per_chem_group = 5,
-                          steep_opt_rate = None, chem_mapping_result = None,
-                          greedy_prune_contact_map = False):
+                          heuristic_n_max_naive = 40320, steep_opt_rate = None,
+                          chem_mapping_result = None,
+                          greedy_prune_contact_map = True):
         """ Identify chain mapping based on QSScore
 
         Scoring is based on CA/C3' positions which are present in all chains of
@@ -954,6 +971,12 @@ class ChainMapper:
           extend them to *block_seed_size*. *block_blocks_per_chem_group*
           for each chem group are selected for exhaustive extension.
 
+        * **heuristic**: Uses *naive* strategy if number of possible mappings
+          is within *heuristic_n_max_naive*. The default of 40320 corresponds
+          to an octamer (8!=40320). A structure with stoichiometry A6B2 would be
+          6!*2!=1440 etc. If the number of possible mappings is larger,
+          *greedy_full* is used.
+
         Sets :attr:`MappingResult.opt_score` in case of no trivial one-to-one
         mapping.
 
@@ -962,7 +985,8 @@ class ChainMapper:
         :param contact_d: Max distance between two residues to be considered as 
                           contact in qs scoring
         :type contact_d: :class:`float` 
-        :param strategy: Strategy for sampling, must be in ["naive"]
+        :param strategy: Strategy for sampling, must be in ["naive",
+                         "greedy_fast", "greedy_full", "greedy_block"]
         :type strategy: :class:`str`
         :param chem_mapping_result: Pro param. The result of
                                     :func:`~GetChemMapping` where you provided
@@ -983,7 +1007,7 @@ class ChainMapper:
         :returns: A :class:`MappingResult`
         """
 
-        strategies = ["naive", "greedy_fast", "greedy_full", "greedy_block"]
+        strategies = ["naive", "greedy_fast", "greedy_full", "greedy_block", "heuristic"]
         if strategy not in strategies:
             raise RuntimeError(f"strategy must be {strategies}")
 
@@ -995,7 +1019,6 @@ class ChainMapper:
                                        self.chem_group_alignments,
                                        chem_mapping,
                                        chem_group_alns)
-
         # check for the simplest case
         one_to_one = _CheckOneToOneMapping(self.chem_groups, chem_mapping)
         if one_to_one is not None:
@@ -1009,6 +1032,14 @@ class ChainMapper:
                         alns[(ref_ch, mdl_ch)] = aln
             return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
                                  one_to_one, alns)
+
+        if strategy == "heuristic":
+            if _NMappingsWithin(self.chem_groups, chem_mapping,
+                                heuristic_n_max_naive):
+                strategy = "naive"
+            else:
+                strategy = "greedy_full"
+
         mapping = None
         opt_qsscore = None
 
@@ -1033,7 +1064,7 @@ class ChainMapper:
                 mapping = _QSScoreGreedyBlock(the_greed, block_seed_size,
                                               block_blocks_per_chem_group)
             # cached => QSScore computation is fast here
-            opt_qsscore = the_greed.Score(mapping, check=False)
+            opt_qsscore = the_greed.Score(mapping, check=False).QS_global
               
         alns = dict()
         for ref_group, mdl_group in zip(self.chem_groups, mapping):
@@ -1047,71 +1078,42 @@ class ChainMapper:
         return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
                              mapping, alns, opt_score = opt_qsscore)
 
-    def GetRigidMapping(self, model, strategy = "greedy_single_gdtts",
-                        single_chain_gdtts_thresh=0.4, subsampling=None,
-                        first_complete=False, iterative_superposition=False,
-                        chem_mapping_result = None):
-        """Identify chain mapping based on rigid superposition
+    def GetRMSDMapping(self, model, strategy = "heuristic", subsampling=50,
+                       chem_mapping_result = None, heuristic_n_max_naive = 120):
+        """Identify chain mapping based on minimal RMSD superposition
 
         Superposition and scoring is based on CA/C3' positions which are present
         in all chains of a :attr:`chem_groups` as well as the *model*
         chains which are mapped to that respective chem group.
 
-        Transformations to superpose *model* onto :attr:`ChainMapper.target`
-        are estimated using all possible combinations of target and model chains
-        within the same chem groups and build the basis for further extension.
+        The following strategies are available:
 
-        There are four extension strategies:
+        * **naive**: Naively iterate all possible mappings and return the one
+          with lowes RMSD.
 
-        * **greedy_single_gdtts**: Iteratively add the model/target chain pair
-          that adds the most conserved contacts based on the GDT-TS metric
-          (Number of CA/C3' atoms within [8, 4, 2, 1] Angstrom). The mapping
-          with highest GDT-TS score is returned. However, that mapping is not
-          guaranteed to be complete (see *single_chain_gdtts_thresh*).
+        * **greedy_single**: perform all vs. all single chain superpositions
+          within the respective ref/mdl chem groups to use as starting points.
+          For each starting point, iteratively add the model/target chain pair
+          with lowest RMSD until a full mapping is achieved. The mapping with
+          lowest RMSD is returned.
 
-        * **greedy_iterative_gdtts**: Same as greedy_single_gdtts except that
-          the transformation gets updated with each added chain pair.
+        * **greedy_iterative**: Same as greedy_single_rmsd exept that the
+          transformation gets updated with each added chain pair.
 
-        * **greedy_single_rmsd**: Conceptually similar to greedy_single_gdtts
-          but the added chain pairs are the ones with lowest RMSD.
-          The mapping with lowest overall RMSD gets returned.
-          *single_chain_gdtts_thresh* is only applied to derive the initial
-          transformations. After that, the minimal RMSD chain pair gets
-          iteratively added without applying any threshold.
-
-        * **greedy_iterative_rmsd**: Same as greedy_single_rmsd exept that
-          the transformation gets updated with each added chain pair.
-          *single_chain_gdtts_thresh* is only applied to derive the initial
-          transformations. After that, the minimal RMSD chain pair gets
-          iteratively added without applying any threshold.
+        * **heuristic**: Uses *naive* strategy if number of possible mappings
+          is within *heuristic_n_max_naive*. The default of 120 corresponds
+          to a homo-pentamer (5!=120). If the number of possible mappings is
+          larger, *greedy_iterative* is used.
 
         :param model: Model to map
         :type model: :class:`ost.mol.EntityView`/:class:`ost.mol.EntityHandle`
-        :param strategy: Strategy to extend mappings from initial transforms,
-                         see description above. Must be in ["greedy_single",
-                         "greedy_iterative", "greedy_iterative_rmsd"]
+        :param strategy: Strategy for sampling. Must be in ["naive",
+                         "greedy_single", "greedy_iterative"]
         :type strategy: :class:`str`
-        :param single_chain_gdtts_thresh: Minimal GDT-TS score for model/target
-                                          chain pair to be added to mapping.
-                                          Mapping extension for a given
-                                          transform stops when no pair fulfills
-                                          this threshold, potentially leading to
-                                          an incomplete mapping.
-        :type single_chain_gdtts_thresh: :class:`float`
-        :param subsampling: If given, only use an equally distributed subset
-                            of all CA/C3' positions for superposition/scoring.
+        :param subsampling: If given, only an equally distributed subset
+                            of CA/C3' positions in each chain are used for
+                            superposition/scoring.
         :type subsampling: :class:`int`
-        :param first_complete: Avoid full enumeration and return first found
-                               mapping that covers all model chains or all
-                               target chains. Has no effect on
-                               greedy_iterative_rmsd strategy.
-        :type first_complete: :class:`bool`
-        :param iterative_superposition: Whether to compute inital
-                                        transformations with
-                                        :func:`ost.mol.alg.IterativeSuperposeSVD`
-                                        as oposed to
-                                        :func:`ost.mol.alg.SuperposeSVD`
-        :type iterative_superposition: :class:`bool`
         :param chem_mapping_result: Pro param. The result of
                                     :func:`~GetChemMapping` where you provided
                                     *model*. If set, *model* parameter is not
@@ -1120,8 +1122,8 @@ class ChainMapper:
         :returns: A :class:`MappingResult`
         """
 
-        strategies = ["greedy_single_gdtts", "greedy_iterative_gdtts",
-                      "greedy_single_rmsd", "greedy_iterative_rmsd"]
+        strategies = ["naive", "greedy_single", "greedy_iterative", "heuristic"]
+
         if strategy not in strategies:
             raise RuntimeError(f"strategy must be {strategies}")
 
@@ -1153,57 +1155,49 @@ class ChainMapper:
                                                   chem_group_alns,
                                                   max_pos = subsampling)
 
-        # get transforms of any mdl chain onto any trg chain in same chem group
-        # that fulfills gdtts threshold
-        initial_transforms = list()
-        initial_mappings = list()
-        for trg_pos, trg_chains, mdl_pos, mdl_chains in zip(trg_group_pos,
-                                                            self.chem_groups,
-                                                            mdl_group_pos,
-                                                            chem_mapping):
-            for t_pos, t in zip(trg_pos, trg_chains):
-                for m_pos, m in zip(mdl_pos, mdl_chains):
-                    if len(t_pos) >= 3 and len(m_pos) >= 3:
-                        transform = _GetTransform(m_pos, t_pos,
-                                                  iterative_superposition)
-                        t_m_pos = geom.Vec3List(m_pos)
-                        t_m_pos.ApplyTransform(transform)
-                        gdt = t_pos.GetGDTTS(t_m_pos)
-                        if gdt >= single_chain_gdtts_thresh:
-                            initial_transforms.append(transform)
-                            initial_mappings.append((t,m))
+        if strategy == "heuristic":
+            if _NMappingsWithin(self.chem_groups, chem_mapping,
+                                heuristic_n_max_naive):
+                strategy = "naive"
+            else:
+                strategy = "greedy_iterative"
 
-        if strategy == "greedy_single_gdtts":
-            mapping = _SingleRigidGDTTS(initial_transforms, initial_mappings,
-                                        self.chem_groups, chem_mapping,
-                                        trg_group_pos, mdl_group_pos,
-                                        single_chain_gdtts_thresh,
-                                        iterative_superposition, first_complete,
-                                        len(self.target.chains),
-                                        len(mdl.chains))
+        mapping = None
 
-        elif strategy == "greedy_iterative_gdtts":
-            mapping = _IterativeRigidGDTTS(initial_transforms, initial_mappings,
-                                           self.chem_groups, chem_mapping,
-                                           trg_group_pos, mdl_group_pos,
-                                           single_chain_gdtts_thresh,
-                                           iterative_superposition,
-                                           first_complete,
-                                           len(self.target.chains),
-                                           len(mdl.chains))
+        if strategy.startswith("greedy"):
+          # get transforms of any mdl chain onto any trg chain in same chem
+          # group that fulfills gdtts threshold
+          initial_transforms = list()
+          initial_mappings = list()
+          for trg_pos, trg_chains, mdl_pos, mdl_chains in zip(trg_group_pos,
+                                                              self.chem_groups,
+                                                              mdl_group_pos,
+                                                              chem_mapping):
+              for t_pos, t in zip(trg_pos, trg_chains):
+                  for m_pos, m in zip(mdl_pos, mdl_chains):
+                      if len(t_pos) >= 3 and len(m_pos) >= 3:
+                          transform = _GetTransform(m_pos, t_pos, False)
+                          initial_transforms.append(transform)
+                          initial_mappings.append((t,m))
 
-        elif strategy == "greedy_single_rmsd":
-            mapping = _SingleRigidRMSD(initial_transforms, initial_mappings,
-                                       self.chem_groups, chem_mapping,
-                                       trg_group_pos, mdl_group_pos,
-                                       iterative_superposition)
+          if strategy == "greedy_single":
+              mapping = _SingleRigidRMSD(initial_transforms,
+                                         initial_mappings,
+                                         self.chem_groups,
+                                         chem_mapping,
+                                         trg_group_pos,
+                                         mdl_group_pos)
 
 
-        elif strategy == "greedy_iterative_rmsd":
-            mapping = _IterativeRigidRMSD(initial_transforms, initial_mappings,
-                                          self.chem_groups, chem_mapping,
-                                          trg_group_pos, mdl_group_pos,
-                                          iterative_superposition)
+          elif strategy == "greedy_iterative":
+              mapping = _IterativeRigidRMSD(initial_transforms,
+                                            initial_mappings,
+                                            self.chem_groups, chem_mapping,
+                                            trg_group_pos, mdl_group_pos)
+        elif strategy == "naive":
+            mapping = _NaiveRMSD(self.chem_groups, chem_mapping,
+                                 trg_group_pos, mdl_group_pos,
+                                 self.n_max_naive)
 
         # translate mapping format and return
         final_mapping = list()
@@ -1237,15 +1231,19 @@ class ChainMapper:
         performed (greedy_prune_contact_map = True). The default for
         *n_max_naive* of 40320 corresponds to an octamer (8!=40320). A
         structure with stoichiometry A6B2 would be 6!*2!=1440 etc.
+
+        If :attr:`~target` has nucleotide sequences, the QS-score target
+        function is replaced with a backbone only lDDT score that has
+        an inclusion radius of 30A. 
         """
-        chem_mapping_res = self.GetChemMapping(model)
-        if _NMappingsWithin(self.chem_groups, chem_mapping_res[0], n_max_naive):
-            return self.GetQSScoreMapping(model, strategy="naive",
-                                          chem_mapping_result=chem_mapping_res)
+        if len(self.polynuc_seqs) > 0:
+            return self.GetlDDTMapping(model, strategy = "heuristic",
+                                       inclusion_radius = 30.0,
+                                       heuristic_n_max_naive = n_max_naive)
         else:
-            return self.GetQSScoreMapping(model, strategy="greedy_full",
+            return self.GetQSScoreMapping(model, strategy="heuristic",
                                           greedy_prune_contact_map=True,
-                                          chem_mapping_result=chem_mapping_res)
+                                          heuristic_n_max_naive = n_max_naive)
 
     def GetRepr(self, substructure, model, topn=1, inclusion_radius=15.0,
                 thresholds=[0.5, 1.0, 2.0, 4.0], bb_only=False,
@@ -1687,13 +1685,13 @@ class _Aligner:
         :returns: Alignment with s1 as first and s2 as second sequence 
         """
         if chem_type == mol.ChemType.AMINOACIDS:
-            return seq.alg.GlobalAlign(s1, s2, self.pep_subst_mat,
-                                       gap_open=self.pep_gap_open,
-                                       gap_ext=self.pep_gap_ext)[0]
+            return seq.alg.SemiGlobalAlign(s1, s2, self.pep_subst_mat,
+                                           gap_open=self.pep_gap_open,
+                                           gap_ext=self.pep_gap_ext)[0]
         elif chem_type == mol.ChemType.NUCLEOTIDES:
-            return seq.alg.GlobalAlign(s1, s2, self.nuc_subst_mat,
-                                       gap_open=self.nuc_gap_open,
-                                       gap_ext=self.nuc_gap_ext)[0]
+            return seq.alg.SemiGlobalAlign(s1, s2, self.nuc_subst_mat,
+                                           gap_open=self.nuc_gap_open,
+                                           gap_ext=self.nuc_gap_ext)[0]
         else:
             raise RuntimeError("Invalid ChemType")
         return aln
@@ -2040,166 +2038,25 @@ def _CheckOneToOneMapping(ref_chains, mdl_chains):
     else:
         return None
 
-class _lDDTDecomposer:
-
-    def __init__(self, ref, mdl, ref_mdl_alns, inclusion_radius = 15.0,
-                 thresholds = [0.5, 1.0, 2.0, 4.0]):
-        """ Compute backbone only lDDT scores for ref/mdl
-
-        Uses the pairwise decomposable property of backbone only lDDT and
-        implements a caching mechanism to efficiently enumerate different
-        chain mappings. 
-        """
-
-        self.ref = ref
-        self.mdl = mdl
-        self.ref_mdl_alns = ref_mdl_alns
-        self.inclusion_radius = inclusion_radius
-        self.thresholds = thresholds
-
-        # keep track of single chains and interfaces in ref
-        self.ref_chains = list() # e.g. ['A', 'B', 'C']
-        self.ref_interfaces = list() # e.g. [('A', 'B'), ('A', 'C')]
-
-        # holds lDDT scorer for each chain in ref
-        # key: chain name, value: scorer
-        self.single_chain_scorer = dict()
-
-        # cache for single chain conserved contacts
-        # key: tuple (ref_ch, mdl_ch) value: number of conserved contacts
-        self.single_chain_cache = dict()
-
-        # holds lDDT scorer for each pairwise interface in target
-        # key: tuple (ref_ch1, ref_ch2), value: scorer
-        self.interface_scorer = dict()
-
-        # cache for interface conserved contacts
-        # key: tuple of tuple ((ref_ch1, ref_ch2),((mdl_ch1, mdl_ch2))
-        # value: number of conserved contacts
-        self.interface_cache = dict()
-
-        self.n = 0
-
-        self._SetupScorer()
-
-    def _SetupScorer(self):
-        for ch in self.ref.chains:
-            # Select everything close to that chain
-            query = f"{self.inclusion_radius} <> "
-            query += f"[cname={mol.QueryQuoteName(ch.GetName())}] "
-            query += f"and cname!={mol.QueryQuoteName(ch.GetName())}"
-            for close_ch in self.ref.Select(query).chains:
-                k1 = (ch.GetName(), close_ch.GetName())
-                k2 = (close_ch.GetName(), ch.GetName())
-                if k1 not in self.interface_scorer and \
-                k2 not in self.interface_scorer:
-                    dimer_ref = _CSel(self.ref, [k1[0], k1[1]])
-                    s = lddt.lDDTScorer(dimer_ref, bb_only=True)
-                    self.interface_scorer[k1] = s
-                    self.interface_scorer[k2] = s
-                    self.n += self.interface_scorer[k1].n_distances_ic
-                    self.ref_interfaces.append(k1)
-                    # single chain scorer are actually interface scorers to save
-                    # some distance calculations
-                    if ch.GetName() not in self.single_chain_scorer:
-                        self.single_chain_scorer[ch.GetName()] = s
-                        self.n += s.GetNChainContacts(ch.GetName(),
-                                                      no_interchain=True)
-                        self.ref_chains.append(ch.GetName())
-                    if close_ch.GetName() not in self.single_chain_scorer:
-                        self.single_chain_scorer[close_ch.GetName()] = s
-                        self.n += s.GetNChainContacts(close_ch.GetName(),
-                                                      no_interchain=True)
-                        self.ref_chains.append(close_ch.GetName())
-
-        # add any missing single chain scorer
-        for ch in self.ref.chains:
-            if ch.GetName() not in self.single_chain_scorer:
-                single_chain_ref = _CSel(self.ref, [ch.GetName()])
-                self.single_chain_scorer[ch.GetName()] = \
-                lddt.lDDTScorer(single_chain_ref, bb_only = True)
-                self.n += self.single_chain_scorer[ch.GetName()].n_distances
-                self.ref_chains.append(ch.GetName())
-
-    def lDDT(self, ref_chain_groups, mdl_chain_groups):
-
-        flat_map = dict()
-        for ref_chains, mdl_chains in zip(ref_chain_groups, mdl_chain_groups):
-            for ref_ch, mdl_ch in zip(ref_chains, mdl_chains):
-                flat_map[ref_ch] = mdl_ch
-
-        return self.lDDTFromFlatMap(flat_map)
-
-
-    def lDDTFromFlatMap(self, flat_map):
-        conserved = 0
-
-        # do single chain scores
-        for ref_ch in self.ref_chains:
-            if ref_ch in flat_map and flat_map[ref_ch] is not None:
-                conserved += self.SCCounts(ref_ch, flat_map[ref_ch])
-
-        # do interfaces
-        for ref_ch1, ref_ch2 in self.ref_interfaces:
-            if ref_ch1 in flat_map and ref_ch2 in flat_map:
-                mdl_ch1 = flat_map[ref_ch1]
-                mdl_ch2 = flat_map[ref_ch2]
-                if mdl_ch1 is not None and mdl_ch2 is not None:
-                    conserved += self.IntCounts(ref_ch1, ref_ch2, mdl_ch1,
-                                                mdl_ch2)
-
-        return conserved / (len(self.thresholds) * self.n)
-
-    def SCCounts(self, ref_ch, mdl_ch):
-        if not (ref_ch, mdl_ch) in self.single_chain_cache:
-            alns = dict()
-            alns[mdl_ch] = self.ref_mdl_alns[(ref_ch, mdl_ch)]
-            mdl_sel = _CSel(self.mdl, [mdl_ch])
-            s = self.single_chain_scorer[ref_ch]
-            _,_,_,conserved,_,_,_ = s.lDDT(mdl_sel,
-                                           residue_mapping=alns,
-                                           return_dist_test=True,
-                                           no_interchain=True,
-                                           chain_mapping={mdl_ch: ref_ch},
-                                           check_resnames=False)
-            self.single_chain_cache[(ref_ch, mdl_ch)] = conserved
-        return self.single_chain_cache[(ref_ch, mdl_ch)]
-
-    def IntCounts(self, ref_ch1, ref_ch2, mdl_ch1, mdl_ch2):
-        k1 = ((ref_ch1, ref_ch2),(mdl_ch1, mdl_ch2))
-        k2 = ((ref_ch2, ref_ch1),(mdl_ch2, mdl_ch1))
-        if k1 not in self.interface_cache and k2 not in self.interface_cache:
-            alns = dict()
-            alns[mdl_ch1] = self.ref_mdl_alns[(ref_ch1, mdl_ch1)]
-            alns[mdl_ch2] = self.ref_mdl_alns[(ref_ch2, mdl_ch2)]
-            mdl_sel = _CSel(self.mdl, [mdl_ch1, mdl_ch2])
-            s = self.interface_scorer[(ref_ch1, ref_ch2)]
-            _,_,_,conserved,_,_,_ = s.lDDT(mdl_sel,
-                                           residue_mapping=alns,
-                                           return_dist_test=True,
-                                           no_intrachain=True,
-                                           chain_mapping={mdl_ch1: ref_ch1,
-                                                          mdl_ch2: ref_ch2},
-                                           check_resnames=False)
-            self.interface_cache[k1] = conserved
-            self.interface_cache[k2] = conserved
-        return self.interface_cache[k1]
-
-class _lDDTGreedySearcher(_lDDTDecomposer):
+class _lDDTGreedySearcher(bb_lddt.BBlDDTScorer):
     def __init__(self, ref, mdl, ref_chem_groups, mdl_chem_groups,
                  ref_mdl_alns, inclusion_radius = 15.0,
                  thresholds = [0.5, 1.0, 2.0, 4.0],
                  steep_opt_rate = None):
+
         """ Greedy extension of already existing but incomplete chain mappings
         """
-        super().__init__(ref, mdl, ref_mdl_alns,
-                         inclusion_radius = inclusion_radius,
-                         thresholds = thresholds)
+        super().__init__(ref, ref_chem_groups, mdl, ref_mdl_alns,
+                         dist_thresh=inclusion_radius,
+                         dist_diff_thresholds=thresholds)
+
+        self.mdl_chem_groups = mdl_chem_groups
         self.steep_opt_rate = steep_opt_rate
-        self.neighbors = {k: set() for k in self.ref_chains}
-        for k in self.interface_scorer.keys():
-            self.neighbors[k[0]].add(k[1])
-            self.neighbors[k[1]].add(k[0])
+
+        self.neighbors = {k: set() for k in self.trg.chain_names}
+        for interface in self.trg.interacting_chains:
+            self.neighbors[interface[0]].add(interface[1])
+            self.neighbors[interface[1]].add(interface[0])
 
         assert(len(ref_chem_groups) == len(mdl_chem_groups))
         self.ref_chem_groups = ref_chem_groups
@@ -2215,16 +2072,10 @@ class _lDDTGreedySearcher(_lDDTDecomposer):
 
         # keep track of mdl chains that potentially give lDDT contributions,
         # i.e. they have locations within inclusion_radius + max(thresholds)
-        self.mdl_neighbors = dict()
-        d = self.inclusion_radius + max(self.thresholds)
-        for ch in self.mdl.chains:
-            ch_name = ch.GetName()
-            self.mdl_neighbors[ch_name] = set()
-            query = f"{d} <> [cname={mol.QueryQuoteName(ch_name)}]"
-            query += f" and cname !={mol.QueryQuoteName(ch_name)}"
-            for close_ch in self.mdl.Select(query).chains:
-                self.mdl_neighbors[ch_name].add(close_ch.GetName())
-
+        self.mdl_neighbors = {k: set() for k in self.mdl.chain_names}
+        for interface in self.mdl.potentially_contributing_chains:
+            self.mdl_neighbors[interface[0]].add(interface[1])
+            self.mdl_neighbors[interface[1]].add(interface[0])
 
     def ExtendMapping(self, mapping, max_ext = None):
 
@@ -2273,14 +2124,14 @@ class _lDDTGreedySearcher(_lDDTDecomposer):
                 chem_group_idx = self.ref_ch_group_mapper[ref_ch]
                 for mdl_ch in free_mdl_chains[chem_group_idx]:
                     # single chain score
-                    n_single = self.SCCounts(ref_ch, mdl_ch)
+                    n_single = self._NSCConserved(ref_ch, mdl_ch).sum()
                     # scores towards neighbors that are already mapped
                     n_inter = 0
                     for neighbor in self.neighbors[ref_ch]:
                         if neighbor in mapping and mapping[neighbor] in \
                         self.mdl_neighbors[mdl_ch]:
-                            n_inter += self.IntCounts(ref_ch, neighbor, mdl_ch,
-                                                      mapping[neighbor])
+                            n_inter += self._NPairConserved((ref_ch, neighbor),
+                                                            (mdl_ch, mapping[neighbor])).sum()
                     n = n_single + n_inter
 
                     if n_inter > 0 and n > max_n:
@@ -2334,7 +2185,7 @@ class _lDDTGreedySearcher(_lDDTDecomposer):
 
         # try all possible mapping swaps. Swaps that improve the score are
         # immediately accepted and we start all over again
-        current_lddt = self.lDDTFromFlatMap(mapping)
+        current_lddt = self.FromFlatMapping(mapping)
         something_happened = True
         while something_happened:
             something_happened = False
@@ -2345,13 +2196,12 @@ class _lDDTGreedySearcher(_lDDTDecomposer):
                     swapped_mapping = dict(mapping)
                     swapped_mapping[ch1] = mapping[ch2]
                     swapped_mapping[ch2] = mapping[ch1]
-                    score = self.lDDTFromFlatMap(swapped_mapping)
+                    score = self.FromFlatMapping(swapped_mapping)
                     if score > current_lddt:
                         something_happened = True
                         mapping = swapped_mapping
                         current_lddt = score
                         break        
-
         return mapping
 
 
@@ -2362,40 +2212,15 @@ def _lDDTNaive(trg, mdl, inclusion_radius, thresholds, chem_groups,
     best_mapping = None
     best_lddt = -1.0
 
-    # Benchmarks on homo-oligomers indicate that full blown lDDT
-    # computation is faster up to tetramers => 4!=24 possible mappings.
-    # For stuff bigger than that, the decomposer approach should be used
-    if _NMappingsWithin(chem_groups, chem_mapping, 24):
-        # Setup scoring
-        lddt_scorer = lddt.lDDTScorer(trg, bb_only = True)
-        for mapping in _ChainMappings(chem_groups, chem_mapping, n_max_naive):
-            # chain_mapping and alns as input for lDDT computation
-            lddt_chain_mapping = dict()
-            lddt_alns = dict()
-            for ref_chem_group, mdl_chem_group in zip(chem_groups, mapping):
-                for ref_ch, mdl_ch in zip(ref_chem_group, mdl_chem_group):
-                    # some mdl chains can be None
-                    if mdl_ch is not None:
-                        lddt_chain_mapping[mdl_ch] = ref_ch
-                        lddt_alns[mdl_ch] = ref_mdl_alns[(ref_ch, mdl_ch)]
-            lDDT, _ = lddt_scorer.lDDT(mdl, thresholds=thresholds,
-                                       chain_mapping=lddt_chain_mapping,
-                                       residue_mapping = lddt_alns,
-                                       check_resnames = False)
-            if lDDT > best_lddt:
-                best_mapping = mapping
-                best_lddt = lDDT
-
-    else:
-        # Setup scoring
-        lddt_scorer = _lDDTDecomposer(trg, mdl, ref_mdl_alns,
-                                      inclusion_radius=inclusion_radius,
-                                      thresholds = thresholds)
-        for mapping in _ChainMappings(chem_groups, chem_mapping, n_max_naive):
-            lDDT = lddt_scorer.lDDT(chem_groups, mapping)
-            if lDDT > best_lddt:
-                best_mapping = mapping
-                best_lddt = lDDT
+    # Setup scoring
+    lddt_scorer = bb_lddt.BBlDDTScorer(trg, chem_groups, mdl, ref_mdl_alns,
+                                       dist_thresh=inclusion_radius,
+                                       dist_diff_thresholds=thresholds)
+    for mapping in _ChainMappings(chem_groups, chem_mapping, n_max_naive):
+        lDDT = lddt_scorer.Score(mapping, check=False)
+        if lDDT > best_lddt:
+            best_mapping = mapping
+            best_lddt = lDDT
 
     return (best_mapping, best_lddt)
 
@@ -2428,7 +2253,7 @@ def _lDDTGreedyFast(the_greed):
         n_best = 0
         best_seed = None
         for seed in seeds:
-            n = the_greed.SCCounts(seed[0], seed[1])
+            n = the_greed._NSCConserved(seed[0], seed[1]).sum()
             if n > n_best:
                 n_best = n
                 best_seed = seed
@@ -2482,7 +2307,7 @@ def _lDDTGreedyFull(the_greed):
                     tmp_mapping = dict(mapping)
                     tmp_mapping[remnant_seed[0]] = remnant_seed[1]
                     tmp_mapping = the_greed.ExtendMapping(tmp_mapping)
-                    score = the_greed.lDDTFromFlatMap(tmp_mapping)
+                    score = the_greed.FromFlatMapping(tmp_mapping)
                     if score > best_score:
                         best_score = score
                         best_mapping = tmp_mapping
@@ -2490,7 +2315,7 @@ def _lDDTGreedyFull(the_greed):
                     something_happened = True
                     mapping = best_mapping
 
-        score = the_greed.lDDTFromFlatMap(mapping)
+        score = the_greed.FromFlatMapping(mapping)
         if score > best_overall_score:
             best_overall_score = score
             best_overall_mapping = mapping
@@ -2554,7 +2379,7 @@ def _lDDTGreedyBlock(the_greed, seed_size, blocks_per_chem_group):
                     seed = dict(mapping)
                     seed.update({s[0]: s[1]})  
                     seed = the_greed.ExtendMapping(seed, max_ext = max_ext)
-                    seed_lddt = the_greed.lDDTFromFlatMap(seed)
+                    seed_lddt = the_greed.FromFlatMapping(seed)
                     if seed_lddt > best_score:
                         best_score = seed_lddt
                         best_mapping = seed
@@ -2570,7 +2395,7 @@ def _lDDTGreedyBlock(the_greed, seed_size, blocks_per_chem_group):
         best_mapping = None
         for seed in starting_blocks:
             seed = the_greed.ExtendMapping(seed)
-            seed_lddt = the_greed.lDDTFromFlatMap(seed)
+            seed_lddt = the_greed.FromFlatMapping(seed)
             if seed_lddt > best_lddt:
                 best_lddt = seed_lddt
                 best_mapping = seed
@@ -3027,162 +2852,8 @@ def _QSScoreGreedyBlock(the_greed, seed_size, blocks_per_chem_group):
 
     return final_mapping
 
-
-def _SingleRigidGDTTS(initial_transforms, initial_mappings, chem_groups,
-                      chem_mapping, trg_group_pos, mdl_group_pos,
-                      single_chain_gdtts_thresh, iterative_superposition,
-                      first_complete, n_trg_chains, n_mdl_chains):
-    """ Takes initial transforms and sequentially adds chain pairs with
-    best scoring gdtts that fulfill single_chain_gdtts_thresh. The mapping
-    from the transform that leads to best overall gdtts score is returned.
-    Optionally, the first complete mapping, i.e. a mapping that covers all
-    target chains or all model chains, is returned.
-    """
-    best_mapping = dict()
-    best_gdt = 0
-    for transform in initial_transforms:
-        mapping = dict()
-        mapped_mdl_chains = set()
-        gdt = 0.0
-
-        for trg_chains, mdl_chains, trg_pos, mdl_pos, in zip(chem_groups,
-                                                             chem_mapping,
-                                                             trg_group_pos,
-                                                             mdl_group_pos):
-
-            if len(trg_pos) == 0 or len(mdl_pos) == 0:
-                continue # cannot compute valid gdt
-
-            gdt_scores = list()
-
-            t_mdl_pos = list()
-            for m_pos in mdl_pos:
-                t_m_pos = geom.Vec3List(m_pos)
-                t_m_pos.ApplyTransform(transform)
-                t_mdl_pos.append(t_m_pos)
-
-            for t_pos, t in zip(trg_pos, trg_chains):
-                for t_m_pos, m in zip(t_mdl_pos, mdl_chains):
-                    gdt = t_pos.GetGDTTS(t_m_pos)
-                    if gdt >= single_chain_gdtts_thresh:
-                        gdt_scores.append((gdt, (t,m)))
-
-            n_gdt_contacts = 4 * len(trg_pos[0])
-            gdt_scores.sort(reverse=True)
-            for item in gdt_scores:
-                p = item[1]
-                if p[0] not in mapping and p[1] not in mapped_mdl_chains:
-                    mapping[p[0]] = p[1]
-                    mapped_mdl_chains.add(p[1])
-                    gdt += (item[0] * n_gdt_contacts)
-
-        if gdt > best_gdt:
-            best_gdt = gdt
-            best_mapping = mapping
-            if first_complete:
-                n = len(mapping)
-                if n == n_mdl_chains or n == n_trg_chains:
-                    break
-
-    return best_mapping
-
-
-def _IterativeRigidGDTTS(initial_transforms, initial_mappings, chem_groups,
-                         chem_mapping, trg_group_pos, mdl_group_pos,
-                         single_chain_gdtts_thresh, iterative_superposition,
-                         first_complete, n_trg_chains, n_mdl_chains):
-    """ Takes initial transforms and sequentially adds chain pairs with
-    best scoring gdtts that fulfill single_chain_gdtts_thresh. With each
-    added chain pair, the transform gets updated. Thus the naming iterative.
-    The mapping from the initial transform that leads to best overall gdtts
-    score is returned. Optionally, the first complete mapping, i.e. a mapping
-    that covers all target chains or all model chains, is returned.
-    """
-
-    # to directly retrieve positions using chain names
-    trg_pos_dict = dict()
-    for trg_pos, trg_chains in zip(trg_group_pos, chem_groups):
-        for t_pos, t in zip(trg_pos, trg_chains):
-            trg_pos_dict[t] = t_pos
-    mdl_pos_dict = dict()
-    for mdl_pos, mdl_chains in zip(mdl_group_pos, chem_mapping):
-        for m_pos, m in zip(mdl_pos, mdl_chains):
-            mdl_pos_dict[m] = m_pos
-
-    best_mapping = dict()
-    best_gdt = 0
-    for initial_transform, initial_mapping in zip(initial_transforms,
-                                                  initial_mappings):
-        mapping = {initial_mapping[0]: initial_mapping[1]}
-        transform = geom.Mat4(initial_transform)
-        mapped_trg_pos = geom.Vec3List(trg_pos_dict[initial_mapping[0]])
-        mapped_mdl_pos = geom.Vec3List(mdl_pos_dict[initial_mapping[1]])
-
-        # the following variables contain the chains which are
-        # available for mapping
-        trg_chain_groups = [set(group) for group in chem_groups]
-        mdl_chain_groups = [set(group) for group in chem_mapping]
-
-        # search and kick out inital mapping
-        for group in trg_chain_groups:
-            if initial_mapping[0] in group:
-                group.remove(initial_mapping[0])
-                break
-        for group in mdl_chain_groups:
-            if initial_mapping[1] in group:
-                group.remove(initial_mapping[1])
-                break
-
-        something_happened = True
-        while something_happened:
-            # search for best mapping given current transform
-            something_happened=False
-            best_sc_mapping = None
-            best_sc_group_idx = None
-            best_sc_gdt = 0.0
-            group_idx = 0
-            for trg_chains, mdl_chains in zip(trg_chain_groups, mdl_chain_groups):
-                for t in trg_chains:
-                    t_pos = trg_pos_dict[t]
-                    for m in mdl_chains:
-                        m_pos = mdl_pos_dict[m]
-                        t_m_pos = geom.Vec3List(m_pos)
-                        t_m_pos.ApplyTransform(transform)
-                        gdt = t_pos.GetGDTTS(t_m_pos)
-                        if gdt > single_chain_gdtts_thresh and gdt > best_sc_gdt:
-                            best_sc_gdt = gdt
-                            best_sc_mapping = (t,m)
-                            best_sc_group_idx = group_idx
-                group_idx += 1
-
-            if best_sc_mapping is not None:
-                something_happened = True
-                mapping[best_sc_mapping[0]] = best_sc_mapping[1]
-                mapped_trg_pos.extend(trg_pos_dict[best_sc_mapping[0]])
-                mapped_mdl_pos.extend(mdl_pos_dict[best_sc_mapping[1]])
-                trg_chain_groups[best_sc_group_idx].remove(best_sc_mapping[0])
-                mdl_chain_groups[best_sc_group_idx].remove(best_sc_mapping[1])
-
-                transform = _GetTransform(mapped_mdl_pos, mapped_trg_pos,
-                                          iterative_superposition)
-
-        # compute overall gdt for current transform (non-normalized gdt!!!)
-        mapped_mdl_pos.ApplyTransform(transform)
-        gdt = mapped_trg_pos.GetGDTTS(mapped_mdl_pos, norm=False)
-
-        if gdt > best_gdt:
-            best_gdt = gdt
-            best_mapping = mapping
-            if first_complete:
-                n = len(mapping)
-                if n == n_mdl_chains or n == n_trg_chains:
-                    break
-
-    return best_mapping
-
 def _SingleRigidRMSD(initial_transforms, initial_mappings, chem_groups,
-                     chem_mapping, trg_group_pos, mdl_group_pos,
-                     iterative_superposition):
+                     chem_mapping, trg_group_pos, mdl_group_pos):
     """
     Takes initial transforms and sequentially adds chain pairs with lowest RMSD.
     The mapping from the transform that leads to lowest overall RMSD is
@@ -3228,8 +2899,7 @@ def _SingleRigidRMSD(initial_transforms, initial_mappings, chem_groups,
     return best_mapping
 
 def _IterativeRigidRMSD(initial_transforms, initial_mappings, chem_groups,
-                        chem_mapping, trg_group_pos, mdl_group_pos,
-                        iterative_superposition):
+                        chem_mapping, trg_group_pos, mdl_group_pos):
     """ Takes initial transforms and sequentially adds chain pairs with
     lowest RMSD. With each added chain pair, the transform gets updated.
     Thus the naming iterative. The mapping from the initial transform that
@@ -3301,7 +2971,7 @@ def _IterativeRigidRMSD(initial_transforms, initial_mappings, chem_groups,
                 mdl_chain_groups[best_sc_group_idx].remove(best_sc_mapping[1])
 
                 transform = _GetTransform(mapped_mdl_pos, mapped_trg_pos,
-                                          iterative_superposition)
+                                          False)
 
         # compute overall RMSD for current transform
         mapped_mdl_pos.ApplyTransform(transform)
@@ -3312,6 +2982,43 @@ def _IterativeRigidRMSD(initial_transforms, initial_mappings, chem_groups,
             best_mapping = mapping
 
     return best_mapping
+
+def _NaiveRMSD(chem_groups, chem_mapping, trg_group_pos, mdl_group_pos,
+               n_max_naive):
+
+    # to directly retrieve positions using chain names
+    trg_pos_dict = dict()
+    for trg_pos, trg_chains in zip(trg_group_pos, chem_groups):
+        for t_pos, t in zip(trg_pos, trg_chains):
+            trg_pos_dict[t] = t_pos
+    mdl_pos_dict = dict()
+    for mdl_pos, mdl_chains in zip(mdl_group_pos, chem_mapping):
+        for m_pos, m in zip(mdl_pos, mdl_chains):
+            mdl_pos_dict[m] = m_pos
+        
+    best_mapping = dict()
+    best_rmsd = float("inf")
+
+    for mapping in _ChainMappings(chem_groups, chem_mapping, n_max_naive):
+        trg_pos = geom.Vec3List()
+        mdl_pos = geom.Vec3List()
+        for trg_group, mdl_group in zip(chem_groups, mapping):
+            for trg_ch, mdl_ch in zip(trg_group, mdl_group):
+                if trg_ch is not None and mdl_ch is not None:
+                    trg_pos.extend(trg_pos_dict[trg_ch])
+                    mdl_pos.extend(mdl_pos_dict[mdl_ch])
+        superpose_res = mol.alg.SuperposeSVD(mdl_pos, trg_pos)
+        if superpose_res.rmsd < best_rmsd:
+            best_rmsd = superpose_res.rmsd
+            best_mapping = mapping
+
+    # this is stupid...
+    tmp = dict()
+    for chem_group, mapping in zip(chem_groups, best_mapping):
+        for trg_ch, mdl_ch in zip(chem_group, mapping):
+            tmp[trg_ch] = mdl_ch
+
+    return tmp
 
 
 def _GetRefPos(trg, mdl, trg_msas, mdl_alns, max_pos = None):
@@ -3520,6 +3227,9 @@ def _RefEqualGenerator(ref_chains, mdl_chains):
     for p in itertools.permutations(mdl_chains):
         yield list(p)
 
+def _RefEmptyGenerator(ref_chains, mdl_chains):
+    yield list()
+
 def _ConcatIterators(iterators):
     for item in itertools.product(*iterators):
         yield list(item)
@@ -3565,8 +3275,8 @@ def _ChainMappings(ref_chains, mdl_chains, n_max=None):
     iterators = list()
     for ref, mdl in zip(ref_chains, mdl_chains):
         if len(ref) == 0:
-            raise RuntimeError("Expext at least one chain in ref chem group")
-        if len(ref) == len(mdl):
+            iterators.append(_RefEmptyGenerator(ref, mdl))
+        elif len(ref) == len(mdl):
             iterators.append(_RefEqualGenerator(ref, mdl))
         elif len(ref) < len(mdl):
             iterators.append(_RefSmallerGenerator(ref, mdl))

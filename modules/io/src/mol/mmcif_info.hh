@@ -846,47 +846,47 @@ typedef std::vector<MMCifInfoStructRefSeqDifPtr> MMCifInfoStructRefSeqDifs;
 class DLLEXPORT_OST_IO MMCifInfoStructRef {
 public:
   MMCifInfoStructRef(const String& id, const String& ent_id, 
-  		               const String& db_name, 
-  		               const String& db_ident, const String& db_access):
-  	id_(id), ent_id_(ent_id), db_name_(db_name), db_ident_(db_ident), 
-  	db_access_(db_access)
-	{ }
+                     const String& db_name,
+                     const String& db_ident, const String& db_access):
+    id_(id), ent_id_(ent_id), db_name_(db_name), db_ident_(db_ident),
+    db_access_(db_access)
+  { }
   const String& GetID() const { return id_; }
   const String& GetDBName() const { return db_name_; }
   const String& GetDBID() const { return db_ident_; }
   const String& GetEntityID() const { return ent_id_; }
   const String& GetDBAccess() const { return db_access_; }
-  MMCifInfoStructRefSeqPtr AddAlignedSeq(const String& align_id, 
-  		                                   const String& chain_name, int seq_begin, 
-  		                                   int seq_end, int db_begin, int db_end);
+  MMCifInfoStructRefSeqPtr AddAlignedSeq(const String& align_id,
+                                         const String& chain_name, int seq_begin,
+                                         int seq_end, int db_begin, int db_end);
   MMCifInfoStructRefSeqPtr GetAlignedSeq(const String& align_id) const;
   MMCifInfoStructRefSeqs GetAlignedSeqs() const
-	{
-		MMCifInfoStructRefSeqs seqs;
-		seqs.reserve(seqs_.size());
-		for (std::map<String, MMCifInfoStructRefSeqPtr>::const_iterator
-				 i=seqs_.begin(), e=seqs_.end(); i!=e; ++i) {
-		  seqs.push_back(i->second);
-		}
-		return seqs;
-	}
+  {
+    MMCifInfoStructRefSeqs seqs;
+    seqs.reserve(seqs_.size());
+    for (std::map<String, MMCifInfoStructRefSeqPtr>::const_iterator
+         i=seqs_.begin(), e=seqs_.end(); i!=e; ++i) {
+      seqs.push_back(i->second);
+    }
+    return seqs;
+  }
 private:
-	String  id_;
-	String  ent_id_;
-	String  db_name_;
-	String  db_ident_;
-	String  db_access_;
-	std::map<String, MMCifInfoStructRefSeqPtr> seqs_;
+  String  id_;
+  String  ent_id_;
+  String  db_name_;
+  String  db_ident_;
+  String  db_access_;
+  std::map<String, MMCifInfoStructRefSeqPtr> seqs_;
 };
 
 class DLLEXPORT_OST_IO MMCifInfoStructRefSeq {
 public:
-  MMCifInfoStructRefSeq(const String& align_id, const String& chain_name, 
-  		                  int seq_begin, int seq_end, 
-  		                  int db_begin, int db_end):
-  	id_(align_id), chain_name_(chain_name), 
-  	seq_begin_(seq_begin), seq_end_(seq_end), db_begin_(db_begin), db_end_(db_end)
-	{ }
+  MMCifInfoStructRefSeq(const String& align_id, const String& chain_name,
+                        int seq_begin, int seq_end,
+                        int db_begin, int db_end):
+    id_(align_id), chain_name_(chain_name),
+    seq_begin_(seq_begin), seq_end_(seq_end), db_begin_(db_begin), db_end_(db_end)
+  { }
 
   const String& GetID() const { return id_; }
   const String& GetChainName() const { return chain_name_; }
@@ -894,68 +894,58 @@ public:
   int GetSeqEnd() const { return seq_end_; }
   int GetDBBegin() const { return db_begin_; }
   int GetDBEnd() const { return db_end_; }
-  MMCifInfoStructRefSeqDifPtr AddDif(int seq_num, const String& db_rnum, 
+  MMCifInfoStructRefSeqDifPtr AddDif(int seq_num, const String& db_rnum,
                                      const String& details);
   const std::vector<MMCifInfoStructRefSeqDifPtr>& GetDifs() const { return difs_; }
 private:
-	String   id_;
-	String   chain_name_;
-	int      seq_begin_;
-	int      seq_end_;
-	int      db_begin_;
-	int      db_end_;
-	std::vector<MMCifInfoStructRefSeqDifPtr> difs_;
+  String   id_;
+  String   chain_name_;
+  int      seq_begin_;
+  int      seq_end_;
+  int      db_begin_;
+  int      db_end_;
+  std::vector<MMCifInfoStructRefSeqDifPtr> difs_;
 };
 
 class DLLEXPORT_OST_IO MMCifInfoStructRefSeqDif {
 public:
-	MMCifInfoStructRefSeqDif(int seq_rnum, const String& db_rnum, const String& details): 
-		seq_rnum_(seq_rnum), db_rnum_(db_rnum), details_(details) {}
-	int GetSeqRNum() const { return seq_rnum_;}
-	const String& GetDBRNum() const { return db_rnum_; }
-	const String& GetDetails() const { return details_; }
+  MMCifInfoStructRefSeqDif(int seq_rnum, const String& db_rnum, const String& details):
+    seq_rnum_(seq_rnum), db_rnum_(db_rnum), details_(details) {}
+  int GetSeqRNum() const { return seq_rnum_;}
+  const String& GetDBRNum() const { return db_rnum_; }
+  const String& GetDetails() const { return details_; }
 private:
-	int    seq_rnum_;
-	String db_rnum_;
-	String details_;
+  int    seq_rnum_;
+  String db_rnum_;
+  String details_;
 };
 
 /// \brief Store information on branched structures (oligosaccharides)
 ///
-class DLLEXPORT_OST_IO MMCifInfoEntityBranchLink {
-public:
-  MMCifInfoEntityBranchLink(mol::AtomHandle atom1,
-                            mol::AtomHandle atom2,
-                            unsigned char bond_order):
-atom1_(atom1), atom2_(atom2), bond_order_(bond_order) {}
-  mol::AtomHandle GetAtom1() const { return atom1_;}
-  mol::AtomHandle GetAtom2() const { return atom2_; }
-  unsigned char GetBondOrder() const { return bond_order_; }
-  void SetAtom1(mol::AtomHandle atom) { atom1_ = atom; }
-  void SetAtom2(mol::AtomHandle atom) { atom2_ = atom; }
-  void SetBondOrder(unsigned char bond_order) { bond_order_ = bond_order; }
-  void ConnectBranchLink(mol::XCSEditor editor) {
-    editor.Connect(atom1_, atom2_, bond_order_);
+struct DLLEXPORT_OST_IO MMCifInfoEntityBranchLink {
+  MMCifInfoEntityBranchLink(int rnum1,
+                            int rnum2,
+                            const String& aname1,
+                            const String& aname2,
+                            unsigned char bond_order): rnum1(rnum1), rnum2(rnum2),
+                                                       aname1(aname1), aname2(aname2),
+                                                       bond_order(bond_order) { }
+
+  bool operator==(const MMCifInfoEntityBranchLink& rhs) const {
+    return rnum1 == rhs.rnum1 && rnum2 == rhs.rnum2 &&
+           aname1 == rhs.aname1 && aname2 == rhs.aname2 &&
+           bond_order == rhs.bond_order;
   }
 
-  bool operator==(const MMCifInfoEntityBranchLink& eb) const {
-    if (this->atom1_ != eb.atom1_) {
-      return false;
-    }
-    if (this->atom2_ != eb.atom2_) {
-      return false;
-    }
-    return true;
+  bool operator!=(const MMCifInfoEntityBranchLink& rhs) const {
+    return !((*this) == rhs);
   }
 
-  bool operator!=(const MMCifInfoEntityBranchLink& eb) const {
-    return !this->operator == (eb);
-  }
-
-private:
-  mol::AtomHandle atom1_;
-  mol::AtomHandle atom2_;
-  unsigned char bond_order_;
+  int rnum1;
+  int rnum2;
+  String aname1;
+  String aname2;
+  unsigned char bond_order;
 };
 typedef std::map<String, std::vector<MMCifInfoEntityBranchLink> > MMCifInfoEntityBranchLinkMap;
 
@@ -967,7 +957,8 @@ typedef struct {
   String entity_poly_type;       ///< value of _entity_poly.type
   String branched_type;          ///< value of _pdbx_entity_branch.type
   String details;                ///< description of this entity
-  String seqres;                 ///< chain of monomers
+  String seqres_canonical;       ///< _entity_poly.pdbx_seq_one_letter_code_can
+  String seqres_pdbx;            ///< _entity_poly.pdbx_seq_one_letter_code
   std::vector<String> mon_ids;   ///< list of monomer names from _entity_poly_seq
   std::vector<int> hetero_num;   ///< res num of heterogeneous compounds
   std::vector<String> hetero_ids;///< names of heterogeneous compounds
@@ -1074,7 +1065,8 @@ public:
   ///
   /// \param cif chain name as used by the mmCIF file (label_asym_id)
   /// \param pdb chain name as used in the PDB file (auth_asym_id)
-  void AddMMCifPDBChainTr(String cif, String pdb);
+  void AddMMCifPDBChainTr(String cif, String pdb,
+                          bool fault_tolerant=false);
 
   /// \brief Get a PDB chain name for a CIF chain name
   ///
@@ -1086,7 +1078,8 @@ public:
   ///
   /// \param pdb chain name as used by the PDB file (auth_asym_id)
   /// \param cif chain name as used in the mmCIF file (label_asym_id)
-  void AddPDBMMCifChainTr(String pdb, String cif);
+  void AddPDBMMCifChainTr(String pdb, String cif,
+                          bool fault_tolerant=false);
 
   /// \brief Get a CIF chain name for a PDB chain name
   ///
@@ -1098,7 +1091,8 @@ public:
   ///
   /// \param cif chain name as used by the mmCIF file (label_asym_id)
   /// \param ent_id entity ID as used by the mmCIF file (label_entity_id)
-  void AddMMCifEntityIdTr(String cif, String ent_id);
+  void AddMMCifEntityIdTr(String cif, String ent_id,
+                          bool fault_tolerant=false);
 
   /// \brief Get the entity ID for a CIF chain name
   ///
@@ -1202,31 +1196,20 @@ public:
   /// \param atom1 first atom of the bond
   /// \param atom2 second atom of the bond
   void AddEntityBranchLink(String chain_name,
-                           mol::AtomHandle atom1,
-                           mol::AtomHandle atom2,
+                           int rnum1, int rnum2,
+                           const String& aname1,
+                           const String& aname2,
                            unsigned char bond_order);
-
-  /// \brief Get all links for all branched entities
-  ///
-  const std::vector<MMCifInfoEntityBranchLink> GetEntityBranchLinks() const;
 
   /// \brief Check if a chain is a branched entity and return it
   ///
   /// \param chain_name Name of the chain to check
   const std::vector<MMCifInfoEntityBranchLink> GetEntityBranchByChain(
-                                                const String& chain_name) const;
+                                               const String& chain_name) const;
 
   /// \brief Get the names of all chains of branched entities.
   ///
   const std::vector<String> GetEntityBranchChainNames() const;
-
-  /// \brief Get the all chains of branched entities.
-  ///
-  const mol::ChainHandleList GetEntityBranchChains() const;
-
-  /// \brief Connect all atoms listed as links for branched entities.
-  ///
-  void ConnectBranchLinks();
 
   const MMCifEntityDesc& GetEntityDesc(const String& entity_id) const;
 

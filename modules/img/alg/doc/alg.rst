@@ -1,4 +1,4 @@
-:mod:`img.alg <ost.img.alg>` - Image Processing Algorithms
+:mod:`~ost.img.alg` - Image Processing Algorithms
 ================================================================================
 
 .. module:: ost.img.alg
@@ -494,6 +494,4 @@ most important ones.
      :rtype: list of ints 
 
    :type  maximum: float
-
-   .. method:: GetBins()
 

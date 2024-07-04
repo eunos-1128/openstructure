@@ -55,13 +55,8 @@ void EntityIOMMCIFHandler::Import(mol::EntityHandle& ent,
   MMCifReader reader(stream,ent,  
                      IOProfileRegistry::Instance().GetDefault());
   reader.Parse();
-  // This is a hack: the reader is not available in
-  // file_loader.cc/ FileLoader::TryLoadEntity, but this is where the Conop
-  // processor is called to establish covalent bonds. Since RequiresProcessor()
-  // always returns true, the mechanism always tries to establish bonds, so we
-  // do that here.
-  MMCifInfo info = reader.GetInfo();
-  info.ConnectBranchLinks();
+  // branch links are already connect in Parse call
+  // all other connectivity is delegated to processor call
 }
 
 void EntityIOMMCIFHandler::Export(const mol::EntityView& ent,
@@ -76,13 +71,8 @@ void EntityIOMMCIFHandler::Import(mol::EntityHandle& ent,
   MMCifReader reader(filename, ent,  
                      IOProfileRegistry::Instance().GetDefault());
   reader.Parse();
-  // This is a hack: the reader is not available in
-  // file_loader.cc/ FileLoader::TryLoadEntity, but this is where the Conop
-  // processor is called to establish covalent bonds. Since RequiresProcessor()
-  // always returns true, the mechanism always tries to establish bonds, so we
-  // do that here.
-  MMCifInfo info = reader.GetInfo();
-  info.ConnectBranchLinks();
+  // branch links are already connect in Parse call
+  // all other connectivity is delegated to processor call
 }
 
 bool EntityIOMMCIFHandler::ProvidesImport(const boost::filesystem::path& loc,

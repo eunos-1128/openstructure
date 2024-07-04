@@ -57,6 +57,11 @@ If you would like to use the :mod:`molecular mechanics <ost.mol.mm>` module:
 
 * `OpenMM <https://simtk.org/home/openmm>`_ (7.7.0)
 
+If you would like to do pairwise sequence alignments with parasail
+in the :mod:`bindings <ost.bindings>` module:
+
+* `parasail <https://github.com/jeffdaily/parasail/>`_ (2.6.2)
+
 We do not provide backwards compatibility to Python 2.7. The last
 release supporting Python 2.7 is 1.11.0.
 
@@ -178,9 +183,6 @@ can influence it.
   then available at python level. This option requires a Fortran compiler. 
   By default, this option is switched off.
 
-* `USE_NUMPY` allows OpenStructure to pass back data in NumPy format. By 
-  default, this is switched off.
-
 * `ENABLE_MM` controls whether the molecular mechanics module is enabled. By
   default, this is switched off. If it is turned on, you should also set the
   paths to your local OpenMM installation:
@@ -189,6 +191,13 @@ can influence it.
   * `OPEN_MM_LIBRARY`: the libOpenMM library
   * `OPEN_MM_PLUGIN_DIR`: the path for OpenMM plugins
   * see example below for commonly used paths
+
+* `ENABLE_PARASAIL` controls whether parasail should be enabled. By default,
+  this is switched off. If it is turned on, you must also set the paths
+  to your parasail installation:
+
+  * `PARASAIL_INCLUDE_DIR`: the include path containing the file parasail.h
+  * `PARASAIL_LIBRARY`: the parasail library
 
 * Several paths to other libraries can be set if they are not in the expected
   locations:

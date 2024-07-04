@@ -3,6 +3,11 @@
 Stereochemistry (deprecated)
 ================================================================================
 
+.. warning::
+
+  These functions in `ost.mol.alg` are deprecated.
+  Consider using the newer implementation in
+  :mod:`~ost.mol.alg.stereochemistry` instead.
 
 .. function:: CheckStructure(ent, \
                              bond_table, \

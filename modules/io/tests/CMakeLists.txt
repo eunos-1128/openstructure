@@ -15,6 +15,7 @@ set(OST_IO_UNIT_TESTS
   tests.cc
   test_star_parser.cc
   test_mmcif_reader.cc
+  test_mmcif_writer.cc
   test_mmcif_info.cc
   test_io_img.cc
   test_exceptions.cc

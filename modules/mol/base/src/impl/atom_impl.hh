@@ -85,6 +85,10 @@ public:
     return connector_list_;
   }
 
+  ConnectorImplList& GetSecondaryConnectors() {
+    return connector_list_;
+  }
+
   void AddSecondaryConnector(const ConnectorImplP& bp);
   
   // updates position and then follows secondary connectors
@@ -225,6 +229,8 @@ public:
 
   unsigned long GetIndex() const {return index_;}
   void SetIndex(unsigned long index) {index_=index;}
+
+  void SetFragment(FragmentImplP fragment) { fragment_ = fragment; }
                      
 private:
   ResidueImplW res_;

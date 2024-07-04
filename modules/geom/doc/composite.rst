@@ -452,7 +452,7 @@ Operations on Geometrical Objects
   :raises: :exc:`~exceptions.RuntimeError` when the two objects do not intersect
   :rtype: :class:`Vec3` (:class:`Vec2` in case of :class:`Line2`)
 
-.. function:: IntersectionLine(plane2, plane2)
+.. function:: IntersectionLine(plane1, plane2)
 
   Returns the intersection line between `plane1` and `plane2`.
   

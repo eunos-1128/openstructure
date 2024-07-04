@@ -1,8 +1,17 @@
-:mod:`seq.alg <ost.seq.alg>` -- Algorithms for Sequences
+:mod:`~ost.seq.alg` -- Algorithms for Sequences
 ================================================================================
 
 .. module:: ost.seq.alg
   :synopsis: Algorithms for sequences
+
+Submodules
+--------------------------------------------------------------------------------
+
+.. toctree::
+  :maxdepth: 1
+
+  aaindex
+  renumber
 
 Algorithms for Alignments
 --------------------------------------------------------------------------------
@@ -109,6 +118,95 @@ Algorithms for Alignments
       aligned to only gaps, is considered highly conserved (depending on the
       number of gap sequences).
 
+.. function:: ShannonEntropy(aln, ignore_gaps=True)
+
+  Returns the per-column Shannon entropies of the alignment. The entropy
+  describes how conserved a certain column in the alignment is. The higher
+  the entropy is, the less conserved the column. For a column with no amino 
+  aids, the entropy value is set to NAN.
+
+  :param aln: Multiple sequence alignment
+  :type aln: :class:`~ost.seq.AlignmentHandle`
+  :param ignore_gaps: Whether to ignore gaps in the column.
+  :type ignore_gaps: bool
+
+  :returns: List of column entropies
+
+.. function:: SequenceIdentity(aln, ref_mode=seq.alg.RefMode.ALIGNMENT, seq_a=0, seq_b=1)
+
+  Calculates the sequence identity between two sequences at index seq_a and seq_b in
+  a multiple sequence alignment.
+
+  :param aln: multiple sequence alignment
+  :type aln: :class:`~ost.seq.AlignmentHandle`
+  :param ref_mode: influences the way the sequence identity is calculated. When
+    set to `seq.alg.RefMode.LONGER_SEQUENCE`, the sequence identity is 
+    calculated as the number of matches divided by the length of the longer
+    sequence. If set to `seq.alg.RefMode.ALIGNMENT` (the default), the sequence
+    identity is calculated as the number of matches divided by the number of
+    aligned residues (not including the gaps).
+  :type ref_mode: int
+  :param seq_a: the index of the first sequence
+  :type seq_a: int
+  :param seq_b: the index of the second sequence
+  :type seq_b: int
+  :returns: sequence identity in the range 0 to 100.
+  :rtype: float
+
+.. function:: SequenceSimilarity(aln, subst_weight, normalize=false, seq_a=0, seq_b=1)
+
+  Calculates the sequence similarity between two sequences at index seq_a and seq_b in
+  a multiple sequence alignment.
+
+  :param aln: Multiple sequence alignment
+  :type aln: :class:`~ost.seq.AlignmentHandle`
+  :param subst_weight: the substitution weight matrix 
+    (see the :ref:`BLOSUM Matrix<blosum>` section below)
+  :type subst_weight: :class:`~SubstWeightMatrix` 
+  :param normalize: if set to True, normalize to the range of the
+    substitution weight matrix
+  :type normalize: bool
+  :param seq_a: the index of the first sequence
+  :type seq_a: int
+  :param seq_b: the index of the second sequence
+  :type seq_b: int
+  :returns: sequence similarity
+  :rtype: float
+
+
+Create pairwise alignments
+--------------------------------------------------------------------------------
+
+OpenStructure provides naive implementations to create pairwise local, global
+and semi-global alignments between two sequences:
+
+* :func:`LocalAlign`
+* :func:`GlobalAlign`
+* :func:`SemiGlobalAlign`
+
+The use of `parasail <https://github.com/jeffdaily/parasail/>`_ as a drop
+in replacement is optional and provides significant speedups.
+It must be enabled at compile time - see installation instructions.
+
+Reference:
+
+  Jeff Daily. Parasail: SIMD C library for global, semi-global,
+  and local pairwise sequence alignments. (2016) BMC Bioinformatics
+
+Parasail allows to choose from various strategies but for the sake of
+simplicity, this Python binding always calls
+``parasail_<mode>_trace_scan_sat`` which seems reasonably fast across the
+global, semi-global and local modes. See parasail documentation for more
+information.
+
+You can always check if the alignment algorithms use parasail or the naive
+implementations by calling:
+
+.. function:: ParasailAvailable()
+
+  Returns True if OpenStructure has been compiled with parasail support,
+  False if not.
+
 .. function:: LocalAlign(seq1, seq2, subst_weight, gap_open=-5, gap_ext=-2)
 
   Performs a Smith/Waterman local alignment of *seq1* and *seq2* and returns
@@ -164,20 +262,6 @@ Algorithms for Alignments
   :param gap_ext: The gap extension penalty. Must be a negative number
   :returns: Best-scoring alignment of *seq1* and *seq2*.
 
-.. function:: ShannonEntropy(aln, ignore_gaps=True)
-
-  Returns the per-column Shannon entropies of the alignment. The entropy
-  describes how conserved a certain column in the alignment is. The higher
-  the entropy is, the less conserved the column. For a column with no amino 
-  aids, the entropy value is set to NAN.
-
-  :param aln: Multiple sequence alignment
-  :type aln: :class:`~ost.seq.AlignmentHandle`
-  :param ignore_gaps: Whether to ignore gaps in the column.
-  :type ignore_gaps: bool
-
-  :returns: List of column entropies
-
 .. function:: SemiGlobalAlign(seq1, seq2, subst_weight, gap_open=-5, gap_ext=-2)
 
   Performs a semi-global alignment of *seq1* and *seq2* and returns the best-
@@ -212,72 +296,64 @@ Algorithms for Alignments
   :param gap_ext: The gap extension penalty. Must be a negative number
   :returns: best-scoring alignment of *seq1* and *seq2*.
 
-.. autofunction:: ost.seq.alg.renumber.Renumber
-
-.. function:: SequenceIdentity(aln, ref_mode=seq.alg.RefMode.ALIGNMENT, seq_a=0, seq_b=1)
-
-  Calculates the sequence identity between two sequences at index seq_a and seq_b in
-  a multiple sequence alignment.
-
-  :param aln: multiple sequence alignment
-  :type aln: :class:`~ost.seq.AlignmentHandle`
-  :param ref_mode: influences the way the sequence identity is calculated. When
-    set to `seq.alg.RefMode.LONGER_SEQUENCE`, the sequence identity is 
-    calculated as the number of matches divided by the length of the longer
-    sequence. If set to `seq.alg.RefMode.ALIGNMENT` (the default), the sequence
-    identity is calculated as the number of matches divided by the number of
-    aligned residues. 
-  :type ref_mode: int
-  :param seq_a: the index of the first sequence
-  :type seq_a: int
-  :param seq_b: the index of the second sequence
-  :type seq_b: int
-  :returns: sequence identity in the range 0 to 100.
-  :rtype: float
-
-.. function:: SequenceSimilarity(aln, subst_weight, normalize=false, seq_a=0, seq_b=1)
-
-  Calculates the sequence similarity between two sequences at index seq_a and seq_b in
-  a multiple sequence alignment.
-
-  :param aln: Multiple sequence alignment
-  :type aln: :class:`~ost.seq.AlignmentHandle`
-  :param subst_weight: the substitution weight matrix 
-    (see the :ref:`BLOSUM Matrix<blosum>` section below)
-  :type subst_weight: :class:`~SubstWeightMatrix` 
-  :param normalize: if set to True, normalize to the range of the
-    substitution weight matrix
-  :type normalize: bool
-  :param seq_a: the index of the first sequence
-  :type seq_a: int
-  :param seq_b: the index of the second sequence
-  :type seq_b: int
-  :returns: sequence similarity
-  :rtype: float
-
 
 .. _substitution-weight-matrices:
 
 Substitution Weight Matrices and BLOSUM Matrices
 --------------------------------------------------------------------------------
 
-.. autoclass:: SubstWeightMatrix
-   :members:
+.. class:: SubstWeightMatrix
+
+  Substitution weights for alignment algorithms
+
+  .. method:: GetWeight(olc_one, olc_two)
+
+    Get :class:`int` weight for pair of characters
+
+    :param olc_one: first character
+    :type olc_one: :class:`string`
+    :param olc_two: second character
+    :type olc_two: :class:`string`
+
+  .. method:: SetWeight(olc_one, olc_two, weight)
+
+    Set :class:`int` weight for pair of characters
+
+    :param olc_one: first character
+    :type olc_one: :class:`string`
+    :param olc_two: second character
+    :type olc_two: :class:`string`
+    :param weight: the weight
+    :type weight: :class:`int`
+
+  .. method:: GetMinWeight()
+
+    Returns the minimal weight of the matrix
+
+  .. method:: GetMaxWeight()
+
+    Returns the maximum weight of the matrix
+
+  .. method:: GetName()
+
+    Getter for name (empty string if not set)
+
+  .. method:: SetName(name)
+
+    Setter for name
+
+    :param name: Name to be set
+    :type name: :class:`str`
 
 .. _blosum:
 
-Four preset BLOSUM (BLOcks SUbstitution Matrix) matrices are available at 
-different levels of sequence identity:
+Four already preset BLOSUM (BLOcks SUbstitution Matrix) matrices are available
+at different levels of sequence identity:
 
 - BLOSUM45
 - BLOSUM62
 - BLOSUM80
 - BLOSUM100
-
-Two naive substitution matrices:
-
-- IDENTITY: Matches have score of 1, all other are 0
-- MATCH: Matches have score of 1, all other are -1
 
 Nucleotide substitution matrices:
 
@@ -285,6 +361,14 @@ Nucleotide substitution matrices:
   ambiguity codes. ATTENTION: has been edited to explicitely encode T/U
   equivalence, i.e. you can just do `m.GetWeight('G', 'U')` instead of first
   translating 'U' to 'T'. 
+
+They can be directly accessed upon importing the sequence module:
+
+.. code-block:: python
+
+  from ost import seq
+  mat = seq.alg.BLOSUM62
+  print(mat.GetWeight('A', 'A'))
 
 
 .. _contact-prediction:
@@ -941,8 +1025,8 @@ etc.) to be set, which is the case if you load a file in hhm format.
     :param filename:    Filename of db
     :type filename:     :class:`str`
 
-
 .. method:: AddAAPseudoCounts(profile, db, a=0.9, b=4.0, c=1.0)
+  :noindex:
 
   Adds pseudo counts to the emission probabilities in *profile* by utilizing 
   context profiles as described in 
@@ -958,23 +1042,3 @@ etc.) to be set, which is the case if you load a file in hhm format.
 
   :raises:  Exception if profile doesn't have HMM information assigned
 
-
-AAIndex annotations
--------------------
-
-.. autoclass:: ost.seq.alg.aaindex.AAIndex
-  :members:
-  :special-members: __getitem__
-
-The annotations/scores can either refer to single amino acids or represent
-pairwise values. The two types are:
-
-.. autoclass:: ost.seq.alg.aaindex.AnnoType
-  :members:
-  :undoc-members:
-
-The actual data of an entry in the aaindex database is stored in a 
-:class:`aaindex.AAIndexData` object:
-
-.. autoclass:: ost.seq.alg.aaindex.AAIndexData
-  :members:

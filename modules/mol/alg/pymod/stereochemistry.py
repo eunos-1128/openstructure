@@ -1,3 +1,13 @@
+"""
+.. note::
+
+  This is a new implementation of the stereochemistry checks, introduced in
+  OpenStructure 2.4, with support for nucleotides. The
+  :doc:`previous stereochemistry checks <stereochemistry_deprecated>` that come
+  with `Mariani et al. <https://dx.doi.org/10.1093/bioinformatics/btt473>`_ are
+  considered deprecated.
+"""
+
 import os
 import json
 import datetime

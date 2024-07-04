@@ -44,7 +44,7 @@ class Anim(QtCore.QTimer):
 #create topology by only defining masses
 
 prof = io.IOProfile(dialect='PDB', fault_tolerant=False,
-                 quack_mode=False, processor=conop.HeuristicProcessor())
+                    processor=conop.HeuristicProcessor())
 
 ent = io.LoadPDB('ethanol.pdb', profile=prof)
 masses = [12.011,12.011,15.999,1.008,1.008,1.008,1.008,1.008,1.008]

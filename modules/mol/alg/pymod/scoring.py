@@ -5,6 +5,7 @@ from ost import io
 from ost import conop
 from ost import settings
 from ost import geom
+from ost import LogScript, LogInfo, LogDebug
 from ost.mol.alg import lddt
 from ost.mol.alg import qsscore
 from ost.mol.alg import chain_mapping
@@ -13,6 +14,8 @@ from ost.mol.alg import dockq
 from ost.mol.alg.lddt import lDDTScorer
 from ost.mol.alg.qsscore import QSScorer
 from ost.mol.alg.contact_score import ContactScorer
+from ost.mol.alg.contact_score import ContactEntity
+from ost.mol.alg import GDT
 from ost.mol.alg import Molck, MolckSettings
 from ost import bindings
 from ost.bindings import cadscore
@@ -121,7 +124,14 @@ class Scorer:
     :param custom_mapping: Provide custom chain mapping between *model* and
                            *target*. Dictionary with target chain names as key
                            and model chain names as value.
+                           :attr:`~mapping` is constructed from this.
     :type custom_mapping: :class:`dict`
+    :param custom_rigid_mapping: Provide custom chain mapping between *model*
+                                 and *target*. Dictionary with target chain
+                                 names as key and model chain names as value.
+                                 :attr:`~rigid_mapping` is constructed from
+                                 this.
+    :type custom_rigid_mapping: :class:`dict`
     :param usalign_exec: Explicit path to USalign executable used to compute
                          TM-score. If not given, TM-score will be computed
                          with OpenStructure internal copy of USalign code.
@@ -137,9 +147,9 @@ class Scorer:
                         A structure with stoichiometry A6B2 would be
                         6!*2! = 1440 etc.
     :type n_max_naive: :class:`int`
-    :param oum: Override USalign Mapping. Inject mapping of :class:`Scorer`
-                object into USalign to compute TM-score. Experimental feature
-                with limitations.
+    :param oum: Override USalign Mapping. Inject rigid_mapping of
+                :class:`Scorer` object into USalign to compute TM-score.
+                Experimental feature with limitations.
     :type oum: :class:`bool`
     :param min_pep_length: Relevant parameter if short peptides are involved in
                            scoring. Minimum peptide length for a chain in the
@@ -162,12 +172,43 @@ class Scorer:
                            produce high sequence identity alignments by pure
                            chance.
     :type min_nuc_length: :class:`int`
+    :param lddt_add_mdl_contacts: lDDT specific flag. Only using contacts in
+                                  lDDT that are within a certain distance 
+                                  threshold in the target does not penalize
+                                  for added model contacts. If set to True, this
+                                  flag will also consider target contacts
+                                  that are within the specified distance
+                                  threshold in the model but not necessarily in
+                                  the target. No contact will be added if the
+                                  respective atom pair is not resolved in the
+                                  target.
+    :type lddt_add_mdl_contacts: :class:`bool`
+    :param dockq_capri_peptide: Flag that changes two things in the way DockQ
+                                and its underlying scores are computed which is
+                                proposed by the CAPRI community when scoring
+                                peptides (PMID: 31886916).
+                                ONE: Two residues are considered in contact if 
+                                any of their atoms is within 5A. This is
+                                relevant for fnat and fnonat scores. CAPRI
+                                suggests to lower this threshold to 4A for
+                                protein-peptide interactions.
+                                TWO: irmsd is computed on interface residues. A
+                                residue is defined as interface residue if any
+                                of its atoms is within 10A of another chain.
+                                CAPRI suggests to lower the default of 10A to
+                                8A in combination with only considering CB atoms
+                                for protein-peptide interactions.
+                                This flag has no influence on patch_dockq
+                                scores.
+    :type dockq_capri_peptide: :class:`bool`
     """
     def __init__(self, model, target, resnum_alignments=False,
                  molck_settings = None, cad_score_exec = None,
-                 custom_mapping=None, usalign_exec = None,
-                 lddt_no_stereochecks=False, n_max_naive=40320,
-                 oum=False, min_pep_length = 6, min_nuc_length = 4):
+                 custom_mapping=None, custom_rigid_mapping=None,
+                 usalign_exec = None, lddt_no_stereochecks=False,
+                 n_max_naive=40320, oum=False, min_pep_length = 6,
+                 min_nuc_length = 4, lddt_add_mdl_contacts=False,
+                 dockq_capri_peptide=False):
 
         self._target_orig = target
         self._model_orig = model
@@ -191,6 +232,7 @@ class Scorer:
                                            colored=False,
                                            map_nonstd_res=True,
                                            assign_elem=True)
+        LogScript("Cleaning up input structures")
         Molck(self._model, conop.GetDefaultLib(), molck_settings)
         Molck(self._target, conop.GetDefaultLib(), molck_settings)
         self._model = self._model.Select("peptide=True or nucleotide=True")
@@ -254,6 +296,8 @@ class Scorer:
         self.oum = oum
         self.min_pep_length = min_pep_length
         self.min_nuc_length = min_nuc_length
+        self.lddt_add_mdl_contacts = lddt_add_mdl_contacts
+        self.dockq_capri_peptide = dockq_capri_peptide
 
         # lazily evaluated attributes
         self._stereochecked_model = None
@@ -266,6 +310,7 @@ class Scorer:
         self._target_bad_angles = None
         self._chain_mapper = None
         self._mapping = None
+        self._rigid_mapping = None
         self._model_interface_residues = None
         self._target_interface_residues = None
         self._aln = None
@@ -283,6 +328,7 @@ class Scorer:
         self._local_lddt = None
         self._bb_lddt = None
         self._bb_local_lddt = None
+        self._ilddt = None
 
         self._qs_global = None
         self._qs_best = None
@@ -328,6 +374,18 @@ class Scorer:
         self._transformed_mapped_model_pos = None
         self._n_target_not_mapped = None
         self._transform = None
+
+        self._rigid_mapped_target_pos = None
+        self._rigid_mapped_model_pos = None
+        self._rigid_transformed_mapped_model_pos = None
+        self._rigid_n_target_not_mapped = None
+        self._rigid_transform = None
+
+        self._gdt_05 = None
+        self._gdt_1 = None
+        self._gdt_2 = None
+        self._gdt_4 = None
+        self._gdt_8 = None
         self._gdtts = None
         self._gdtha = None
         self._rmsd = None
@@ -342,7 +400,12 @@ class Scorer:
         self._usalign_mapping = None
 
         if custom_mapping is not None:
-            self._set_custom_mapping(custom_mapping)
+            self._mapping = self._construct_custom_mapping(custom_mapping)
+
+        if custom_rigid_mapping is not None:
+            self._rigid_mapping = \
+            self._construct_custom_mapping(custom_rigid_mapping)
+        LogDebug("Scorer sucessfully initialized")
 
     @property
     def model(self):
@@ -523,13 +586,30 @@ class Scorer:
     def mapping(self):
         """ Full chain mapping result for :attr:`target`/:attr:`model`
 
+        Computed with :func:`ost.mol.alg.ChainMapper.GetMapping`
+
         :type: :class:`ost.mol.alg.chain_mapping.MappingResult` 
         """
         if self._mapping is None:
+            LogScript("Computing chain mapping")
             self._mapping = \
             self.chain_mapper.GetMapping(self.model,
                                          n_max_naive = self.n_max_naive)
         return self._mapping
+
+    @property
+    def rigid_mapping(self):
+        """ Full chain mapping result for :attr:`target`/:attr:`model`
+
+        Computed with :func:`ost.mol.alg.ChainMapper.GetRMSDMapping`
+
+        :type: :class:`ost.mol.alg.chain_mapping.MappingResult` 
+        """
+        if self._rigid_mapping is None:
+            LogScript("Computing rigid chain mapping")
+            self._rigid_mapping = \
+            self.chain_mapper.GetRMSDMapping(self.model)
+        return self._rigid_mapping
 
     @property
     def model_interface_residues(self):
@@ -663,6 +743,24 @@ class Scorer:
         if self._bb_local_lddt is None:
             self._compute_bb_lddt()
         return self._bb_local_lddt
+
+    @property
+    def ilddt(self):
+        """ Global interface lDDT score in range [0.0, 1.0]
+
+        This is lDDT only based on inter-chain contacts. Value is None if no
+        such contacts are present. For example if we're dealing with a monomer.
+        Computed based on :attr:`~stereochecked_model` and :attr:`~mapping` for
+        chain mapping.
+
+        :type: :class:`float`
+        """
+        if self._ilddt is None:
+            # the whole None business kind of invalidates the idea of lazy
+            # evaluation. The assumption is that this is called only once...
+            self._compute_ilddt()
+        return self._ilddt
+    
 
     @property
     def qs_global(self):
@@ -976,18 +1074,32 @@ class Scorer:
     def dockq_target_interfaces(self):
         """ Interfaces in :attr:`target` that are relevant for DockQ
 
-        In principle a subset of :attr:`~contact_target_interfaces` that only
-        contains peptide sequences. Chain names are lexicographically sorted.
+        All interfaces in :attr:`~target` with non-zero contacts that are
+        relevant for DockQ. Chain names are lexicographically sorted.
 
         :type: :class:`list` of :class:`tuple` with 2 elements each:
                (trg_ch1, trg_ch2)
         """
         if self._dockq_target_interfaces is None:
-            self._dockq_target_interfaces = list()
+            
+            # interacting chains are identified with ContactEntity
+            contact_d = 5.0
+            if self.dockq_capri_peptide:
+                contact_d = 4.0
+            cent = ContactEntity(self.target, contact_mode = "aa",
+                                 contact_d = contact_d)
+
+            # fetch lexicographically sorted interfaces
+            interfaces = cent.interacting_chains
+            interfaces = [(min(x[0],x[1]), max(x[0],x[1])) for x in interfaces]
+
+            # select the ones with only peptides involved
             pep_seqs = set([s.GetName() for s in self.chain_mapper.polypep_seqs])
-            for interface in self.contact_target_interfaces:
+            self._dockq_target_interfaces = list()
+            for interface in interfaces:
                 if interface[0] in pep_seqs and interface[1] in pep_seqs:
                     self._dockq_target_interfaces.append(interface)
+
         return self._dockq_target_interfaces
 
     @property
@@ -1211,57 +1323,198 @@ class Scorer:
         return self._transform
 
     @property
-    def gdtts(self):
-        """ GDT with thresholds: 8.0A, 4.0A, 2.0A and 1.0A
+    def rigid_mapped_target_pos(self):
+        """ Mapped representative positions in target
 
-        Computed on :attr:`~transformed_mapped_model_pos` and
-        :attr:`mapped_target_pos`
+        Thats CA positions for peptide residues and C3' positions for
+        nucleotides. Has same length as :attr:`~rigid_mapped_model_pos` and mapping
+        is based on :attr:`~rigid_mapping`.
+
+        :type: :class:`ost.geom.Vec3List`
+        """
+        if self._rigid_mapped_target_pos is None:
+            self._extract_rigid_mapped_pos()
+        return self._rigid_mapped_target_pos
+
+    @property
+    def rigid_mapped_model_pos(self):
+        """ Mapped representative positions in model
+
+        Thats CA positions for peptide residues and C3' positions for
+        nucleotides. Has same length as :attr:`~mapped_target_pos` and mapping
+        is based on :attr:`~rigid_mapping`.
+
+        :type: :class:`ost.geom.Vec3List`
+        """
+        if self._rigid_mapped_model_pos is None:
+            self._extract_rigid_mapped_pos()
+        return self._rigid_mapped_model_pos
+
+    @property
+    def rigid_transformed_mapped_model_pos(self):
+        """ :attr:`~rigid_mapped_model_pos` with :attr:`~rigid_transform` applied
+
+        :type: :class:`ost.geom.Vec3List`
+        """
+        if self._rigid_transformed_mapped_model_pos is None:
+            self._rigid_transformed_mapped_model_pos = \
+            geom.Vec3List(self.rigid_mapped_model_pos)
+            self._rigid_transformed_mapped_model_pos.ApplyTransform(self.rigid_transform)
+        return self._rigid_transformed_mapped_model_pos
+
+    @property
+    def rigid_n_target_not_mapped(self):
+        """ Number of target residues which have no rigid mapping to model
+
+        :type: :class:`int`
+        """
+        if self._rigid_n_target_not_mapped is None:
+            self._extract_rigid_mapped_pos()
+        return self._rigid_n_target_not_mapped
+
+    @property
+    def rigid_transform(self):
+        """ Transform: :attr:`~rigid_mapped_model_pos` onto :attr:`~rigid_mapped_target_pos`
+
+        Computed using Kabsch minimal rmsd algorithm
+
+        :type: :class:`ost.geom.Mat4`
+        """
+        if self._rigid_transform is None:
+            try:
+                res = mol.alg.SuperposeSVD(self.rigid_mapped_model_pos,
+                                           self.rigid_mapped_target_pos)
+                self._rigid_transform = res.transformation
+            except:
+                self._rigid_transform = geom.Mat4()
+        return self._rigid_transform
+
+    @property
+    def gdt_05(self):
+        """ Fraction CA (C3' for nucleotides) that can be superposed within 0.5A
+
+        Uses :attr:`~rigid_mapped_model_pos` and :attr:`~rigid_mapped_target_pos`.
+        Similar iterative algorithm as LGA tool
+
+        :type: :class:`float` 
+        """
+        if self._gdt_05 is None:
+            n, m = GDT(self.rigid_mapped_model_pos, self.rigid_mapped_target_pos, 7, 1000, 0.5)
+            n_full = len(self.rigid_mapped_target_pos) + self.rigid_n_target_not_mapped
+            if n_full > 0:
+                self._gdt_05 = float(n) / n_full
+            else:
+                self._gdt_05 = 0.0
+        return self._gdt_05
+
+    @property
+    def gdt_1(self):
+        """ Fraction CA (C3' for nucleotides) that can be superposed within 1.0A
+
+        Uses :attr:`~rigid_mapped_model_pos` and :attr:`~rigid_mapped_target_pos`.
+        Similar iterative algorithm as LGA tool
+
+        :type: :class:`float` 
+        """
+        if self._gdt_1 is None:
+            n, m = GDT(self.rigid_mapped_model_pos, self.rigid_mapped_target_pos, 7, 1000, 1.0)
+            n_full = len(self.rigid_mapped_target_pos) + self.rigid_n_target_not_mapped
+            if n_full > 0:
+                self._gdt_1 = float(n) / n_full
+            else:
+                self._gdt_1 = 0.0
+        return self._gdt_1
+
+    @property
+    def gdt_2(self):
+        """ Fraction CA (C3' for nucleotides) that can be superposed within 2.0A
+
+        Uses :attr:`~rigid_mapped_model_pos` and :attr:`~rigid_mapped_target_pos`.
+        Similar iterative algorithm as LGA tool
+
+
+        :type: :class:`float` 
+        """
+        if self._gdt_2 is None:
+            n, m = GDT(self.rigid_mapped_model_pos, self.rigid_mapped_target_pos, 7, 1000, 2.0)
+            n_full = len(self.rigid_mapped_target_pos) + self.rigid_n_target_not_mapped
+            if n_full > 0:
+                self._gdt_2 = float(n) / n_full
+            else:
+                self._gdt_2 = 0.0
+        return self._gdt_2
+
+    @property
+    def gdt_4(self):
+        """ Fraction CA (C3' for nucleotides) that can be superposed within 4.0A
+
+        Uses :attr:`~rigid_mapped_model_pos` and :attr:`~rigid_mapped_target_pos`.
+        Similar iterative algorithm as LGA tool
+
+        :type: :class:`float` 
+        """
+        if self._gdt_4 is None:
+            n, m = GDT(self.rigid_mapped_model_pos, self.rigid_mapped_target_pos, 7, 1000, 4.0)
+            n_full = len(self.rigid_mapped_target_pos) + self.rigid_n_target_not_mapped
+            if n_full > 0:
+                self._gdt_4 = float(n) / n_full
+            else:
+                self._gdt_4 = 0.0
+        return self._gdt_4
+
+    @property
+    def gdt_8(self):
+        """ Fraction CA (C3' for nucleotides) that can be superposed within 8.0A
+
+        Similar iterative algorithm as LGA tool
+
+        :type: :class:`float` 
+        """
+        if self._gdt_8 is None:
+            n, m = GDT(self.rigid_mapped_model_pos, self.rigid_mapped_target_pos, 7, 1000, 8.0)
+            n_full = len(self.rigid_mapped_target_pos) + self.rigid_n_target_not_mapped
+            if n_full > 0:
+                self._gdt_8 = float(n) / n_full
+            else:
+                self._gdt_8 = 0.0
+        return self._gdt_8
+    
+
+    @property
+    def gdtts(self):
+        """ avg GDT with thresholds: 8.0A, 4.0A, 2.0A and 1.0A
 
         :type: :class:`float`
         """
         if self._gdtts is None:
-            n = \
-            self.mapped_target_pos.GetGDTTS(self.transformed_mapped_model_pos,
-                                            norm=False)
-            n_full = 4*len(self.mapped_target_pos) + 4*self.n_target_not_mapped
-            if n_full > 0:
-                self._gdtts = float(n) / n_full
-            else:
-                self._gdtts = 0.0
+            LogScript("Computing GDT-TS score")
+            self._gdtts = (self.gdt_1 + self.gdt_2 + self.gdt_4 + self.gdt_8) / 4
         return self._gdtts
 
     @property
     def gdtha(self):
-        """ GDT with thresholds: 4.0A, 2.0A, 1.0A and 0.5A
-
-        Computed on :attr:`~transformed_mapped_model_pos` and
-        :attr:`mapped_target_pos`
+        """ avg GDT with thresholds: 4.0A, 2.0A, 1.0A and 0.5A
 
         :type: :class:`float`
         """
         if self._gdtha is None:
-            n = \
-            self.mapped_target_pos.GetGDTHA(self.transformed_mapped_model_pos,
-                                            norm=False)
-            n_full = 4*len(self.mapped_target_pos) + 4*self.n_target_not_mapped
-            if n_full > 0:
-                self._gdtha = float(n) / n_full
-            else:
-                self._gdtha = 0.0
+            LogScript("Computing GDT-HA score")
+            self._gdtha = (self.gdt_05 + self.gdt_1 + self.gdt_2 + self.gdt_4) / 4
         return self._gdtha
 
     @property
     def rmsd(self):
         """ RMSD
 
-        Computed on :attr:`~transformed_mapped_model_pos` and
-        :attr:`mapped_target_pos`
+        Computed on :attr:`~rigid_transformed_mapped_model_pos` and
+        :attr:`rigid_mapped_target_pos`
 
         :type: :class:`float`
         """
         if self._rmsd is None:
+            LogScript("Computing RMSD")
             self._rmsd = \
-            self.mapped_target_pos.GetRMSD(self.transformed_mapped_model_pos)
+            self.rigid_mapped_target_pos.GetRMSD(self.rigid_transformed_mapped_model_pos)
         return self._rmsd
 
     @property
@@ -1368,14 +1621,14 @@ class Scorer:
             cname = ch.GetName()
             s = ''.join([r.one_letter_code for r in ch.residues])
             s = seq.CreateSequence(ch.GetName(), s)
-            s.AttachView(target.Select(f"cname='{cname}'"))
+            s.AttachView(target.Select(f"cname={mol.QueryQuoteName(cname)}"))
             trg_seqs[ch.GetName()] = s
         mdl_seqs = dict()
         for ch in model.chains:
             cname = ch.GetName()
             s = ''.join([r.one_letter_code for r in ch.residues])
             s = seq.CreateSequence(cname, s)
-            s.AttachView(model.Select(f"cname='{cname}'"))
+            s.AttachView(model.Select(f"cname={mol.QueryQuoteName(cname)}"))
             mdl_seqs[ch.GetName()] = s
 
         alns = list()
@@ -1413,6 +1666,7 @@ class Scorer:
                                                    self.stereochecked_model)
 
     def _compute_lddt(self):
+        LogScript("Computing all-atom lDDT")
         # lDDT requires a flat mapping with mdl_ch as key and trg_ch as value
         flat_mapping = self.mapping.GetFlatMapping(mdl_as_key=True)
 
@@ -1439,7 +1693,8 @@ class Scorer:
                                                chain_mapping = lddt_chain_mapping,
                                                residue_mapping = alns,
                                                check_resnames=False,
-                                               local_lddt_prop="lddt")[0]
+                                               local_lddt_prop="lddt",
+                                               add_mdl_contacts = self.lddt_add_mdl_contacts)[0]
             local_lddt = dict()
             for r in self.model.residues:
                 cname = r.GetChain().GetName()
@@ -1462,7 +1717,8 @@ class Scorer:
                                                chain_mapping = lddt_chain_mapping,
                                                residue_mapping = stereochecked_alns,
                                                check_resnames=False,
-                                               local_lddt_prop="lddt")[0]
+                                               local_lddt_prop="lddt",
+                                               add_mdl_contacts = self.lddt_add_mdl_contacts)[0]
             local_lddt = dict()
             for r in self.model.residues:
                 cname = r.GetChain().GetName()
@@ -1499,7 +1755,7 @@ class Scorer:
         self._local_lddt = local_lddt
 
     def _compute_bb_lddt(self):
-
+        LogScript("Computing backbone lDDT")
         # make alignments accessible by mdl seq name
         alns = dict()
         for aln in self.aln:
@@ -1517,7 +1773,8 @@ class Scorer:
                                               chain_mapping = lddt_chain_mapping,
                                               residue_mapping = alns,
                                               check_resnames=False,
-                                              local_lddt_prop="bb_lddt")[0]
+                                              local_lddt_prop="bb_lddt",
+                                              add_mdl_contacts = self.lddt_add_mdl_contacts)[0]
         local_lddt = dict()
         for r in self.model.residues:
             cname = r.GetChain().GetName()
@@ -1534,12 +1791,53 @@ class Scorer:
         self._bb_lddt = lddt_score
         self._bb_local_lddt = local_lddt
 
+    def _compute_ilddt(self):
+        LogScript("Computing all-atom ilDDT")
+        # lDDT requires a flat mapping with mdl_ch as key and trg_ch as value
+        flat_mapping = self.mapping.GetFlatMapping(mdl_as_key=True)
+
+        if self.lddt_no_stereochecks:
+            alns = dict()
+            for aln in self.aln:
+                mdl_seq = aln.GetSequence(1)
+                alns[mdl_seq.name] = aln
+            lddt_chain_mapping = dict()
+            for mdl_ch, trg_ch in flat_mapping.items():
+                if mdl_ch in alns:
+                    lddt_chain_mapping[mdl_ch] = trg_ch
+            self._ilddt = self.lddt_scorer.lDDT(self.model,
+                                                chain_mapping = lddt_chain_mapping,
+                                                residue_mapping = alns,
+                                                check_resnames=False,
+                                                local_lddt_prop="lddt",
+                                                add_mdl_contacts = self.lddt_add_mdl_contacts,
+                                                no_intrachain=True)[0]
+        else:
+            alns = dict()
+            for aln in self.stereochecked_aln:
+                mdl_seq = aln.GetSequence(1)
+                alns[mdl_seq.name] = aln
+            lddt_chain_mapping = dict()
+            for mdl_ch, trg_ch in flat_mapping.items():
+                if mdl_ch in alns:
+                    lddt_chain_mapping[mdl_ch] = trg_ch
+            self._ilddt = self.lddt_scorer.lDDT(self.stereochecked_model,
+                                                chain_mapping = lddt_chain_mapping,
+                                                residue_mapping = alns,
+                                                check_resnames=False,
+                                                local_lddt_prop="lddt",
+                                                add_mdl_contacts = self.lddt_add_mdl_contacts,
+                                                no_intrachain=True)[0]
+
+
     def _compute_qs(self):
+        LogScript("Computing global QS-score")
         qs_score_result = self.qs_scorer.Score(self.mapping.mapping)
         self._qs_global = qs_score_result.QS_global
         self._qs_best = qs_score_result.QS_best
 
     def _compute_per_interface_qs_scores(self):
+        LogScript("Computing per-interface QS-score")
         self._per_interface_qs_global = list()
         self._per_interface_qs_best = list()
 
@@ -1554,6 +1852,7 @@ class Scorer:
             self._per_interface_qs_global.append(qs_res.QS_global)
 
     def _compute_ics_scores(self):
+        LogScript("Computing ICS scores")
         contact_scorer_res = self.contact_scorer.ScoreICS(self.mapping.mapping)
         self._ics_precision = contact_scorer_res.precision
         self._ics_recall = contact_scorer_res.recall
@@ -1579,6 +1878,7 @@ class Scorer:
                 self._per_interface_ics.append(None)
 
     def _compute_ips_scores(self):
+        LogScript("Computing IPS scores")
         contact_scorer_res = self.contact_scorer.ScoreIPS(self.mapping.mapping)
         self._ips_precision = contact_scorer_res.precision
         self._ips_recall = contact_scorer_res.recall
@@ -1605,6 +1905,7 @@ class Scorer:
                 self._per_interface_ips.append(None)
 
     def _compute_dockq_scores(self):
+        LogScript("Computing DockQ")
         # lists with values in contact_target_interfaces
         self._dockq_scores = list()
         self._fnat = list()
@@ -1627,9 +1928,17 @@ class Scorer:
             mdl_ch2 = interface[3]
             aln1 = dockq_alns[(trg_ch1, mdl_ch1)]
             aln2 = dockq_alns[(trg_ch2, mdl_ch2)]
-            res = dockq.DockQ(self.model, self.target, mdl_ch1, mdl_ch2,
-                              trg_ch1, trg_ch2, ch1_aln=aln1,
-                              ch2_aln=aln2)
+            if self.dockq_capri_peptide:
+                res = dockq.DockQ(self.model, self.target, mdl_ch1, mdl_ch2,
+                                  trg_ch1, trg_ch2, ch1_aln=aln1,
+                                  ch2_aln=aln2, contact_dist_thresh = 4.0,
+                                  interface_dist_thresh=8.0,
+                                  interface_cb = True)
+            else:
+                res = dockq.DockQ(self.model, self.target, mdl_ch1, mdl_ch2,
+                                  trg_ch1, trg_ch2, ch1_aln=aln1,
+                                  ch2_aln=aln2)
+
             self._fnat.append(res["fnat"])
             self._fnonnat.append(res["fnonnat"])
             self._irmsd.append(res["irmsd"])
@@ -1650,8 +1959,17 @@ class Scorer:
                 # match for sure
                 trg_ch1 = interface[0]
                 trg_ch2 = interface[1]
-                res = dockq.DockQ(self.target, self.target,
-                                  trg_ch1, trg_ch2, trg_ch1, trg_ch2)
+
+                if self.dockq_capri_peptide:
+                    res = dockq.DockQ(self.target, self.target,
+                                      trg_ch1, trg_ch2, trg_ch1, trg_ch2,
+                                      contact_dist_thresh = 4.0,
+                                      interface_dist_thresh=8.0,
+                                      interface_cb = True)
+                else:
+                    res = dockq.DockQ(self.target, self.target,
+                                      trg_ch1, trg_ch2, trg_ch1, trg_ch2)
+
                 not_covered_counts.append(res["nnat"])
   
         # there are 4 types of combined scores
@@ -1701,6 +2019,35 @@ class Scorer:
             if ch.GetName() not in processed_trg_chains:
                 self._n_target_not_mapped += len(ch.residues)
 
+
+    def _extract_rigid_mapped_pos(self):
+        self._rigid_mapped_target_pos = geom.Vec3List()
+        self._rigid_mapped_model_pos = geom.Vec3List()
+        self._rigid_n_target_not_mapped = 0
+        processed_trg_chains = set()
+        for trg_ch, mdl_ch in self.rigid_mapping.GetFlatMapping().items():
+            processed_trg_chains.add(trg_ch)
+            aln = self.rigid_mapping.alns[(trg_ch, mdl_ch)]
+            for col in aln:
+                if col[0] != '-' and col[1] != '-':
+                    trg_res = col.GetResidue(0)
+                    mdl_res = col.GetResidue(1)
+                    trg_at = trg_res.FindAtom("CA")
+                    mdl_at = mdl_res.FindAtom("CA")
+                    if not trg_at.IsValid():
+                        trg_at = trg_res.FindAtom("C3'")
+                    if not mdl_at.IsValid():
+                        mdl_at = mdl_res.FindAtom("C3'")
+                    self._rigid_mapped_target_pos.append(trg_at.GetPos())
+                    self._rigid_mapped_model_pos.append(mdl_at.GetPos())
+                elif col[0] != '-':
+                    self._rigid_n_target_not_mapped += 1
+        # count number of trg residues from non-mapped chains
+        for ch in self.rigid_mapping.target.chains:
+            if ch.GetName() not in processed_trg_chains:
+                self._rigid_n_target_not_mapped += len(ch.residues)
+
+
     def _compute_cad_score(self):
         if not self.resnum_alignments:
             raise RuntimeError("CAD score computations rely on residue numbers "
@@ -1708,6 +2055,7 @@ class Scorer:
                                "chains, i.e. only work if resnum_alignments "
                                "is True at Scorer construction.")
         try:
+            LogScript("Computing CAD score")
             cad_score_exec = \
             settings.Locate("voronota-cadscore",
                             explicit_file_name=self.cad_score_exec)
@@ -1767,13 +2115,14 @@ class Scorer:
         result = {ch.GetName(): list() for ch in ent.chains}
         for ch in ent.chains:
             cname = ch.GetName()
-            sel = repr_ent.Select(f"(cname='{cname}' and 8 <> [cname!='{cname}'])")
+            sel = repr_ent.Select(f"(cname={mol.QueryQuoteName(cname)} and 8 <> [cname!={mol.QueryQuoteName(cname)}])")
             result[cname] = [r.GetNumber() for r in sel.residues]
         return result
 
     def _do_stereochecks(self):
         """ Perform stereochemistry checks on model and target
         """
+        LogInfo("Performing stereochemistry checks on model and target")
         data = stereochemistry.GetDefaultStereoData()
         l_data = stereochemistry.GetDefaultStereoLinkData()
 
@@ -1834,9 +2183,9 @@ class Scorer:
         # => all residues within 8A of r and within 12A of any other chain
     
         # q1 selects for everything in same chain and within 8A of r_pos
-        q1 = f"(cname='{mdl_ch}' and 8 <> {{{r_pos[0]},{r_pos[1]},{r_pos[2]}}})"
+        q1 = f"(cname={mol.QueryQuoteName(mdl_ch)} and 8 <> {{{r_pos[0]},{r_pos[1]},{r_pos[2]}}})"
         # q2 selects for everything within 12A of any other chain
-        q2 = f"(12 <> [cname!={mdl_ch}])"
+        q2 = f"(12 <> [cname!={mol.QueryQuoteName(mdl_ch)}])"
         mdl_patch_one = self.model.CreateEmptyView()
         sel = repr_mdl.Select(" and ".join([q1, q2]))
         for r in sel.residues:
@@ -1847,7 +2196,7 @@ class Scorer:
         # the closest residue to r is identified in any other chain, and the
         # patch is filled with residues that are within 8A of that residue and
         # within 12A of chain from r
-        sel = repr_mdl.Select(f"(cname!='{mdl_ch}')")
+        sel = repr_mdl.Select(f"(cname!={mol.QueryQuoteName(mdl_ch)})")
         close_stuff = sel.FindWithin(r_pos, 8)
         min_pos = None
         min_dist = 42.0
@@ -1858,9 +2207,9 @@ class Scorer:
                 min_dist = dist
     
         # q1 selects for everything not in mdl_ch but within 8A of min_pos
-        q1 = f"(cname!='{mdl_ch}' and 8 <> {{{min_pos[0]},{min_pos[1]},{min_pos[2]}}})"
+        q1 = f"(cname!={mol.QueryQuoteName(mdl_ch)} and 8 <> {{{min_pos[0]},{min_pos[1]},{min_pos[2]}}})"
         # q2 selects for everything within 12A of mdl_ch
-        q2 = f"(12 <> [cname='{mdl_ch}'])"
+        q2 = f"(12 <> [cname={mol.QueryQuoteName(mdl_ch)}])"
         mdl_patch_two = self.model.CreateEmptyView()
         sel = repr_mdl.Select(" and ".join([q1, q2]))
         for r in sel.residues:
@@ -1908,6 +2257,7 @@ class Scorer:
                 trg_patch_one, trg_patch_two)
 
     def _compute_patchqs_scores(self):
+        LogScript("Computing patch QS-scores")
         self._patch_qs = dict()
         for cname, rnums in self.model_interface_residues.items():
             scores = list()
@@ -1925,6 +2275,7 @@ class Scorer:
             self._patch_qs[cname] = scores
 
     def _compute_patchdockq_scores(self):
+        LogScript("Computing patch DockQ scores")
         self._patch_dockq = dict()
         for cname, rnums in self.model_interface_residues.items():
             scores = list()
@@ -2028,12 +2379,13 @@ class Scorer:
                 ed.InsertAtom(added_r, a.handle)
         return ent
 
-    def _set_custom_mapping(self, mapping):
-        """ sets self._mapping with a full blown MappingResult object
+    def _construct_custom_mapping(self, mapping):
+        """ constructs a full blown MappingResult object from simple dict
 
         :param mapping: mapping with trg chains as key and mdl ch as values
         :type mapping: :class:`dict`
         """
+        LogInfo("Setting custom chain mapping")
 
         chain_mapper = self.chain_mapper
         chem_mapping, chem_group_alns, mdl = \
@@ -2111,29 +2463,33 @@ class Scorer:
             for ref_ch, mdl_ch in zip(ref_group, mdl_group):
                 if ref_ch is not None and mdl_ch is not None:
                     aln = ref_mdl_alns[(ref_ch, mdl_ch)]
-                    trg_view = chain_mapper.target.Select(f"cname='{ref_ch}'")
-                    mdl_view = mdl.Select(f"cname='{mdl_ch}'")
+                    trg_view = chain_mapper.target.Select(f"cname={mol.QueryQuoteName(ref_ch)}")
+                    mdl_view = mdl.Select(f"cname={mol.QueryQuoteName(mdl_ch)}")
                     aln.AttachView(0, trg_view)
                     aln.AttachView(1, mdl_view)
                     alns[(ref_ch, mdl_ch)] = aln
 
-        self._mapping = chain_mapping.MappingResult(chain_mapper.target, mdl,
-                                                    chain_mapper.chem_groups,
-                                                    chem_mapping,
-                                                    final_mapping, alns)
+        return chain_mapping.MappingResult(chain_mapper.target, mdl,
+                                           chain_mapper.chem_groups,
+                                           chem_mapping,
+                                           final_mapping, alns)
 
     def _compute_tmscore(self):
         res = None
         if self.usalign_exec is None:
+            LogScript("Computing patch TM-score with USalign exectuable")
             if self.oum:
-                flat_mapping = self.mapping.GetFlatMapping()
+                flat_mapping = self.rigid_mapping.GetFlatMapping()
+                LogInfo("Overriding TM-score chain mapping")
                 res = res = bindings.WrappedMMAlign(self.model, self.target,
                                                     mapping=flat_mapping)
             else:
                 res = bindings.WrappedMMAlign(self.model, self.target)
         else:
+            LogScript("Computing patch TM-score with built-in USalign")
             if self.oum:
-                flat_mapping = self.mapping.GetFlatMapping()
+                LogInfo("Overriding TM-score chain mapping")
+                flat_mapping = self.rigid_mapping.GetFlatMapping()
                 res = tmtools.USAlign(self.model, self.target,
                                       usalign = self.usalign_exec,
                                       custom_chain_mapping = flat_mapping)
@@ -2145,3 +2501,6 @@ class Scorer:
         self._usalign_mapping = dict()
         for a,b in zip(res.ent1_mapped_chains, res.ent2_mapped_chains):
             self._usalign_mapping[b] = a
+
+# specify public interface
+__all__ = ('lDDTBSScorer', 'Scorer',)

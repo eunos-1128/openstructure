@@ -65,10 +65,7 @@ public:
   using MMCifReader::ParsePdbxEntityBranchLink;
   using MMCifReader::TryStoreIdx;
   using MMCifReader::SetRestrictChains;
-  using MMCifReader::SetReadSeqRes;
-  using MMCifReader::SetReadCanonicalSeqRes;
   using MMCifReader::ClearState;
-  using MMCifReader::ConvertSEQRES;
   using MMCifReader::GetInfo;
   using MMCifReader::DetermineSecStructType;
   using MMCifReader::MMCifSecStructElement;
@@ -126,23 +123,6 @@ BOOST_AUTO_TEST_CASE(mmcif_trystoreidx)
   // positive
   mmcif_h.Add(StringRef("bar", 3));
   BOOST_CHECK_NO_THROW(tmmcif_p.TryStoreIdx(0, "bar", mmcif_h));
-}
-
-BOOST_AUTO_TEST_CASE(mmcif_convert_seqres)
-{
-  conop::CompoundLibPtr compound_lib = SetDefaultCompoundLib();
-  if (!compound_lib) {
-    std::cout << "WARNING: skipping mmcif_convert_seqres unit test. " 
-              << "Compound library is required" << std::endl;
-    return;
-  }
-
-  mol::EntityHandle eh=mol::CreateEntity();
-  
-  TestMMCifReaderProtected tmmcif_p("testfiles/mmcif/atom_site.mmcif", eh);
-  BOOST_CHECK_EQUAL(tmmcif_p.ConvertSEQRES("A(MSE)Y", compound_lib), "AMY");
-  BOOST_CHECK_THROW(tmmcif_p.ConvertSEQRES("A(MSEY", compound_lib), 
-                    IOException);
 }
 
 BOOST_AUTO_TEST_CASE(mmcif_onbeginloop)
@@ -404,7 +384,6 @@ BOOST_AUTO_TEST_CASE(mmcif_entity_poly_tests)
   mol::EntityHandle eh = mol::CreateEntity();
   MMCifReader mmcif_p("testfiles/mmcif/atom_site.mmcif", eh, profile);
 
-  mmcif_p.SetReadSeqRes(true);
   mmcif_p.Parse();
 
   seq::SequenceList seqres = mmcif_p.GetSeqRes();
@@ -414,7 +393,6 @@ BOOST_AUTO_TEST_CASE(mmcif_entity_poly_tests)
   BOOST_TEST_MESSAGE("          testing type recognition...");
   {
     TestMMCifReaderProtected tmmcif_p("testfiles/mmcif/atom_site.mmcif", eh);
-    tmmcif_p.SetReadSeqRes(false);
     std::vector<StringRef> columns;
 
     // create corresponding entity entry
@@ -493,46 +471,7 @@ columns.push_back(StringRef("polydeoxyribonucleotide/polyribonucleotide hybrid",
     columns.push_back(StringRef("1", 1));
     columns.push_back(StringRef("other", 5));
     columns.push_back(StringRef("ABRND", 5));
-    tmmcif_p.SetReadSeqRes(true);
-    tmmcif_p.SetReadCanonicalSeqRes(true);
-    BOOST_CHECK_THROW(tmmcif_p.ParseEntityPoly(columns), IOException);
-    tmmcif_p.SetReadCanonicalSeqRes(false);
     BOOST_CHECK_NO_THROW(tmmcif_p.ParseEntityPoly(columns));
-    BOOST_CHECK_THROW(tmmcif_p.ParseEntityPoly(columns), IOException);
-  }
-  BOOST_TEST_MESSAGE("          done.");
-  BOOST_TEST_MESSAGE("          testing pdbx_seq_one_letter_code_can "
-                     "reading...");
-  {
-    TestMMCifReaderProtected tmmcif_p("testfiles/mmcif/atom_site.mmcif", eh);
-    std::vector<StringRef> columns;
-
-    tmmcif_h.Clear();
-    tmmcif_h.SetCategory(StringRef("entity", 6));
-    tmmcif_h.Add(StringRef("id", 2));
-    tmmcif_h.Add(StringRef("type", 4));
-    tmmcif_p.OnBeginLoop(tmmcif_h);
-    columns.push_back(StringRef("1", 1));
-    columns.push_back(StringRef("polymer", 7));
-    tmmcif_p.ParseEntity(columns);
-    columns.pop_back();
-    columns.pop_back();
-
-    tmmcif_h.Clear();
-    tmmcif_h.SetCategory(StringRef("entity_poly", 11));
-    tmmcif_h.Add(StringRef("entity_id", 9));
-    tmmcif_h.Add(StringRef("type", 4));
-    tmmcif_h.Add(StringRef("pdbx_seq_one_letter_code_can", 28));
-    tmmcif_p.OnBeginLoop(tmmcif_h);
-    tmmcif_p.SetReadCanonicalSeqRes(false);
-    columns.push_back(StringRef("1", 1));
-    columns.push_back(StringRef("other", 5));
-    columns.push_back(StringRef("ABRND", 5));
-    tmmcif_p.SetReadSeqRes(true);
-    BOOST_CHECK_THROW(tmmcif_p.ParseEntityPoly(columns), IOException);
-    tmmcif_p.SetReadCanonicalSeqRes(true);
-    BOOST_CHECK_NO_THROW(tmmcif_p.ParseEntityPoly(columns));
-    BOOST_CHECK_THROW(tmmcif_p.ParseEntityPoly(columns), IOException);
   }
   BOOST_TEST_MESSAGE("          done.");
 
@@ -1159,7 +1098,7 @@ BOOST_AUTO_TEST_CASE(mmcif_parseatomident)
     columns.push_back(StringRef("30.691", 6)); // Cartn_y
     columns.push_back(StringRef("11.795", 6)); // Cartn_z
     BOOST_CHECK_EQUAL(tmmcif_p.ParseAtomIdent(columns, auth_chain_name,
-    			                                    cif_chain_name, res_name,
+                                              cif_chain_name, res_name,
                                               resnum, valid_res_num, atom_name,
                                               alt_loc), true);
     columns.pop_back();
@@ -1179,7 +1118,7 @@ BOOST_AUTO_TEST_CASE(mmcif_parseatomident)
     columns.push_back(StringRef("30.691", 6)); // Cartn_y
     columns.push_back(StringRef("11.795", 6)); // Cartn_z
     BOOST_CHECK_EQUAL(tmmcif_p.ParseAtomIdent(columns, auth_chain_name, 
-    			                                    cif_chain_name, res_name,
+                                              cif_chain_name, res_name,
                                               resnum, valid_res_num, atom_name,
                                               alt_loc), false);
   }
@@ -1323,9 +1262,6 @@ BOOST_AUTO_TEST_CASE(mmcif_test_chain_mappings)
   std::ifstream s("testfiles/mmcif/atom_site.mmcif");
   IOProfile profile;
   MMCifReader mmcif_p(s, eh, profile);
-  if (compound_lib_available) {
-    mmcif_p.SetReadSeqRes(true);
-  }
   BOOST_REQUIRE_NO_THROW(mmcif_p.Parse());
   const MMCifInfo& info = mmcif_p.GetInfo();
   

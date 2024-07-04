@@ -24,7 +24,7 @@ options, this is a dictionary with 8 keys describing model/reference comparison:
  * "chem_groups": Groups of polypeptides/polynucleotides from reference that
    are considered chemically equivalent. You can derive stoichiometry from this.
    Contains only chains that are considered in chain mapping, i.e. pass a
-   size threshold (defaults: 10 for peptides, 4 for nucleotides).
+   size threshold (defaults: 6 for peptides, 4 for nucleotides).
  * "chem_mapping": List of same length as "chem_groups". Assigns model chains to
    the respective chem group. Again, only contains chains that are considered
    in chain mapping.
@@ -59,6 +59,8 @@ results:
  * "lddt_no_stereochecks"
  * "min_pep_length"
  * "min_nuc_length"
+ * "lddt_add_mdl_contacts"
+ * "dockq_capri_peptide"
 
 The pairwise sequence alignments are computed with Needleman-Wunsch using
 BLOSUM62 (NUC44 for nucleotides). Many benchmarking scenarios preprocess the
@@ -265,6 +267,15 @@ def _ParseArgs():
               "local_lddt."))
 
     parser.add_argument(
+        "--ilddt",
+        dest="ilddt",
+        default=False,
+        action="store_true",
+        help=("Compute global lDDT score which is solely based on inter-chain "
+              "contacts and store as key \"ilddt\". Same stereochemical "
+              "irregularities as for lddt apply."))
+
+    parser.add_argument(
         "--cad-score",
         dest="cad_score",
         default=False,
@@ -305,9 +316,9 @@ def _ParseArgs():
         dest="oum",
         default=False,
         action="store_true",
-        help=("Override USalign mapping and inject our own mapping. Only works "
-              "if external usalign executable is provided that is reasonably "
-              "new and contains that feature."))
+        help=("Override USalign mapping and inject our own rigid mapping. Only "
+              "works if external usalign executable is provided that is "
+              "reasonably new and contains that feature."))
     
     parser.add_argument(
         "--qs-score",
@@ -352,6 +363,27 @@ def _ParseArgs():
               "reference. \"dockq_ave_full\" and \"dockq_wave_full\" add zeros "
               "in the average computation for each interface that is only "
               "present in the reference but not in the model."))
+
+    parser.add_argument(
+        "--dockq-capri-peptide",
+        dest="dockq_capri_peptide",
+        default=False,
+        action="store_true",
+        help=("Flag that changes two things in the way DockQ and its "
+              "underlying scores are computed which is proposed by the CAPRI "
+              "community when scoring peptides (PMID: 31886916). "
+              "ONE: Two residues are considered in contact if any of their "
+              "atoms is within 5A. This is relevant for fnat and fnonat "
+              "scores. CAPRI suggests to lower this threshold to 4A for "
+              "protein-peptide interactions. "
+              "TWO: irmsd is computed on interface residues. A residue is "
+              "defined as interface residue if any of its atoms is within 10A "
+              "of another chain. CAPRI suggests to lower the default of 10A to "
+              "8A in combination with only considering CB atoms for "
+              "protein-peptide interactions. "
+              "Note that the resulting DockQ is not evaluated for these "
+              "slightly updated fnat and irmsd (lrmsd stays the same)."
+              "This flag has no influence on patch_dockq scores."))
 
     parser.add_argument(
         "--ics",
@@ -500,7 +532,8 @@ def _ParseArgs():
         dest="min_pep_length",
         default = 6,
         type=int,
-        help=("Relevant parameter if short peptides are involved in scoring."
+        help=("Default: 6 - "
+              "Relevant parameter if short peptides are involved in scoring. "
               "Minimum peptide length for a chain in the target structure to "
               "be considered in chain mapping. The chain mapping algorithm "
               "first performs an all vs. all pairwise sequence alignment to "
@@ -515,7 +548,8 @@ def _ParseArgs():
         dest="min_nuc_length",
         default = 4,
         type=int,
-        help=("Relevant parameter if short nucleotides are involved in scoring."
+        help=("Default: 4 - "
+              "Relevant parameter if short nucleotides are involved in scoring."
               "Minimum nucleotide length for a chain in the target structure to "
               "be considered in chain mapping. The chain mapping algorithm "
               "first performs an all vs. all pairwise sequence alignment to "
@@ -524,6 +558,29 @@ def _ParseArgs():
               "problematic as they may produce high sequence identity "
               "alignments by pure chance.")
     )
+
+    parser.add_argument(
+        '-v',
+        '--verbosity',
+        dest="verbosity",
+        type=int,
+        default=2,
+        help="Set verbosity level. Defaults to 3 (Script).")
+
+    parser.add_argument(
+        "--lddt-add-mdl-contacts",
+        dest="lddt_add_mdl_contacts",
+        default=False,
+        action="store_true",
+        help=("Only using contacts in lDDT that"
+              "are within a certain distance threshold in the "
+              "reference does not penalize for added model "
+              "contacts. If set to True, this flag will also "
+              "consider reference contacts that are within the "
+              "specified distance threshold in the model but "
+              "not necessarily in the reference. No contact will "
+              "be added if the respective atom pair is not "
+              "resolved in the reference."))
  
     return parser.parse_args()
 
@@ -721,7 +778,9 @@ def _Process(model, reference, args, model_format, reference_format):
                             n_max_naive = args.n_max_naive,
                             oum = args.oum,
                             min_pep_length = args.min_pep_length,
-                            min_nuc_length = args.min_nuc_length)
+                            min_nuc_length = args.min_nuc_length,
+                            lddt_add_mdl_contacts = args.lddt_add_mdl_contacts,
+                            dockq_capri_peptide = args.dockq_capri_peptide)
 
     ir = _GetInconsistentResidues(scorer.aln)
     if len(ir) > 0 and args.enforce_consistency:
@@ -764,6 +823,9 @@ def _Process(model, reference, args, model_format, reference_format):
 
     if args.bb_local_lddt:
         out["bb_local_lddt"] = _LocalScoresToJSONDict(scorer.bb_local_lddt)
+
+    if args.ilddt:
+        out["ilddt"] = _RoundOrNone(scorer.ilddt)
 
     if args.cad_score:
         out["cad_score"] = scorer.cad_score
@@ -860,6 +922,9 @@ def _Process(model, reference, args, model_format, reference_format):
 def _Main():
 
     args = _ParseArgs()
+    ost.PushVerbosityLevel(args.verbosity)
+    if args.verbosity < 4:
+        sys.tracebacklimit = 0
     _CheckCompoundLib()
     try:
         compute_cad = args.cad_score or args.local_cad_score
@@ -894,6 +959,8 @@ def _Main():
         out["lddt_no_stereochecks"] = args.lddt_no_stereochecks
         out["min_pep_length"] = args.min_pep_length
         out["min_nuc_length"] = args.min_nuc_length
+        out["lddt_add_mdl_contacts"] = args.lddt_add_mdl_contacts
+        out["dockq_capri_peptide"] = args.dockq_capri_peptide
         out["status"] = "SUCCESS"
         with open(args.output, 'w') as fh:
             json.dump(out, fh, indent=4, sort_keys=False)
@@ -901,7 +968,8 @@ def _Main():
         out = dict()
         out["status"] = "FAILURE"
         out["traceback"] = traceback.format_exc()
-        out["exception"] = " ".join(traceback.format_exception_only(exc))
+        etype, evalue, tb = sys.exc_info()
+        out["exception"] = " ".join(traceback.format_exception_only(etype, evalue))
         with open(args.output, 'w') as fh:
             json.dump(out, fh, indent=4, sort_keys=False)
         raise
