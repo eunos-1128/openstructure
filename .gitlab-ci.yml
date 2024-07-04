@@ -15,9 +15,7 @@ test:ubuntu22.04:
     - apt-get update -y
     - apt-get install -y cmake
     - apt-get install -y g++
-    - apt-get install -y gfortran
     - apt-get install -y wget
-    - apt-get install -y tar
     - apt-get install -y libsqlite3-dev
     - apt-get install -y sip-dev
     - apt-get install -y libtiff-dev
@@ -30,11 +28,37 @@ test:ubuntu22.04:
     - apt-get install -y python3-scipy
     - apt-get install -y python3-networkx
     - apt-get install -y clustalw
-    - apt-get install -y cython3
     - apt-get install -y voronota
     - apt-get install -y libopenmm-dev
     - apt-get install -y libparasail-dev
     - echo "... done running ubuntu22.04 'before_script'."
   script:
   - echo "Testing on Ubuntu 22.04..."
+  - echo "    Building OST..."
+  - mkdir build-ci
+  - cd build-ci
+  - cmake .. -DOPTIMIZE=ON
+             -DENABLE_GFX=ON
+             -DENABLE_GUI=OFF
+             -DENABLE_INFO=OFF
+             -DENABLE_MM=1
+             -DOPEN_MM_PLUGIN_DIR=/usr/lib/x86_64-linux-gnu/openmm
+             -DENABLE_PARASAIL=1
+  - make -j 2
+  - echo "    ... done building OST."
+  - echo "    Downloading chemical compounds..."
+  - wget ftp://ftp.wwpdb.org/pub/pdb/data/monomers/components.cif.gz
+  - echo "    ... done downloading compounds"
+  - echo "    Building a compound library..."
+  - stage/bin/chemdict_tool create components.cif.gz compounds.chemlib pdb -i
+  - stage/bin/chemdict_tool update ../modules/conop/data/charmm.cif compounds.chemlib charmm
+  - echo "    ... done building the compound lib."
+  - echo "    Building OST with the compound lib..."
+  - cmake .. -DCOMPOUND_LIB=compounds.chemlib
+  - make -j 2
+  - echo "    ... done building OST with the compound library..."
+  - echo "    Running unit tests for OST..."
+  - make check
+  - echo "    ... done running unit tests for OST..." 
   - echo "... done testing on Ubuntu 22.04."
+ 
