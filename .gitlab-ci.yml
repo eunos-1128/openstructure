@@ -6,76 +6,45 @@
 stages:
   - test
 
-# CentOS7 STAGE
-test:centos7.3:
+# Ubuntu22.04 STAGE
+test:ubuntu22.04:
   stage: test
-  image: centos:7.3.1611
+  image: ubuntu:22.04
   before_script:
-    - echo "Running centos7.3 'before_script'..."
-    - yum -y -q -e 0 install tcl
-    - yum -y -q -e 0 install glibc-common
-    - yum -y -q -e 0 install glibc-devel
-    - yum -y -q -e 0 install make
-    - yum -y -q -e 0 install libicu
-    - yum -y -q -e 0 install libjpeg-turbo
-    - yum -y -q -e 0 install freetype
-    - yum -y -q -e 0 install openssl
-    - mkdir -p /scicore/soft/modules
-    - ln -s /export/soft/apps/centos7/generic /scicore/soft/apps
-    - ln -s /export/soft/modules/centos7/generic/all /scicore/soft/modules
-    - source /export/soft/lua_lmod/centos7/lmod/lmod/init/bash
-    - module use /scicore/soft/modules/all
-    - module load foss/2021a
-    - module load wget/1.21.1-GCCcore-10.3.0
-    - module load CMake/3.23.1-GCCcore-10.3.0
-    - module load Python/3.9.5-GCCcore-10.3.0
-    - module load Eigen/3.4.0-GCCcore-10.3.0
-    - module load Boost.Python/1.76.0-GCC-10.3.0
-    - module load LibTIFF/.4.2.0-GCCcore-10.3.0
-    - module load libpng/.1.6.37-GCCcore-10.3.0
-    - module load HH-suite/3.2.0-gompi-2021a
-    - module load Perl/5.32.1-GCCcore-10.3.0
-    - module load OpenMM/7.7.0-foss-2021a
-    - module load SQLite/3.35.4-GCCcore-10.3.0
-    - module load dssp/2.2.1-foss-2021a
-    - module load msms/2.6.1-linux-x86_64 
-    - module load ClustalW2/2.1-foss-2021a
-    - module load networkx/2.5.1-foss-2021a
-    - echo "... done running centos7.3 'before_script'."
+    - echo "Running ubuntu22.04 'before_script'..."
+    - apt-get update -y
+    - apt-get install -y cmake
+    - apt-get install -y g++
+    - apt-get install -y wget
+    - apt-get install -y libsqlite3-dev
+    - apt-get install -y sip-dev
+    - apt-get install -y libtiff-dev
+    - apt-get install -y libfftw3-dev
+    - apt-get install -y libeigen3-dev
+    - apt-get install -y libboost-all-dev
+    - apt-get install -y libpng-dev
+    - apt-get install -y python3-all
+    - apt-get install -y python3-numpy
+    - apt-get install -y python3-scipy
+    - apt-get install -y python3-networkx
+    - apt-get install -y clustalw
+    - apt-get install -y voronota
+    - apt-get install -y libopenmm-dev
+    - apt-get install -y libparasail-dev
+    - echo "... done running ubuntu22.04 'before_script'."
   script:
-  - echo "Testing on CentOS 7..."
+  - echo "Testing on Ubuntu 22.04..."
   - echo "    Building OST..."
   - mkdir build-ci
   - cd build-ci
-  - cmake .. -DENABLE_MM=1
-             -DOPEN_MM_LIBRARY=$EBROOTOPENMM/lib/libOpenMM.so
-             -DOPEN_MM_PLUGIN_DIR=$EBROOTOPENMM/lib/plugins
-             -DOPEN_MM_INCLUDE_DIR=$EBROOTOPENMM/include
-             -DCOMPILE_TMTOOLS=1
-             -DENABLE_INFO=OFF
-             -DENABLE_GFX=OFF
+  - cmake .. -DOPTIMIZE=ON
+             -DENABLE_GFX=ON
              -DENABLE_GUI=OFF
-             -DUSE_RPATH=1
-             -DPython_ROOT_DIR=$EBROOTPYTHON
-             -DEIGEN3_INCLUDE_DIR=$EBROOTEIGEN/include
-             -DFFTW_LIBRARY=$EBROOTFFTW/lib/libfftw3f.a
-             -DFFTW_INCLUDE_DIR=$EBROOTFFTW/include
-             -DSQLITE3_LIBRARY=$EBROOTSQLITE/lib/libsqlite3.so
-             -DSQLITE3_INCLUDE_DIR=$EBROOTSQLITE/include
-             -DBOOST_ROOT=$EBROOTBOOST
-             -DPNG_LIBRARY=$EBROOTLIBPNG/lib/libpng.so
-             -DPNG_PNG_INCLUDE_DIR=$EBROOTLIBPNG/include
-             -DZLIB_LIBRARY=$EBROOTZLIB/lib/libz.so
-             -DZLIB_INCLUDE_DIR=$EBROOTZLIB/include
-             -DTIFF_INCLUDE_DIR=$EBROOTLIBTIFF/include
-             -DTIFF_LIBRARY=$EBROOTLIBTIFF/lib/libtiff.so
-             -DZLIB_INCLUDE_DIR=$EBROOTZLIB/include
-             -DZLIB_LIBRARY=$EBROOTZLIB/lib/libz.so
-             -DOPTIMIZE=1
-             -DCMAKE_C_FLAGS='-L${EBROOTLIBPNG}/lib/ -L${EBROOTLIBTIFF}/lib/ -L${EBROOTZLIB}/lib/ -isystem ${EBROOTBOOST}/include -isystem ${EBROOTOPENMM}/include'
-             -DCMAKE_CXX_FLAGS='-L${EBROOTLIBPNG}/lib/ -L${EBROOTLIBTIFF}/lib/ -L${EBROOTZLIB}/lib/ -isystem ${EBROOTBOOST}/include -isystem ${EBROOTOPENMM}/include'
-             -DCMAKE_EXE_LINKER_FLAGS=" -pthread"
-  - make -j 2 chemdict_tool
+             -DENABLE_INFO=OFF
+             -DENABLE_MM=1
+             -DOPEN_MM_PLUGIN_DIR=/usr/lib/x86_64-linux-gnu/openmm
+             -DENABLE_PARASAIL=1
+  - make -j 2
   - echo "    ... done building OST."
   - echo "    Downloading chemical compounds..."
   - wget ftp://ftp.wwpdb.org/pub/pdb/data/monomers/components.cif.gz
@@ -91,4 +60,5 @@ test:centos7.3:
   - echo "    Running unit tests for OST..."
   - make check
   - echo "    ... done running unit tests for OST..." 
-  - echo "... done testing on CentOS 7."
+  - echo "... done testing on Ubuntu 22.04."
+ 
