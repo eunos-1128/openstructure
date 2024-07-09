@@ -772,7 +772,7 @@ class LigandScorer:
 
             # Instantiate the editor
             if new_editor is None:
-                new_editor = new_entity.EditXCS()
+                new_editor = new_entity.EditXCS(mol.BUFFERED_EDIT)
 
             new_chain = new_entity.FindChain(residue.chain.name)
             if not new_chain.IsValid():
