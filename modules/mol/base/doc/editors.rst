@@ -44,8 +44,12 @@ The basic functionality of editors is implemented in the EditorBase class.
 .. note::
 
   To use the editing functions available in :class:`EditorBase`, it is
-  recommended to use the external coordinate system :class:`XCSEditor` for
-  performance reasons.
+  recommended to use the external coordinate system :class:`XCSEditor` with
+  buffering for performance reasons:
+
+  .. code-block:: python
+    
+    editor = entity.EditXCS(ost.mol.EditMode.BUFFERED_EDIT)
 
 .. class::  EditorBase
   
