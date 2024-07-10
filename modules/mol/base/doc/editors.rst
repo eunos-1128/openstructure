@@ -11,16 +11,30 @@ atoms. There are two flavors of editors, one for the internal coordinate system 
 Edit Modes
 --------------------------------------------------------------------------------
 
-Editors support two modes: An unbuffered edit mode and a buffered edit mode. In
-the unbuffered edit mode, dependent information such as the spatial organizer 
-and the internal coordinate system (in case of the XCSEditor) are updated after 
-every change. In buffered edit mode, the updates are delayed until one of the 
-following happens:
+.. class:: EditMode
 
- * The last editor goes out of scope.
- * :meth:`XCSEditor.UpdateICS` or :meth:`ICSEditor.UpdateXCS` is called
-   explicitly.
+  Editors support two modes: An unbuffered edit mode and a buffered edit mode.
 
+  .. attribute:: UNBUFFERED_EDIT
+
+    This is the default edit mode in editors. In unbuffered edit mode,
+    dependent information such as the spatial organizer and the internal
+    coordinate system (in case of the :class:`XCSEditor`) are updated after
+    every change.
+
+     .. warning::
+
+       The unbuffered edit mode can be extremely inefficient as every operation
+       can trigger expensive calculations.
+
+  .. attribute:: BUFFERED_EDIT
+
+    In buffered edit mode, the updates are delayed until one of the following
+    happens:
+
+    * The last editor goes out of scope.
+    * :meth:`XCSEditor.UpdateICS` or :meth:`ICSEditor.UpdateXCS` is called
+      explicitly.
 
 The editors follow the RIAA (resource allocation is initialization) principle: 
 Whenever an editor is requested an internal reference counter is incremented. In 
@@ -30,6 +44,39 @@ zero, the dependent information is updated.
 In Python, one can not rely on the destructors being called. It is advised to 
 always put a call to :meth:`XCSEditor.UpdateICS` or
 :meth:`ICSEditor.UpdateXCS` when the editing is finished.
+
+Here is a short example of how to use the editors to correctly create a
+methionine residue:
+
+.. code-block:: python
+
+  entity = ost.mol.CreateEntity()
+
+  # A buffered external coordinate system editor covers most use cases
+  editor = entity.EditXCS(ost.mol.EditMode.BUFFERED_EDIT)
+
+  # Insert a new protein chain
+  chain = editor.InsertChain("A");
+  editor.SetChainType(chain, ost.mol.ChainType.CHAINTYPE_POLY_PEPTIDE_L)
+
+  # Insert a residue
+  res1 = editor.AppendResidue(chain, "MET");
+  res1.SetChemClass(ost.mol.L_PEPTIDE_LINKING)
+  res1.SetChemType(ost.mol.ChemType.AMINOACIDS)
+
+  # Insert atoms
+  editor.InsertAtom(res1, "N", ost.geom.Vec3(21.609, 35.384, 56.705))
+  editor.InsertAtom(res1, "CA", ost.geom.Vec3(20.601, 35.494, 57.793))
+  editor.InsertAtom(res1, "C", ost.geom.Vec3(19.654, 34.300, 57.789))
+  editor.InsertAtom(res1, "O", ost.geom.Vec3(18.447, 34.456, 57.595))
+
+  # Connect them
+  editor.Connect(res1.FindAtom("N"), res1.FindAtom("CA"))
+  editor.Connect(res1.FindAtom("CA"), res1.FindAtom("C"))
+  editor.Connect(res1.FindAtom("C"), res1.FindAtom("O"))
+
+  # Finalize
+  editor.UpdateICS()
 
 
 Basic Editing Operations
@@ -41,11 +88,7 @@ The basic functionality of editors is implemented in the EditorBase class.
 
   To use the editing functions available in :class:`EditorBase`, it is
   recommended to use the external coordinate system :class:`XCSEditor` with
-  buffering for performance reasons:
-
-  .. code-block:: python
-    
-    editor = entity.EditXCS(ost.mol.EditMode.BUFFERED_EDIT)
+  buffering for performance reasons.
 
 .. class::  EditorBase
   
