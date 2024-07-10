@@ -932,6 +932,16 @@ Residue Handle
 
     See :attr:`chain`
 
+  .. method:: GetChemClass()
+              SetChemClass()
+
+    See :attr:`chem_class`
+
+  .. method:: GetChemType()
+              SetChemType()
+
+    See :attr:`chem_type`
+
   .. method:: GetPhiTorsion()
 
     See :attr:`phi_torsion`
@@ -2175,7 +2185,9 @@ Residue View
               GetPsiTorsion
               GetOmegaTorsion
               GetChemClass
+              SetChemClass
               GetChemType
+              SetChemType
               GetSecStructure
               IsLigand
               SetIsLigand
