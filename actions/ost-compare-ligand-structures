@@ -436,7 +436,8 @@ def _SetupSCRMSDScorer(model, model_ligands, reference, reference_ligands, args)
                                               substructure_match = args.substructure_match,
                                               coverage_delta = args.coverage_delta,
                                               bs_radius = args.radius,
-                                              lddt_lp_radius = args.lddt_lp_radius)
+                                              lddt_lp_radius = args.lddt_lp_radius,
+                                              full_bs_search = args.full_bs_search)
 
 def _Process(model, model_ligands, reference, reference_ligands, args):
 
