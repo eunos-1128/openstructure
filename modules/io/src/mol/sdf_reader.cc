@@ -113,9 +113,11 @@ void SDFReader::Import(mol::EntityHandle& ent)
       ProcessV3000Line(line, ent, editor);
     }
   }
-
-  LOG_INFO("imported " << chain_count_ << " chains, " << residue_count_
-               << " residues, " << atom_count_ << " atoms");
+  LOG_INFO("imported "
+               << ent.GetChainCount() << " chains, "
+               << ent.GetResidueCount() << " residues, "
+               << ent.GetAtomCount() << " atoms and "
+               << ent.GetBondCount() << " bonds");
 }
 
 void SDFReader::ClearState(const boost::filesystem::path& loc)
