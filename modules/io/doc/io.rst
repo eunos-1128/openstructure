@@ -78,12 +78,15 @@ behaviour.
   even if one is available in the IO Profile.
 
   :param pdb_string: A PDB file as a string.
+  :type pdb_str: :class:`str`
 
   :param profile: The IO Profile to read the entity with. For more information
       on the IO Profiles available, see :doc:`profile`.
+  :type profile: :class:`ost.io.IOProfile`
 
   :param process: If set to True, run the :class:`~ost.conop.Processor`
       contained in the IO Profile.
+  :type process: :class:`bool`
 
   :rtype: :class:`~ost.mol.EntityHandle`.
 
@@ -92,9 +95,29 @@ behaviour.
 
   .. code-block:: python
 
-    with open('protein.pdb') as pdb_fd:
-        pdb_str = pdb.read()
+    with open('protein.pdb') as pdb_fh:
+        pdb_str = pdb_fh.read()
         ent = io.PDBStrToEntity(pdb_str, ost.io.profiles['DEFAULT'], True)
+
+
+.. function:: MMCifStrToEntity(mmcif_str, profile=IOProfile(), process=False)
+
+  Load entity from a string in mmCIF format. By default the entity is loaded with
+  an empty IO Profile and is not processed with the :class:`~ost.conop.Processor`,
+  even if one is available in the IO Profile.
+
+  :param mmcif_str: mmCIF file as a string
+  :type mmcif_str: :class:`str`
+
+  :param profile: The IO Profile to read the entity with. For more information
+      on the IO Profiles available, see :doc:`profile`.
+  :type profile: :class:`ost.io.IOProfile`
+
+  :param process: If set to True, run the :class:`~ost.conop.Processor`
+      contained in the IO Profile.
+  :type process: :class:`bool`
+
+  :rtype: :class:`~ost.mol.EntityHandle`.
 
 
 .. function:: LoadSDF(filename)
