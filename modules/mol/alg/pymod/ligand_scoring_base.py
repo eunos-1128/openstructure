@@ -1,9 +1,29 @@
+from contextlib import contextmanager
 import numpy as np
 import networkx
 
 from ost import mol
-from ost import LogWarning, LogScript, LogVerbose, LogDebug
+from ost import LogWarning, LogScript, LogInfo, LogVerbose, LogDebug, GetVerbosityLevel, PushVerbosityLevel, PopVerbosityLevel
 from ost.mol.alg import chain_mapping
+
+
+@contextmanager
+def _SinkVerbosityLevel(n=1):
+    """ Context manager to temporarily reduce the verbosity level by n.
+
+    Example usage:
+        with _SinkVerbosityLevel(2):
+            LogVerbose("Test")
+    Will only write "Test" in script level (2 above)
+    """
+    PushVerbosityLevel(GetVerbosityLevel() - n)
+    try:
+        yield
+    except:
+        raise
+    finally:
+        PopVerbosityLevel()
+
 
 class LigandScorer:
     """ Scorer to compute various small molecule ligand (non polymer) scores.
@@ -426,6 +446,7 @@ class LigandScorer:
                 raise RuntimeError("LigandScorer._score_dir must return one in "
                                    "['+', '-']")
 
+            LogScript("Computing ligand assignment")
             while len(tmp) > 0:
                 # select high coverage ligand pairs in working array
                 coverage_thresh = max([x[1] for x in tmp]) - self.coverage_delta
@@ -712,10 +733,11 @@ class LigandScorer:
         :type: :class:`ost.mol.alg.chain_mapping.ChainMapper`
         """
         if self.__chain_mapper is None:
-            self.__chain_mapper = \
-            chain_mapping.ChainMapper(self.target,
-                                      n_max_naive=1e9,
-                                      resnum_alignments=self.resnum_alignments)
+            with _SinkVerbosityLevel():
+                self.__chain_mapper = \
+                chain_mapping.ChainMapper(self.target,
+                                          n_max_naive=1e9,
+                                          resnum_alignments=self.resnum_alignments)
         return self.__chain_mapper
 
     @staticmethod
@@ -887,7 +909,7 @@ class LigandScorer:
                 self._state_matrix[g_idx,:] = 6
                 msg = "Disconnected graph observed for target ligand "
                 msg += str(self.target_ligands[g_idx])
-                LogVerbose(msg)
+                LogWarning(msg)
 
         for g_idx, g in enumerate(model_graphs):
             if not networkx.is_connected(g):
@@ -895,11 +917,11 @@ class LigandScorer:
                 self._state_matrix[:,g_idx] = 6
                 msg = "Disconnected graph observed for model ligand "
                 msg += str(self.model_ligands[g_idx])
-                LogVerbose(msg)
+                LogWarning(msg)
 
 
         for target_id, target_ligand in enumerate(self.target_ligands):
-            LogVerbose("Analyzing target ligand %s" % target_ligand)
+            LogInfo("Analyzing target ligand %s" % target_ligand)
 
             if self._target_ligand_states[target_id] == 4:
                 # Disconnected graph - already updated states and reported
@@ -907,7 +929,7 @@ class LigandScorer:
                 continue 
 
             for model_id, model_ligand in enumerate(self.model_ligands):
-                LogVerbose("Compare to model ligand %s" % model_ligand)
+                LogInfo("Comparing to model ligand %s" % model_ligand)
 
                 #########################################################
                 # Compute symmetries for given target/model ligand pair #
@@ -926,30 +948,30 @@ class LigandScorer:
                         max_symmetries=self.max_symmetries,
                         model_graph = model_graphs[model_id],
                         target_graph = target_graphs[target_id])
-                    LogVerbose("Ligands %s and %s symmetry match" % (
+                    LogInfo("Ligands %s and %s symmetry match" % (
                         str(model_ligand), str(target_ligand)))
                 except NoSymmetryError:
                     # Ligands are different - skip
-                    LogVerbose("No symmetry between %s and %s" % (
+                    LogInfo("No symmetry between %s and %s" % (
                         str(model_ligand), str(target_ligand)))
                     self._state_matrix[target_id, model_id] = 1
                     continue
                 except TooManySymmetriesError:
                     # Ligands are too symmetrical - skip
-                    LogVerbose("Too many symmetries between %s and %s" % (
+                    LogWarning("Too many symmetries between %s and %s" % (
                         str(model_ligand), str(target_ligand)))
                     self._state_matrix[target_id, model_id] = 2
                     continue
                 except NoIsomorphicSymmetryError:
                     # Ligands are different - skip
-                    LogVerbose("No isomorphic symmetry between %s and %s" % (
+                    LogInfo("No isomorphic symmetry between %s and %s" % (
                         str(model_ligand), str(target_ligand)))
                     self._state_matrix[target_id, model_id] = 3
                     continue
                 except DisconnectedGraphError:
                     # this should never happen as we guard against
                     # DisconnectedGraphError when precomputing the graph
-                    LogVerbose("Disconnected graph observed for %s and %s" % (
+                    LogError("Disconnected graph observed for %s and %s" % (
                         str(model_ligand), str(target_ligand)))
                     # just set both ligand states to 4
                     self._model_ligand_states[model_id] = 4

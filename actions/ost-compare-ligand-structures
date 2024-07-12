@@ -320,8 +320,6 @@ def _LoadStructure(structure_path, sformat, fault_tolerant, bu_id):
     The returned structure has structure_path attached as structure name
     """
 
-    # increase loglevel, as we would pollute the info log with weird stuff
-    ost.PushVerbosityLevel(ost.LogLevel.Error)
     # Load the structure
     if sformat == "mmcif":
         if bu_id is not None:
@@ -346,7 +344,6 @@ def _LoadStructure(structure_path, sformat, fault_tolerant, bu_id):
             raise Exception(f"No residues found in file: {structure_path}")
 
     # restore old loglevel and return
-    ost.PopVerbosityLevel()
     entity.SetName(structure_path)
     return entity
 
@@ -528,6 +525,7 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
     ##################
 
     if args.lddt_pli:
+        LogScript("Computing lDDT-PLI scores")
         out["lddt_pli"] = dict()
         out["lddt_pli"]["assigned_scores"] = list()
         for lig_pair in lddtpli_scorer.assignment:
@@ -590,6 +588,7 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
 
 
     if args.rmsd:
+        LogScript("Computing BiSyRMSD scores")
         out["rmsd"] = dict()
         out["rmsd"]["assigned_scores"] = list()
         for lig_pair in scrmsd_scorer.assignment:
@@ -680,12 +679,15 @@ def _Main():
     _CheckCompoundLib()
     try:
         # Load structures
+        LogScript("Loading data")
+        LogInfo("Loading reference structure")
         reference_format = _GetStructureFormat(args.reference,
                                                sformat=args.reference_format)
         reference = _LoadStructure(args.reference,
                                    sformat=reference_format,
                                    bu_id=args.reference_biounit,
                                    fault_tolerant = args.fault_tolerant)
+        LogInfo("Loading model structure")
         model_format = _GetStructureFormat(args.model,
                                            sformat=args.model_format)
         model = _LoadStructure(args.model,
@@ -694,13 +696,19 @@ def _Main():
                                fault_tolerant = args.fault_tolerant)
 
         # Load ligands
-        model_ligands = _LoadLigands(args.model_ligands)
+        LogInfo("Loading reference ligands")
         reference_ligands = _LoadLigands(args.reference_ligands)
+        LogInfo("Loading model ligands")
+        model_ligands = _LoadLigands(args.model_ligands)
 
         # Cleanup
+        LogVerbose("Cleaning up reference structure")
         cleaned_reference = _CleanupStructure(reference)
+        LogVerbose("Cleaning up model structure")
         cleaned_model = _CleanupStructure(model)
+        LogVerbose("Cleaning up reference ligands")
         cleaned_reference_ligands = _CleanupLigands(reference_ligands)
+        LogVerbose("Cleaning up model ligands")
         cleaned_model_ligands = _CleanupLigands(model_ligands)
 
         # Validate

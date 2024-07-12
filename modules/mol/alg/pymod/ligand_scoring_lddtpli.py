@@ -935,10 +935,11 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
   
     @property
     def _chain_mapping_mdl(self):
-        if self.__chain_mapping_mdl is None:   
-            self.__chem_mapping, self.__chem_group_alns, \
-            self.__chain_mapping_mdl = \
-            self._chain_mapper.GetChemMapping(self.model)
+        if self.__chain_mapping_mdl is None:
+            with ligand_scoring_base._SinkVerbosityLevel():
+                self.__chem_mapping, self.__chem_group_alns, \
+                self.__chain_mapping_mdl = \
+                self._chain_mapper.GetChemMapping(self.model)
         return self.__chain_mapping_mdl
 
 # specify public interface

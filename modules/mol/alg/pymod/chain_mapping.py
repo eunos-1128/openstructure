@@ -1438,6 +1438,10 @@ class ChainMapper:
                                            substructure_chem_mapping,
                                            self.n_max_naive))
 
+        # This step can be slow so give some hints in logs
+        msg = "Computing initial ranking of %d chain mappings" % len(mappings)
+        (ost.LogWarning if len(mappings) > 10000 else ost.LogInfo)(msg)
+
         for mapping in mappings:
             # chain_mapping and alns as input for lDDT computation
             lddt_chain_mapping = dict()

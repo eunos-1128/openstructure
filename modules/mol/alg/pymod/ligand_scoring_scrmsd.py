@@ -1,10 +1,11 @@
 import numpy as np
 
-from ost import LogWarning
+from ost import LogWarning, LogScript, LogInfo, LogVerbose
 from ost import geom
 from ost import mol
 
 from ost.mol.alg import ligand_scoring_base
+
 
 class SCRMSDScorer(ligand_scoring_base.LigandScorer):
     """ :class:`LigandScorer` implementing symmetry corrected RMSD.
@@ -174,6 +175,9 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
                            "inconsistent_residues": list()}
 
         representations = self._get_repr(target_ligand, model_ligand)
+        # This step can be slow so give some hints in logs
+        msg = "Computing BiSyRMSD with %d chain mappings" % len(representations)
+        (LogWarning if len(representations) > 10000 else LogInfo)(msg)
 
         for r in representations:
             rmsd = _SCRMSD_symmetries(symmetries, model_ligand, 
@@ -231,6 +235,8 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
 
         if key not in self._repr:
             ref_bs = self._get_target_binding_site(target_ligand)
+            LogVerbose("%d chains are in proximity of the target ligand: %s" % (
+                ref_bs.chain_count, ", ".join([c.name for c in ref_bs.chains])))
             if self.full_bs_search:
                 reprs = self._chain_mapper.GetRepr(
                     ref_bs, self.model, inclusion_radius=self.lddt_lp_radius,
@@ -262,7 +268,8 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
                     h = ref_res.handle.GetHashCode()
                     if h not in ref_residues_hashes and \
                             h not in ignored_residue_hashes:
-                        view = self._chain_mapper.target.ViewForHandle(ref_res) 
+                        with ligand_scoring_base._SinkVerbosityLevel(1):
+                            view = self._chain_mapper.target.ViewForHandle(ref_res) 
                         if view.IsValid():
                             h = ref_res.handle.GetHashCode()
                             ref_residues_hashes.add(h)
@@ -341,12 +348,15 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
             radius = self.model_bs_radius
             chains = set()
             for at in mdl_ligand.atoms:
-                close_atoms = self._chain_mapping_mdl.FindWithin(at.GetPos(),
-                                                                 radius)
+                with ligand_scoring_base._SinkVerbosityLevel(1):
+                    close_atoms = self._chain_mapping_mdl.FindWithin(at.GetPos(),
+                                                                     radius)
                 for close_at in close_atoms:
                     chains.add(close_at.GetChain().GetName())
 
             if len(chains) > 0:
+                LogVerbose("%d chains are in proximity of the model ligand: %s" % (
+                    len(chains), ", ".join(chains)))
 
                 # the chain mapping model which only contains close chains
                 query = "cname="
