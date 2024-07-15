@@ -33,9 +33,12 @@ Conop Functions
 
 .. function:: IsBondFeasible(atom_a, atom_b)
 
-  :return: True, if *atom_a* and *atom_b* are within a reasonable distance for a
-           bond to be present. Depends on :attr:`~ost.mol.AtomHandle.radius` of
-           atoms and heuristic formulas.
+  :return: True, if *atom_a* and *atom_b* are within a reasonable distance for
+           a bond to be present, namely if the distance between the two atoms
+           is between 0.0625 and 0.375 times the square of the sum of the 
+           :attr:`van der Waals radii <ost.mol.AtomHandle.radius>` of the two
+           atom.
+
   :rtype:  :class:`bool`
   :param atom_a: Atom to be checked.
   :type atom_a:  :class:`~ost.mol.AtomHandle`
