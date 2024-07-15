@@ -954,14 +954,6 @@ Residue Handle
 
     See :attr:`omega_torsion`
 
-  .. method:: GetChemClass()
-
-    See :attr:`chem_class`
-
-  .. method:: GetChemType()
-
-    See :attr:`chem_type`
-
   .. method:: GetSecStructure()
 
     See :attr:`sec_structure`
