@@ -32,8 +32,10 @@ definition, and have properly named residues and atoms, in order for
 ligand connectivity to be loaded correctly. Ligands loaded from SDF files
 are exempt from this restriction, meaning any arbitrary ligand can be assessed.
 
-Output is written in JSON format (default: out.json). In case of no additional
-options, this is a dictionary with three keys:
+Output can be written in two format: JSON (default) or CSV, controlled by the
+--output-format/-of argument.
+
+Without additional options, the JSON ouput is a dictionary with three keys:
 
  * "model_ligands": A list of ligands in the model. If ligands were provided
    explicitly with --model-ligands, elements of the list will be the paths to
@@ -70,9 +72,36 @@ This is a list of data items for each pair of model/reference ligands. The data
 items follow the same structure as in "assigned_scores". If no score for a
 specific pair of ligands could be computed, "score" and "coverage" are set to
 null and a key "reason" is added giving an educated guess why this happened.
+
+CSV output is a table of comma-separated values, with one line for each
+reference ligand. The following column is always available:
+
+ * reference_ligand: If reference ligands were provided explicitly with
+   --reference-ligands, elements of the list will be the paths to the ligand
+   SDF file(s). Otherwise, they will be the chain name, residue number and
+   insertion code of the ligand, separated by a dot.
+
+If lDDT-PLI was enabled with --lddt-pli, the following columns are added:
+
+ * "lddt_pli", "lddt_pli_coverage" and "lddt_pli_model_ligand" are the
+   lDDT-PLI score result, the corresponding coverage and assigned model ligand,
+   if an assignment was found, respectively, empty otherwise.
+ * "lddt_pli_unassigned" is empty if an assignment was found, otherwise it
+   lists the short reason this reference ligand was unassigned.
+
+If BiSyRMSD was enabled with --rmsd, the following columns are added:
+
+ * "rmsd", "rmsd_coverage". "rmsd_lddt_lp" "rmsd_bb_rmsd" and
+   "rmsd_model_ligand" are the BiSyRMSD, the corresponding coverage,
+   lDDT-LP, backbone RMSD and assigned model ligand, if an assignment was
+   found, respectively, empty otherwise.
+ * "rmsd_unassigned" is empty if an assignment was found, otherwise it
+   lists the short reason this reference ligand was unassigned.
+
 """
 
 import argparse
+import csv
 import json
 import os
 import sys
@@ -128,9 +157,9 @@ def _ParseArgs():
         "--out",
         "--output",
         dest="output",
-        default="out.json",
-        help=("Output file name. The output will be saved as a JSON file. "
-              "default: out.json"))
+        default=None,
+        help=("Output file name. "
+              "Default depends on format: out.json or out.csv"))
 
     parser.add_argument(
         "-mf",
@@ -153,6 +182,16 @@ def _ParseArgs():
         choices=["pdb", "cif", "mmcif"],
         help=("Format of reference file. pdb reads pdb but also pdb.gz, same "
               "applies to cif/mmcif. Inferred from filepath if not given."))
+
+    parser.add_argument(
+        "-of",
+        "--out-format",
+        "--output-format",
+        dest="output_format",
+        choices=["json", "csv"],
+        default="json",
+        help=("Output format, JSON or CSV, in lowercase. "
+              "default: json"))
 
     parser.add_argument(
         "-mb",
@@ -280,7 +319,11 @@ def _ParseArgs():
         help=("Enumerate all potential binding sites in the model when "
               "searching rigid superposition for RMSD computation"))
 
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.output is None:
+        args.output = "out.%s" % args.output_format
+
+    return args
 
 
 def _CheckCompoundLib():
@@ -669,6 +712,58 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
 
     return out
 
+def _WriteCSV(out, args):
+    csv_dict = {}
+
+    # Always fill-in basic reference ligand info
+    fieldnames = ["reference_ligand"]
+    for reference_ligand in out["reference_ligands"]:
+        csv_dict[reference_ligand] = {
+            "reference_ligand": reference_ligand,
+        }
+
+    if args.lddt_pli:
+        fieldnames.extend(["lddt_pli",  "lddt_pli_coverage",
+                           "lddt_pli_model_ligand", "lddt_pli_unassigned"])
+        for score in out["lddt_pli"]["assigned_scores"]:
+            csv_dict[score["reference_ligand"]].update({
+                "reference_ligand": score["reference_ligand"],
+                "lddt_pli": score["score"],
+                "lddt_pli_coverage": score["coverage"],
+                "lddt_pli_model_ligand": score["model_ligand"],
+            })
+        for reference_ligand, reason in out["lddt_pli"][
+                "reference_ligand_unassigned_reason"].items():
+            csv_dict[reference_ligand].update({
+                "reference_ligand": reference_ligand,
+                "lddt_pli_unassigned": reason[0],
+            })
+
+    if args.rmsd:
+        fieldnames.extend(["rmsd", "rmsd_coverage", "rmsd_lddt_lp",
+                           "rmsd_bb_rmsd", "rmsd_model_ligand",
+                           "rmsd_unassigned"])
+        for score in out["rmsd"]["assigned_scores"]:
+            csv_dict[score["reference_ligand"]].update({
+                "reference_ligand": score["reference_ligand"],
+                "rmsd": score["score"],
+                "rmsd_coverage": score["coverage"],
+                "rmsd_lddt_lp": score["lddt_lp"],
+                "rmsd_bb_rmsd": score["bb_rmsd"],
+                "rmsd_model_ligand": score["model_ligand"],
+            })
+        for reference_ligand, reason in out["rmsd"][
+                "reference_ligand_unassigned_reason"].items():
+            csv_dict[reference_ligand].update({
+                "reference_ligand": reference_ligand,
+                "rmsd_unassigned": reason[0],
+            })
+
+    with open(args.output, 'w', newline='') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in csv_dict.values():
+            writer.writerow(row)
 
 def _Main():
 
@@ -722,17 +817,25 @@ def _Main():
                        args)
 
         out["status"] = "SUCCESS"
-        with open(args.output, 'w') as fh:
-            json.dump(out, fh, indent=4, sort_keys=False)
+        if args.output_format == "json":
+            with open(args.output, 'w') as fh:
+                json.dump(out, fh, indent=4, sort_keys=False)
+        else:
+            _WriteCSV(out, args)
+        LogScript("Saved results in %s" % args.output)
 
     except Exception as exc:
-        out = dict()
-        out["status"] = "FAILURE"
-        out["traceback"] = traceback.format_exc(limit=1000)
-        etype, evalue, tb = sys.exc_info()
-        out["exception"] = " ".join(traceback.format_exception_only(etype, evalue))
-        with open(args.output, 'w') as fh:
-            json.dump(out, fh, indent=4, sort_keys=False)
+        if args.output_format == "json":
+            out = dict()
+            out["status"] = "FAILURE"
+            out["traceback"] = traceback.format_exc(limit=1000)
+            etype, evalue, tb = sys.exc_info()
+            out["exception"] = " ".join(traceback.format_exception_only(etype, evalue))
+            with open(args.output, 'w') as fh:
+                json.dump(out, fh, indent=4, sort_keys=False)
+            LogWarning("Error information saved in %s" % args.output)
+        else:
+            LogScript("Error encountered, no output saved")
         raise
 
 

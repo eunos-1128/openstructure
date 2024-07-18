@@ -438,7 +438,8 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
                                        -r REFERENCE
                                        [-rl [REFERENCE_LIGANDS ...]] [-o OUTPUT]
                                        [-mf {pdb,cif,mmcif}]
-                                       [-rf {pdb,cif,mmcif}] [-mb MODEL_BIOUNIT]
+                                       [-rf {pdb,cif,mmcif}] [-of {json,csv}]
+                                       [-mb MODEL_BIOUNIT]
                                        [-rb REFERENCE_BIOUNIT] [-ft] [-rna]
                                        [-sm] [-cd COVERAGE_DELTA] [-v VERBOSITY]
                                        [--full-results] [--lddt-pli]
@@ -480,8 +481,10 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
   ligand connectivity to be loaded correctly. Ligands loaded from SDF files
   are exempt from this restriction, meaning any arbitrary ligand can be assessed.
   
-  Output is written in JSON format (default: out.json). In case of no additional
-  options, this is a dictionary with three keys:
+  Output can be written in two format: JSON (default) or CSV, controlled by the
+  --output-format/-of argument.
+
+  Without additional options, the JSON ouput is a dictionary with three keys:
   
    * "model_ligands": A list of ligands in the model. If ligands were provided
      explicitly with --model-ligands, elements of the list will be the paths to
@@ -518,6 +521,31 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
   items follow the same structure as in "assigned_scores". If no score for a
   specific pair of ligands could be computed, "score" and "coverage" are set to
   null and a key "reason" is added giving an educated guess why this happened.
+
+  CSV output is a table of comma-separated values, with one line for each
+  reference ligand. The following column is always available:
+
+   * reference_ligand: If reference ligands were provided explicitly with
+     --reference-ligands, elements of the list will be the paths to the ligand
+     SDF file(s). Otherwise, they will be the chain name, residue number and
+     insertion code of the ligand, separated by a dot.
+
+  If lDDT-PLI was enabled with --lddt-pli, the following columns are added:
+
+   * "lddt_pli", "lddt_pli_coverage" and "lddt_pli_model_ligand" are the
+     lDDT-PLI score result, the corresponding coverage and assigned model ligand,
+     if an assignment was found, respectively, empty otherwise.
+   * "lddt_pli_unassigned" is empty if an assignment was found, otherwise it
+     lists the short reason this reference ligand was unassigned.
+
+  If BiSyRMSD was enabled with --rmsd, the following columns are added:
+
+   * "rmsd", "rmsd_coverage". "rmsd_lddt_lp" "rmsd_bb_rmsd" and
+     "rmsd_model_ligand" are the BiSyRMSD, the corresponding coverage,
+     lDDT-LP, backbone RMSD and assigned model ligand, if an assignment was
+     found, respectively, empty otherwise.
+   * "rmsd_unassigned" is empty if an assignment was found, otherwise it
+     lists the short reason this reference ligand was unassigned.
   
   options:
     -h, --help            show this help message and exit
@@ -530,8 +558,8 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
     -rl [REFERENCE_LIGANDS ...], --ref-ligands [REFERENCE_LIGANDS ...], --reference-ligands [REFERENCE_LIGANDS ...]
                           Path to reference ligand files.
     -o OUTPUT, --out OUTPUT, --output OUTPUT
-                          Output file name. The output will be saved as a JSON
-                          file. default: out.json
+                          Output file name. Default depends on format: out.json or
+                          out.csv
     -mf {pdb,cif,mmcif}, --mdl-format {pdb,cif,mmcif}, --model-format {pdb,cif,mmcif}
                           Format of model file. pdb reads pdb but also pdb.gz,
                           same applies to cif/mmcif. Inferred from filepath if
@@ -540,6 +568,8 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
                           Format of reference file. pdb reads pdb but also
                           pdb.gz, same applies to cif/mmcif. Inferred from
                           filepath if not given.
+    -of {json,csv}, --out-format {json,csv}, --output-format {json,csv}
+                          Output format, JSON or CSV, in lowercase. default: json
     -mb MODEL_BIOUNIT, --model-biounit MODEL_BIOUNIT
                           Only has an effect if model is in mmcif format. By
                           default, the asymmetric unit (AU) is used for scoring.
