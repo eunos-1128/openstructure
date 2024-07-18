@@ -675,7 +675,7 @@ def _Main():
     args = _ParseArgs()
     ost.PushVerbosityLevel(args.verbosity)
     if args.verbosity < 4:
-        sys.tracebacklimit = 100
+        sys.tracebacklimit = 0
     _CheckCompoundLib()
     try:
         # Load structures
