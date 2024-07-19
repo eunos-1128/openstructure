@@ -348,9 +348,10 @@ def LoadCHARMMTraj(crd, dcd_file=None, profile='CHARMM',
 def LoadMMCIF(filename, fault_tolerant=None, calpha_only=None,
               profile='DEFAULT', remote=False, seqres=False, info=False):
   """
-  Load a mmCIF file and return one or more entities. Several options allow to
-  customize the exact behaviour of the mmCIF import. For more information on
-  these options, see :doc:`profile`.
+  Load an mmCIF file and return the first model as an entity.
+
+  Several options allow to customize the exact behaviour of the mmCIF import.
+  For more information on these options, see :doc:`profile`.
   
   Residues are flagged as ligand if they are not waters nor covered by an
   ``entity_poly`` record (ie. they are non-polymer entities in

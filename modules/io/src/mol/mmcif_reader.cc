@@ -478,15 +478,21 @@ void MMCifReader::ParseAndAddAtom(const std::vector<StringRef>& columns)
   mol::ResNum res_num(0);
   bool valid_res_num = false;
   if (indices_[PDBX_PDB_MODEL_NUM] != -1) {
+    int model_id = TryGetInt(columns[indices_[PDBX_PDB_MODEL_NUM]],
+                             "atom_site.pdbx_PDB_model_num");
     if (has_model_) {
-      if (curr_model_ != TryGetInt(columns[indices_[PDBX_PDB_MODEL_NUM]],
-                                   "atom_site.pdbx_PDB_model_num")) {
+      if (curr_model_ != model_id) {
+        if (warned_ignored_model_.find(model_id) == warned_ignored_model_.end()) {
+          LOG_WARNING("Ignorning new model " << model_id <<
+                      ". Only model " << curr_model_ << " was read.");
+          warned_ignored_model_.insert(model_id);
+        }
         return;
       }
     } else {
+      LOG_INFO("Reading model " << model_id << ".");
       has_model_ = true;
-      curr_model_ = TryGetInt(columns[indices_[PDBX_PDB_MODEL_NUM]],
-      "atom_site.pdbx_PDB_model_num");
+      curr_model_ = model_id;
     }
   }
 

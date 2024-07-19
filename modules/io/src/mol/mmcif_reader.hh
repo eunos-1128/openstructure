@@ -691,6 +691,7 @@ private:
   String subst_res_id_; ///< work around for missing label_seq_id's
   bool has_model_;      ///< keep track of models through different atom_sites
   int curr_model_;      ///< if we have pdbx_PDB_model_num, store no.
+  std::set<int> warned_ignored_model_; // keep track of ignored model warnings
   std::vector<std::pair<mol::ChainHandle, String> > chain_id_pairs_;
   ///< chain and label_entity_id
   MMCifEntityDescMap entity_desc_map_; ///< stores entity items
