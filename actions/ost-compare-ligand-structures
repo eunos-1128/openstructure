@@ -770,6 +770,8 @@ def _Main():
     args = _ParseArgs()
     ost.PushVerbosityLevel(args.verbosity)
     if args.verbosity < 4:
+        # Hide tracebacks by default
+        # Run script with -v 4 (Verbose) or higher to display them
         sys.tracebacklimit = 0
     _CheckCompoundLib()
     try:
