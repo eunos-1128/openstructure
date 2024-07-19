@@ -439,7 +439,7 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
                                        [-rl [REFERENCE_LIGANDS ...]] [-o OUTPUT]
                                        [-mf {pdb,cif,mmcif}]
                                        [-rf {pdb,cif,mmcif}] [-of {json,csv}]
-                                       [-mb MODEL_BIOUNIT]
+                                       [-csvm] [-mb MODEL_BIOUNIT]
                                        [-rb REFERENCE_BIOUNIT] [-ft] [-rna]
                                        [-sm] [-cd COVERAGE_DELTA] [-v VERBOSITY]
                                        [--full-results] [--lddt-pli]
@@ -523,17 +523,23 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
   null and a key "reason" is added giving an educated guess why this happened.
 
   CSV output is a table of comma-separated values, with one line for each
-  reference ligand. The following column is always available:
+  reference ligand (or one model ligand if the --by-model-ligand-output flag was
+  set).
 
-   * reference_ligand: If reference ligands were provided explicitly with
-     --reference-ligands, elements of the list will be the paths to the ligand
-     SDF file(s). Otherwise, they will be the chain name, residue number and
-     insertion code of the ligand, separated by a dot.
+  The following column is always available:
+
+   * reference_ligand/model_ligand: If reference ligands were provided explicitly
+     with --reference-ligands, elements of the list will be the paths to the
+     ligand SDF file(s). Otherwise, they will be the chain name, residue number
+     and insertion code of the ligand, separated by a dot. If the
+     --by-model-ligand-output flag was set, this will be model ligand instead,
+     following the same rules.
 
   If lDDT-PLI was enabled with --lddt-pli, the following columns are added:
 
-   * "lddt_pli", "lddt_pli_coverage" and "lddt_pli_model_ligand" are the
-     lDDT-PLI score result, the corresponding coverage and assigned model ligand,
+   * "lddt_pli", "lddt_pli_coverage" and "lddt_pli_(model|reference)_ligand"
+     are the lDDT-PLI score result, the corresponding coverage and assigned model
+     ligand (or reference ligand if the --by-model-ligand-output flag was set)
      if an assignment was found, respectively, empty otherwise.
    * "lddt_pli_unassigned" is empty if an assignment was found, otherwise it
      lists the short reason this reference ligand was unassigned.
@@ -541,9 +547,10 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
   If BiSyRMSD was enabled with --rmsd, the following columns are added:
 
    * "rmsd", "rmsd_coverage". "rmsd_lddt_lp" "rmsd_bb_rmsd" and
-     "rmsd_model_ligand" are the BiSyRMSD, the corresponding coverage,
-     lDDT-LP, backbone RMSD and assigned model ligand, if an assignment was
-     found, respectively, empty otherwise.
+     "rmsd_(model|reference)_ligand" are the BiSyRMSD, the corresponding
+     coverage, lDDT-LP, backbone RMSD and assigned model ligand (or reference
+     ligand if the --by-model-ligand-output flag was set) if an assignment
+     was found, respectively, empty otherwise.
    * "rmsd_unassigned" is empty if an assignment was found, otherwise it
      lists the short reason this reference ligand was unassigned.
   
@@ -570,6 +577,10 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
                           filepath if not given.
     -of {json,csv}, --out-format {json,csv}, --output-format {json,csv}
                           Output format, JSON or CSV, in lowercase. default: json
+    -csvm, --by-model-ligand, --by-model-ligand-output
+                          For CSV output, this flag changes the output so that
+                          each line reports one model ligand, instead of a
+                          reference ligand. Has no effect with JSON output.
     -mb MODEL_BIOUNIT, --model-biounit MODEL_BIOUNIT
                           Only has an effect if model is in mmcif format. By
                           default, the asymmetric unit (AU) is used for scoring.

@@ -74,17 +74,23 @@ specific pair of ligands could be computed, "score" and "coverage" are set to
 null and a key "reason" is added giving an educated guess why this happened.
 
 CSV output is a table of comma-separated values, with one line for each
-reference ligand. The following column is always available:
+reference ligand (or one model ligand if the --by-model-ligand-output flag was
+set).
 
- * reference_ligand: If reference ligands were provided explicitly with
-   --reference-ligands, elements of the list will be the paths to the ligand
-   SDF file(s). Otherwise, they will be the chain name, residue number and
-   insertion code of the ligand, separated by a dot.
+The following column is always available:
+
+ * reference_ligand/model_ligand: If reference ligands were provided explicitly
+   with --reference-ligands, elements of the list will be the paths to the
+   ligand SDF file(s). Otherwise, they will be the chain name, residue number
+   and insertion code of the ligand, separated by a dot. If the
+   --by-model-ligand-output flag was set, this will be model ligand instead,
+   following the same rules.
 
 If lDDT-PLI was enabled with --lddt-pli, the following columns are added:
 
- * "lddt_pli", "lddt_pli_coverage" and "lddt_pli_model_ligand" are the
-   lDDT-PLI score result, the corresponding coverage and assigned model ligand,
+ * "lddt_pli", "lddt_pli_coverage" and "lddt_pli_(model|reference)_ligand"
+   are the lDDT-PLI score result, the corresponding coverage and assigned model
+   ligand (or reference ligand if the --by-model-ligand-output flag was set)
    if an assignment was found, respectively, empty otherwise.
  * "lddt_pli_unassigned" is empty if an assignment was found, otherwise it
    lists the short reason this reference ligand was unassigned.
@@ -92,9 +98,10 @@ If lDDT-PLI was enabled with --lddt-pli, the following columns are added:
 If BiSyRMSD was enabled with --rmsd, the following columns are added:
 
  * "rmsd", "rmsd_coverage". "rmsd_lddt_lp" "rmsd_bb_rmsd" and
-   "rmsd_model_ligand" are the BiSyRMSD, the corresponding coverage,
-   lDDT-LP, backbone RMSD and assigned model ligand, if an assignment was
-   found, respectively, empty otherwise.
+   "rmsd_(model|reference)_ligand" are the BiSyRMSD, the corresponding
+   coverage, lDDT-LP, backbone RMSD and assigned model ligand (or reference
+   ligand if the --by-model-ligand-output flag was set) if an assignment
+   was found, respectively, empty otherwise.
  * "rmsd_unassigned" is empty if an assignment was found, otherwise it
    lists the short reason this reference ligand was unassigned.
 
@@ -192,6 +199,17 @@ def _ParseArgs():
         default="json",
         help=("Output format, JSON or CSV, in lowercase. "
               "default: json"))
+
+    parser.add_argument(
+        "-csvm",
+        "--by-model-ligand",
+        "--by-model-ligand-output",
+        dest="output_by_model_ligand",
+        default=False,
+        action="store_true",
+        help=("For CSV output, this flag changes the output so that each line "
+              "reports one model ligand, instead of a reference ligand. "
+              "Has no effect with JSON output."))
 
     parser.add_argument(
         "-mb",
@@ -715,47 +733,54 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
 def _WriteCSV(out, args):
     csv_dict = {}
 
+    if args.output_by_model_ligand:
+        ligand_by = "model_ligand"
+        ligand_other = "reference_ligand"
+    else:
+        ligand_by = "reference_ligand"
+        ligand_other = "model_ligand"
+
     # Always fill-in basic reference ligand info
-    fieldnames = ["reference_ligand"]
-    for reference_ligand in out["reference_ligands"]:
-        csv_dict[reference_ligand] = {
-            "reference_ligand": reference_ligand,
+    fieldnames = [ligand_by]
+    for ligand in out["%ss" % ligand_by]:
+        csv_dict[ligand] = {
+            ligand_by: ligand,
         }
 
     if args.lddt_pli:
         fieldnames.extend(["lddt_pli",  "lddt_pli_coverage",
-                           "lddt_pli_model_ligand", "lddt_pli_unassigned"])
+                           "lddt_pli_%s" % ligand_other, "lddt_pli_unassigned"])
         for score in out["lddt_pli"]["assigned_scores"]:
-            csv_dict[score["reference_ligand"]].update({
-                "reference_ligand": score["reference_ligand"],
+            csv_dict[score[ligand_by]].update({
+                ligand_by: score[ligand_by],
                 "lddt_pli": score["score"],
                 "lddt_pli_coverage": score["coverage"],
-                "lddt_pli_model_ligand": score["model_ligand"],
+                "lddt_pli_%s" % ligand_other: score[ligand_other],
             })
-        for reference_ligand, reason in out["lddt_pli"][
-                "reference_ligand_unassigned_reason"].items():
-            csv_dict[reference_ligand].update({
-                "reference_ligand": reference_ligand,
+        for ligand, reason in out["lddt_pli"][
+                "%s_unassigned_reason" % ligand_by].items():
+            csv_dict[ligand].update({
+                ligand_by: ligand,
                 "lddt_pli_unassigned": reason[0],
             })
 
     if args.rmsd:
         fieldnames.extend(["rmsd", "rmsd_coverage", "rmsd_lddt_lp",
-                           "rmsd_bb_rmsd", "rmsd_model_ligand",
+                           "rmsd_bb_rmsd", "rmsd_%s" % ligand_other,
                            "rmsd_unassigned"])
         for score in out["rmsd"]["assigned_scores"]:
-            csv_dict[score["reference_ligand"]].update({
-                "reference_ligand": score["reference_ligand"],
+            csv_dict[score[ligand_by]].update({
+                ligand_by: score[ligand_by],
                 "rmsd": score["score"],
                 "rmsd_coverage": score["coverage"],
                 "rmsd_lddt_lp": score["lddt_lp"],
                 "rmsd_bb_rmsd": score["bb_rmsd"],
-                "rmsd_model_ligand": score["model_ligand"],
+                "rmsd_%s" % ligand_other: score[ligand_other],
             })
-        for reference_ligand, reason in out["rmsd"][
-                "reference_ligand_unassigned_reason"].items():
-            csv_dict[reference_ligand].update({
-                "reference_ligand": reference_ligand,
+        for ligand, reason in out["rmsd"][
+                "%s_unassigned_reason" % ligand_by].items():
+            csv_dict[ligand].update({
+                ligand_by: ligand,
                 "rmsd_unassigned": reason[0],
             })
 
