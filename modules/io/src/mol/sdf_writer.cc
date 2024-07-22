@@ -22,6 +22,7 @@
 
 #include "sdf_writer.hh"
 
+#include <time.h>
 #include <ost/boost_filesystem_helper.hh>
 #include <ost/mol/atom_view.hh>
 #include <ost/mol/residue_view.hh>
@@ -251,8 +252,19 @@ bool SDFWriter::VisitChain(const mol::ChainView& chain) {
   }
 
   // print header lines
+  // line 1: molecule name
   ostr_ << cname << std::endl;
-  ostr_ << std::endl;
+  // line 2: program name and time
+  // IIPPPPPPPPMMDDYYHHmmddSSssssssssssEEEEEEEEEEEERRRRRR
+  std::time_t t = std::time(nullptr);
+  std::tm tm = *std::localtime(&t);
+  ostr_ << "  "                             // User's first and last initials
+        << "     OST"                       // program name
+        << std::put_time(&tm, "%m%d%y%H%M") // date/time
+        << "3D"                             // dimensional codes
+        << "                            "   // scaling factors, energy, internal registry number
+        << std::endl;
+  // line 3: comment (blank)
   ostr_ << std::endl;
   // print counts line
   ostr_ << format("%3d") % chain.GetAtomCount()
