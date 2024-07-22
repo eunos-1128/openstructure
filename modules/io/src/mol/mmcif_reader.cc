@@ -99,6 +99,18 @@ bool MMCifReader::OnBeginData(const StringRef& data_name)
 {
   LOG_DEBUG("MCIFFReader: " << profile_);
   Profile profile_import("MMCifReader::OnBeginData");
+  if (chain_count_ > 0) {
+      std::stringstream ss;
+      ss << "Can only read one data block. Found second one 'data_" << data_name << "'.";
+      if (profile_.fault_tolerant) {
+        LOG_WARNING(ss.str());
+      } else {
+        throw IOException(this->FormatDiagnostic(STAR_DIAG_ERROR,
+                                                 ss.str(),
+                                                 this->GetCurrentLinenum()));
+      }
+
+  }
 
   // IDs in mmCIF files can be any string, so no restrictions here
 
