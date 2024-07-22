@@ -381,6 +381,7 @@ class Scorer:
         self._rigid_n_target_not_mapped = None
         self._rigid_transform = None
 
+        self._gdt_window_sizes = [5, 7, 9, 12, 24, 36, 48]
         self._gdt_05 = None
         self._gdt_1 = None
         self._gdt_2 = None
@@ -1399,7 +1400,13 @@ class Scorer:
         :type: :class:`float` 
         """
         if self._gdt_05 is None:
-            n, m = GDT(self.rigid_mapped_model_pos, self.rigid_mapped_target_pos, 7, 1000, 0.5)
+            N = list()
+            for window_size in self._gdt_window_sizes:
+                n = GDT(self.rigid_mapped_model_pos,
+                        self.rigid_mapped_target_pos,
+                        window_size, 1000, 0.5)[0]
+                N.append(n)
+            n = max(N)
             n_full = len(self.rigid_mapped_target_pos) + self.rigid_n_target_not_mapped
             if n_full > 0:
                 self._gdt_05 = float(n) / n_full
@@ -1417,7 +1424,13 @@ class Scorer:
         :type: :class:`float` 
         """
         if self._gdt_1 is None:
-            n, m = GDT(self.rigid_mapped_model_pos, self.rigid_mapped_target_pos, 7, 1000, 1.0)
+            N = list()
+            for window_size in self._gdt_window_sizes:
+                n = GDT(self.rigid_mapped_model_pos,
+                        self.rigid_mapped_target_pos,
+                        window_size, 1000, 1.0)[0]
+                N.append(n)
+            n = max(N)
             n_full = len(self.rigid_mapped_target_pos) + self.rigid_n_target_not_mapped
             if n_full > 0:
                 self._gdt_1 = float(n) / n_full
@@ -1436,7 +1449,13 @@ class Scorer:
         :type: :class:`float` 
         """
         if self._gdt_2 is None:
-            n, m = GDT(self.rigid_mapped_model_pos, self.rigid_mapped_target_pos, 7, 1000, 2.0)
+            N = list()
+            for window_size in self._gdt_window_sizes:
+                n = GDT(self.rigid_mapped_model_pos,
+                        self.rigid_mapped_target_pos,
+                        window_size, 1000, 2.0)[0]
+                N.append(n)
+            n = max(N)
             n_full = len(self.rigid_mapped_target_pos) + self.rigid_n_target_not_mapped
             if n_full > 0:
                 self._gdt_2 = float(n) / n_full
@@ -1454,7 +1473,13 @@ class Scorer:
         :type: :class:`float` 
         """
         if self._gdt_4 is None:
-            n, m = GDT(self.rigid_mapped_model_pos, self.rigid_mapped_target_pos, 7, 1000, 4.0)
+            N = list()
+            for window_size in self._gdt_window_sizes:
+                n = GDT(self.rigid_mapped_model_pos,
+                        self.rigid_mapped_target_pos,
+                        window_size, 1000, 4.0)[0]
+                N.append(n)
+            n = max(N)
             n_full = len(self.rigid_mapped_target_pos) + self.rigid_n_target_not_mapped
             if n_full > 0:
                 self._gdt_4 = float(n) / n_full
@@ -1471,7 +1496,13 @@ class Scorer:
         :type: :class:`float` 
         """
         if self._gdt_8 is None:
-            n, m = GDT(self.rigid_mapped_model_pos, self.rigid_mapped_target_pos, 7, 1000, 8.0)
+            N = list()
+            for window_size in self._gdt_window_sizes:
+                n = GDT(self.rigid_mapped_model_pos,
+                        self.rigid_mapped_target_pos,
+                        window_size, 1000, 8.0)[0]
+                N.append(n)
+            n = max(N)
             n_full = len(self.rigid_mapped_target_pos) + self.rigid_n_target_not_mapped
             if n_full > 0:
                 self._gdt_8 = float(n) / n_full
