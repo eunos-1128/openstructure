@@ -1686,7 +1686,7 @@ void MMCifReader::ParseStructRefSeq(const std::vector<StringRef>& columns)
        e=struct_refs_.end(); i!=e; ++i) { 
     if ((*i)->GetID()==sr_id) {
      (*i)->AddAlignedSeq(aln_id, chain_name, entbeg.second, entend.second, 
-                          dbbeg.second, dbend.second);
+                          dbbeg.second, dbend.second, profile_.fault_tolerant);
      found=true;
        break;
     }
