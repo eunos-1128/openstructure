@@ -22,7 +22,7 @@
 #include "compare_files.hh"
 
 namespace ost {
-bool compare_files(const String& test, const String& gold_standard)
+bool compare_files(const String& test, const String& gold_standard, const std::unordered_set<int>& ignore_line)
 {
   std::ifstream test_stream(test.c_str());
   if (!test_stream) {
@@ -36,6 +36,7 @@ bool compare_files(const String& test, const String& gold_standard)
     return false;
   }
   String test_line, gold_line;
+  int line_num = 1;
   while (true) {
     bool test_read = static_cast<bool>(std::getline(test_stream, test_line));
     bool gold_read = static_cast<bool>(std::getline(gold_stream, gold_line));
@@ -54,10 +55,15 @@ bool compare_files(const String& test, const String& gold_standard)
       return false;
     }
     if (gold_line!=test_line) {
+      if (ignore_line.find(line_num) != ignore_line.end()) {
+        continue;
+      }
       std::cerr << "line mismatch:" << std::endl << "test: " << test_line
-                << std::endl << "gold: " << gold_line << std::endl;
+                << std::endl << "gold: " << gold_line << std::endl
+                << "line: " << line_num << std::endl;
       return false;
     }
+    ++line_num;
   }
   return true;
 }

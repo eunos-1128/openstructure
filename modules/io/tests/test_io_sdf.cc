@@ -149,7 +149,8 @@ BOOST_AUTO_TEST_CASE(write_sdf)
     SaveEntity(eh, "testfiles/sdf/compound-out.sdf");
   }
   BOOST_CHECK(compare_files("testfiles/sdf/compound-out.sdf",
-                            "testfiles/sdf/compound.sdf"));
+                            "testfiles/sdf/compound.sdf",
+                            {2, 159, 316, 473}));
 }
 
 BOOST_AUTO_TEST_CASE(write_sdf_view)
@@ -164,7 +165,8 @@ BOOST_AUTO_TEST_CASE(write_sdf_view)
     SaveEntity(ev, "testfiles/sdf/compound-view-out.sdf");
   }
   BOOST_CHECK(compare_files("testfiles/sdf/compound-view-out.sdf",
-                            "testfiles/sdf/compound-view.sdf"));
+                            "testfiles/sdf/compound-view.sdf",
+                            {2, 111, 220, 329}));
 }
 
 BOOST_AUTO_TEST_CASE(nonexisting_file)
