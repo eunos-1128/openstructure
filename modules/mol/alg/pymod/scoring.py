@@ -371,12 +371,16 @@ class Scorer:
 
         self._mapped_target_pos = None
         self._mapped_model_pos = None
+        self._mapped_target_pos_full_bb = None
+        self._mapped_model_pos_full_bb = None
         self._transformed_mapped_model_pos = None
         self._n_target_not_mapped = None
         self._transform = None
 
         self._rigid_mapped_target_pos = None
         self._rigid_mapped_model_pos = None
+        self._rigid_mapped_target_pos_full_bb = None
+        self._rigid_mapped_model_pos_full_bb = None
         self._rigid_transformed_mapped_model_pos = None
         self._rigid_n_target_not_mapped = None
         self._rigid_transform = None
@@ -1271,6 +1275,20 @@ class Scorer:
         return self._mapped_target_pos
 
     @property
+    def mapped_target_pos_full_bb(self):
+        """ Mapped representative positions in target
+
+        Thats the equivalent of :attr:`mapped_target_pos` but containing more
+        backbone atoms (N, CA, C for peptide residues and O5', C5', C4', C3', O3
+        for nucleotide residues). mapping is based on :attr:`mapping`.
+
+        :type: :class:`ost.geom.Vec3List`
+        """
+        if self._mapped_target_pos_full_bb is None:
+            self._extract_mapped_pos_full_bb()
+        return self._mapped_target_pos_full_bb
+
+    @property
     def mapped_model_pos(self):
         """ Mapped representative positions in model
 
@@ -1283,6 +1301,20 @@ class Scorer:
         if self._mapped_model_pos is None:
             self._extract_mapped_pos()
         return self._mapped_model_pos
+
+    @property
+    def mapped_model_pos_full_bb(self):
+        """ Mapped representative positions in model
+
+        Thats the equivalent of :attr:`mapped_model_pos` but containing more
+        backbone atoms (N, CA, C for peptide residues and O5', C5', C4', C3', O3
+        for nucleotide residues). mapping is based on :attr:`mapping`.
+
+        :type: :class:`ost.geom.Vec3List`
+        """
+        if self._mapped_model_pos_full_bb is None:
+            self._extract_mapped_pos_full_bb()
+        return self._mapped_model_pos_full_bb
 
     @property
     def transformed_mapped_model_pos(self):
@@ -1310,17 +1342,21 @@ class Scorer:
     def transform(self):
         """ Transform: :attr:`~mapped_model_pos` onto :attr:`~mapped_target_pos`
 
-        Computed using Kabsch minimal rmsd algorithm
+        Computed using Kabsch minimal rmsd algorithm. If number of positions
+        is too small (< 3), :attr:`~mapped_model_pos_full_bb` and
+        :attr:`~mapped_target_pos_full_bb` are used.
 
         :type: :class:`ost.geom.Mat4`
         """
         if self._transform is None:
-            try:
+            if len(self.mapped_model_pos) < 3:
+                res = mol.alg.SuperposeSVD(self.mapped_model_pos_full_bb,
+                                           self.mapped_target_pos_full_bb)
+                self._transform = res.transformation
+            else:
                 res = mol.alg.SuperposeSVD(self.mapped_model_pos,
                                            self.mapped_target_pos)
                 self._transform = res.transformation
-            except:
-                self._transform = geom.Mat4()
         return self._transform
 
     @property
@@ -1338,6 +1374,20 @@ class Scorer:
         return self._rigid_mapped_target_pos
 
     @property
+    def rigid_mapped_target_pos_full_bb(self):
+        """ Mapped representative positions in target
+
+        Thats the equivalent of :attr:`rigid_mapped_target_pos` but containing
+        more backbone atoms (N, CA, C for peptide residues and O5', C5', C4',
+        C3', O3 for nucleotide residues). mapping is based on :attr:`mapping`.
+
+        :type: :class:`ost.geom.Vec3List`
+        """
+        if self._rigid_mapped_target_pos_full_bb is None:
+            self._extract_rigid_mapped_pos_full_bb()
+        return self._rigid_mapped_target_pos_full_bb
+
+    @property
     def rigid_mapped_model_pos(self):
         """ Mapped representative positions in model
 
@@ -1350,6 +1400,20 @@ class Scorer:
         if self._rigid_mapped_model_pos is None:
             self._extract_rigid_mapped_pos()
         return self._rigid_mapped_model_pos
+
+    @property
+    def rigid_mapped_model_pos_full_bb(self):
+        """ Mapped representative positions in model
+
+        Thats the equivalent of :attr:`rigid_mapped_model_pos` but containing
+        more backbone atoms (N, CA, C for peptide residues and O5', C5', C4',
+        C3', O3 for nucleotide residues). mapping is based on :attr:`mapping`.
+
+        :type: :class:`ost.geom.Vec3List`
+        """
+        if self._rigid_mapped_model_pos_full_bb is None:
+            self._extract_rigid_mapped_pos_full_bb()
+        return self._rigid_mapped_model_pos_full_bb
 
     @property
     def rigid_transformed_mapped_model_pos(self):
@@ -1377,17 +1441,21 @@ class Scorer:
     def rigid_transform(self):
         """ Transform: :attr:`~rigid_mapped_model_pos` onto :attr:`~rigid_mapped_target_pos`
 
-        Computed using Kabsch minimal rmsd algorithm
+        Computed using Kabsch minimal rmsd algorithm. If number of positions
+        is too small (< 3), :attr:`~rigid_mapped_model_pos_full_bb` and
+        :attr:`~rigid_mapped_target_pos_full_bb` are used.
 
         :type: :class:`ost.geom.Mat4`
         """
         if self._rigid_transform is None:
-            try:
+            if len(self.rigid_mapped_model_pos) < 3:
+                res = mol.alg.SuperposeSVD(self.rigid_mapped_model_pos_full_bb,
+                                           self.rigid_mapped_target_pos_full_bb)
+                self._rigid_transform = res.transformation
+            else:
                 res = mol.alg.SuperposeSVD(self.rigid_mapped_model_pos,
                                            self.rigid_mapped_target_pos)
                 self._rigid_transform = res.transformation
-            except:
-                self._rigid_transform = geom.Mat4()
         return self._rigid_transform
 
     @property
@@ -2050,6 +2118,37 @@ class Scorer:
             if ch.GetName() not in processed_trg_chains:
                 self._n_target_not_mapped += len(ch.residues)
 
+    def _extract_mapped_pos_full_bb(self):
+        self._mapped_target_pos_full_bb = geom.Vec3List()
+        self._mapped_model_pos_full_bb = geom.Vec3List()
+        exp_pep_atoms = ["N", "CA", "C"]
+        exp_nuc_atoms = ["\"O5'\"", "\"C5'\"", "\"C4'\"", "\"C3'\"", "\"O3'\""]
+        trg_pep_chains = [s.GetName() for s in self.chain_mapper.polypep_seqs]
+        trg_nuc_chains = [s.GetName() for s in self.chain_mapper.polynuc_seqs]
+        for trg_ch, mdl_ch in self.mapping.GetFlatMapping().items():
+            aln = self.mapping.alns[(trg_ch, mdl_ch)]
+            trg_ch = aln.GetSequence(0).GetName()
+            if trg_ch in trg_pep_chains:
+                exp_atoms = exp_pep_atoms
+            elif trg_ch in trg_nuc_chains:
+                exp_atoms = exp_nuc_atoms
+            else:
+                # this should be guaranteed by the chain mapper
+                raise RuntimeError("Unexpected error - contact OST developer")
+            for col in aln:
+                if col[0] != '-' and col[1] != '-':
+                    trg_res = col.GetResidue(0)
+                    mdl_res = col.GetResidue(1)
+                    for aname in exp_atoms:
+                        trg_at = trg_res.FindAtom(aname)
+                        mdl_at = mdl_res.FindAtom(aname)
+                        if not (trg_at.IsValid() and mdl_at.IsValid()):
+                            # this should be guaranteed by the chain mapper
+                            raise RuntimeError("Unexpected error - contact OST "
+                                               "developer")
+                        self._mapped_target_pos_full_bb.append(trg_at.GetPos())
+                        self._mapped_model_pos_full_bb.append(mdl_at.GetPos())
+
 
     def _extract_rigid_mapped_pos(self):
         self._rigid_mapped_target_pos = geom.Vec3List()
@@ -2078,6 +2177,36 @@ class Scorer:
             if ch.GetName() not in processed_trg_chains:
                 self._rigid_n_target_not_mapped += len(ch.residues)
 
+    def _extract_rigid_mapped_pos_full_bb(self):
+        self._rigid_mapped_target_pos_full_bb = geom.Vec3List()
+        self._rigid_mapped_model_pos_full_bb = geom.Vec3List()
+        exp_pep_atoms = ["N", "CA", "C"]
+        exp_nuc_atoms = ["\"O5'\"", "\"C5'\"", "\"C4'\"", "\"C3'\"", "\"O3'\""]
+        trg_pep_chains = [s.GetName() for s in self.chain_mapper.polypep_seqs]
+        trg_nuc_chains = [s.GetName() for s in self.chain_mapper.polynuc_seqs]
+        for trg_ch, mdl_ch in self.rigid_mapping.GetFlatMapping().items():
+            aln = self.mapping.alns[(trg_ch, mdl_ch)]
+            trg_ch = aln.GetSequence(0).GetName()
+            if trg_ch in trg_pep_chains:
+                exp_atoms = exp_pep_atoms
+            elif trg_ch in trg_nuc_chains:
+                exp_atoms = exp_nuc_atoms
+            else:
+                # this should be guaranteed by the chain mapper
+                raise RuntimeError("Unexpected error - contact OST developer")
+            for col in aln:
+                if col[0] != '-' and col[1] != '-':
+                    trg_res = col.GetResidue(0)
+                    mdl_res = col.GetResidue(1)
+                    for aname in exp_atoms:
+                        trg_at = trg_res.FindAtom(aname)
+                        mdl_at = mdl_res.FindAtom(aname)
+                        if not (trg_at.IsValid() and mdl_at.IsValid()):
+                            # this should be guaranteed by the chain mapper
+                            raise RuntimeError("Unexpected error - contact OST "
+                                               "developer")
+                        self._rigid_mapped_target_pos_full_bb.append(trg_at.GetPos())
+                        self._rigid_mapped_model_pos_full_bb.append(mdl_at.GetPos())
 
     def _compute_cad_score(self):
         if not self.resnum_alignments:
