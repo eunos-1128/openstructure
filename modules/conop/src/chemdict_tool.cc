@@ -79,7 +79,7 @@ int main(int argc, char const *argv[])
       Logger::Instance().PushVerbosityLevel(0);
     } else {
       PrintUsage();
-      return 0;
+      return 1;
     }
   }
   boost::iostreams::filtering_stream<boost::iostreams::input>  filtered_istream;  
