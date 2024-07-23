@@ -78,7 +78,8 @@ int main(int argc, char const *argv[])
     } else if (param=="-q") {
       Logger::Instance().PushVerbosityLevel(0);
     } else {
-      PrintUsage();
+      std::cout << "Unrecognized argument '" << param << "'" << std::endl;
+      std::cout << "Try 'chemdict_tool -h' for more information" << std::endl;
       return 1;
     }
   }
