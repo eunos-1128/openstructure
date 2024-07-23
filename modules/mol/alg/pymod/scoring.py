@@ -1350,9 +1350,13 @@ class Scorer:
         """
         if self._transform is None:
             if len(self.mapped_model_pos) < 3:
-                res = mol.alg.SuperposeSVD(self.mapped_model_pos_full_bb,
-                                           self.mapped_target_pos_full_bb)
-                self._transform = res.transformation
+                if len(self.mapped_model_pos_full_bb) >=3:
+                    res = mol.alg.SuperposeSVD(self.mapped_model_pos_full_bb,
+                                               self.mapped_target_pos_full_bb)
+                    self._transform = res.transformation
+                else:
+                    # there is really nothing we can do => set identity matrix
+                    self._transform = geom.Mat4()
             else:
                 res = mol.alg.SuperposeSVD(self.mapped_model_pos,
                                            self.mapped_target_pos)
@@ -1449,9 +1453,13 @@ class Scorer:
         """
         if self._rigid_transform is None:
             if len(self.rigid_mapped_model_pos) < 3:
-                res = mol.alg.SuperposeSVD(self.rigid_mapped_model_pos_full_bb,
-                                           self.rigid_mapped_target_pos_full_bb)
-                self._rigid_transform = res.transformation
+                if len(self.rigid_mapped_model_pos_full_bb) >= 3:
+                    res = mol.alg.SuperposeSVD(self.rigid_mapped_model_pos_full_bb,
+                                               self.rigid_mapped_target_pos_full_bb)
+                    self._rigid_transform = res.transformation
+                else:
+                    # there is really nothing we can do => set identity matrix
+                    self._rigid_transform = geom.Mat4()
             else:
                 res = mol.alg.SuperposeSVD(self.rigid_mapped_model_pos,
                                            self.rigid_mapped_target_pos)
