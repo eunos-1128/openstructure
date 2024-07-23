@@ -179,6 +179,12 @@ public:
   const String& GetID() const {
     return tlc_;
   }
+
+  /// \brief set three-letter code that is unique for every compound
+   void SetID(const String& id) {
+    tlc_ = id;
+  }
+
   Dialect GetDialect() const { return dialect_; }
   
   String GetDialectAsString() const { 

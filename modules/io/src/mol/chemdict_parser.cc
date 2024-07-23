@@ -7,6 +7,8 @@ using namespace ost::conop;
   
 bool ChemdictParser::OnBeginData(const StringRef& data_name) 
 {
+  // Create empty compound skeleton
+  valid_compound_ = false;
   compound_.reset(new Compound(data_name.str()));
   compound_->SetDialect(dialect_);
   if (last_!=data_name[0]) {
@@ -14,6 +16,7 @@ bool ChemdictParser::OnBeginData(const StringRef& data_name)
     std::cout << last_ << std::flush;
   }
   atom_map_.clear();
+  valid_atom_ = false;
   return true;
 }
 
@@ -94,6 +97,14 @@ void ChemdictParser::OnDataRow(const StarLoopDesc& header,
 void ChemdictParser::OnDataItem(const StarDataItem& item)
 {
   if (item.GetCategory()==StringRef("chem_comp", 9)) {
+    if (item.GetName()==StringRef("id", 2)) {
+      if (compound_->GetID() != item.GetValue().str()) {
+          LOG_INFO("_chem_comp.id '" << item.GetValue() << "' doesn't match"
+                      << "ID from data block '" << compound_->GetID() << "'");
+          compound_->SetID(item.GetValue().str());
+      }
+      valid_compound_ = true;
+    }
     if (item.GetName()==StringRef("type", 4)) {
       // convert type to uppercase
       String type=item.GetValue().str();
@@ -159,6 +170,7 @@ void ChemdictParser::OnDataItem(const StarDataItem& item)
     }
   } else if (item.GetName()==StringRef("atom_id", 7)) {
     atom_.name=item.GetValue().str();
+    valid_atom_ = true;
   } else if (item.GetName()==StringRef("alt_atom_id", 11)) {
     if (compound_->GetID()=="ILE" && item.GetValue()==StringRef("CD1", 3)) {
       atom_.alt_name="CD";
@@ -177,12 +189,24 @@ void ChemdictParser::OnEndData()
 {
   if (compound_)
   {
-    if (compound_->GetID() != "UNL" &&
+    if (! valid_compound_)
+    {
+      LOG_WARNING("Skipping compound without _chem_comp.id: " << compound_->GetID());
+    }
+    else if (compound_->GetID() != "UNL" &&
         ! (ignore_reserved_ && IsNameReserved(compound_->GetID())) &&
         ! (ignore_obsolete_ && compound_->GetObsolete()))
     {
       if (compound_->GetAtomSpecs().empty()) {
-        compound_->AddAtom(atom_);
+        // This happens if we had a single atom
+        if (valid_atom_)
+        {
+          compound_->AddAtom(atom_);
+        }
+        else
+        {
+          LOG_WARNING("Adding compound with no atoms: " << compound_->GetID());
+        }
       }
       lib_->AddCompound(compound_);
     }

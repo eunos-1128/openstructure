@@ -71,6 +71,7 @@ private:
   bool IsNameReserved(const String& data_name);
   conop::CompoundLibPtr                   lib_;
   conop::CompoundPtr                      compound_;
+  bool                                    valid_compound_;
   typedef enum {
     ATOM_NAME=0,
     ALT_ATOM_NAME=1,
@@ -93,6 +94,7 @@ private:
   std::map<String, int>                   atom_map_;
   LoopType                                loop_type_;  
   conop::AtomSpec                         atom_;
+  bool                                    valid_atom_;
   conop::Compound::Dialect                dialect_;
   bool                                    ignore_reserved_;
   bool                                    ignore_obsolete_;
