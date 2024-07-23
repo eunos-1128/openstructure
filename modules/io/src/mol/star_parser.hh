@@ -239,6 +239,11 @@ public:
 public:
   static bool SplitLine(const StringRef& line, 
                         std::vector<StringRef>& parts, bool clear=true);
+  static inline bool IsUndefined(StringRef value)
+{
+  return value.size()==1 && (value[0]=='?' || value[0]=='.');
+}
+
 private:
   void ParseLoop();
   /// \brief Calls the loop parsing functions on the last data item fetched to

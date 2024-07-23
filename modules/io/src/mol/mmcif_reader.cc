@@ -31,11 +31,6 @@
 namespace ost { namespace io {
 
 
-bool is_undef(StringRef value)
-{
-  return value.size()==1 && (value[0]=='?' || value[0]=='.');
-}
-
 MMCifReader::MMCifReader(std::istream& stream, mol::EntityHandle& ent_handle,
                          const IOProfile& profile):
   StarParser(stream, true), profile_(profile), ent_handle_(ent_handle)
@@ -538,10 +533,10 @@ void MMCifReader::ParseAndAddAtom(const std::vector<StringRef>& columns)
     occ = this->GetRealOrDefault(columns[indices_[OCCUPANCY]],
                                  "atom_site.occupancy",
                                  1.0,
-                                 is_undef);
+                                 IsUndefined);
   }
   if (indices_[B_ISO_OR_EQUIV] != -1) {
-    if (!is_undef(columns[indices_[B_ISO_OR_EQUIV]])) {
+    if (!IsUndefined(columns[indices_[B_ISO_OR_EQUIV]])) {
       temp = this->TryGetReal(columns[indices_[B_ISO_OR_EQUIV]],
                               "atom_site.B_iso_or_equiv");
     }
@@ -889,13 +884,13 @@ void MMCifReader::ParseCitation(const std::vector<StringRef>& columns)
     }
   }
   if (indices_[PDBX_DATABASE_ID_PUBMED] != -1) {
-    if (!is_undef(columns[indices_[PDBX_DATABASE_ID_PUBMED]])) {
+    if (!IsUndefined(columns[indices_[PDBX_DATABASE_ID_PUBMED]])) {
       cit.SetPubMed(this->TryGetInt(columns[indices_[PDBX_DATABASE_ID_PUBMED]],
                                     "citation.pdbx_database_id_PubMed"));
     }
   }
   if (indices_[YEAR] != -1) {
-    if (!is_undef(columns[indices_[YEAR]])) {
+    if (!IsUndefined(columns[indices_[YEAR]])) {
       cit.SetYear(this->TryGetInt(columns[indices_[YEAR]], "citation.year"));
     }
   }
@@ -1194,7 +1189,7 @@ void MMCifReader::ParseStruct(const std::vector<StringRef>& columns)
   }
 
   if (indices_[PDBX_FORMULA_WEIGHT] != -1) {
-    if (!is_undef(columns[indices_[PDBX_FORMULA_WEIGHT]])) {
+    if (!IsUndefined(columns[indices_[PDBX_FORMULA_WEIGHT]])) {
       details.SetMass(this->TryGetReal(columns[indices_[PDBX_FORMULA_WEIGHT]],
                                        "struct.pdbx_formula_weight"));
     }
@@ -1729,7 +1724,7 @@ void MMCifReader::ParseStructRefSeqDif(const std::vector<StringRef>& columns)
 
   std::pair<bool,int> seq_rnum;
   if (indices_[SRSD_SEQ_RNUM] != -1) {
-    if (!is_undef(columns[indices_[SRSD_SEQ_RNUM]])) {
+    if (!IsUndefined(columns[indices_[SRSD_SEQ_RNUM]])) {
       seq_rnum=this->TryGetInt(columns[indices_[SRSD_SEQ_RNUM]],
                                "_struct_ref_seq_dif.seq_num",
                                profile_.fault_tolerant);
