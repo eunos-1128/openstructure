@@ -45,6 +45,7 @@ void PrintUsage()
   std::cout << "  -i  - ignore compounds reserved by the PDB (01-99, DRG, INH, LIG)" << std::endl;
   std::cout << "  -o  - ignore obsolete compounds" << std::endl;
   std::cout << "  -v  - be more verbose" << std::endl;
+  std::cout << "  -q  - be more quiet (last of -v or -q is applied)" << std::endl;
 }
 
 int main(int argc, char const *argv[])
@@ -74,6 +75,8 @@ int main(int argc, char const *argv[])
       ignore_obsolete=true;
     } else if (param=="-v") {
       Logger::Instance().PushVerbosityLevel(4);
+    } else if (param=="-q") {
+      Logger::Instance().PushVerbosityLevel(0);
     } else {
       PrintUsage();
       return 0;
