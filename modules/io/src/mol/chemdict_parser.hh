@@ -44,7 +44,8 @@ public:
     bool ignore_reserved=false, bool ignore_obsolete=false):
     StarParser(stream), compound_(new conop::Compound("UNK")), 
     last_(0), loop_type_(DONT_KNOW), dialect_(dialect),
-    ignore_reserved_(ignore_reserved), ignore_obsolete_(ignore_obsolete)
+    ignore_reserved_(ignore_reserved), ignore_obsolete_(ignore_obsolete),
+    imported_count_(0)
   {
     this->InitTypeMap();
     this->InitPDBXTypeMap();
@@ -64,6 +65,12 @@ public:
   void SetCompoundLib(const conop::CompoundLibPtr& lib) 
   {
     lib_=lib;
+  }
+
+  /// \brief Get the number of compounds that were successfully parsed
+  int GetImportedCount()
+  {
+    return imported_count_;
   }
 private:
   void InitTypeMap();  
@@ -98,6 +105,7 @@ private:
   conop::Compound::Dialect                dialect_;
   bool                                    ignore_reserved_;
   bool                                    ignore_obsolete_;
+  int                                     imported_count_;
 };
 
 

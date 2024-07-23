@@ -215,6 +215,7 @@ void ChemdictParser::OnEndData()
         }
       }
       lib_->AddCompound(compound_);
+      ++imported_count_;
     }
   }
 }

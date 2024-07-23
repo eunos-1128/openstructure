@@ -116,6 +116,11 @@ int main(int argc, char const *argv[])
     compound_lib.reset();
     cdp.SetCompoundLib(in_mem_lib);
     cdp.Parse();
+    if (cdp.GetImportedCount() == 0)
+    {
+      std::cout << "No compound imported from " << argv[2] << std::endl;
+      return 1;
+    }
     in_mem_lib->SetChemLibInfo();
     conop::CompoundLibPtr copy = in_mem_lib->Copy(argv[3]);
     if (! copy) {
