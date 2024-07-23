@@ -118,6 +118,32 @@ class TestCompLib(unittest.TestCase):
         # OX is obsolete
         assert complib_no_obsolete.FindCompound("OX") is None
 
+    def test_bird(self):
+        """ the test file in test_compounds.cif contains two entries from
+          BIRD:
+
+          - PRD_900116 is not in a compound format and should not be added
+            to the compound lib.
+          - PRDCC_900116 is in a valid format and should be read in
+        """
+        complib = self.complib
+        # PRD_900116 not added
+        comp = complib.FindCompound("PRD_900116")
+        self.assertIsNone(comp)
+
+        # PRD_900116 is added
+        comp = complib.FindCompound("PRDCC_900116")
+        self.assertIsNotNone(comp)
+        self.assertEqual(
+            comp.smiles,
+            "C1[C@H]([C@@H]([C@H]([C@@H](O1)O[C@@H]2CO[C@H]([C@@H]([C@H]2O)O)O)O)O)O")
+        # The release flag is REF_ONLY and compound should not be marked as
+        # obsolete
+        self.assertFalse(comp.obsolete)
+        # Contains atoms and bonds
+        self.assertEqual(len(comp.atom_specs), 37)
+        self.assertEqual(len(comp.bond_specs), 38)
+
 
 if __name__ == "__main__":
     from ost import testutils
