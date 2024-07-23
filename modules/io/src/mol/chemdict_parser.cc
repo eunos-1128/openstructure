@@ -155,18 +155,24 @@ void ChemdictParser::OnDataItem(const StarDataItem& item)
         compound_->SetObsolete(true);
       }
     } else if (item.GetName()==StringRef("pdbx_replaced_by", 16)) {
-      String replaced_by = item.GetValue().str();
-      if (replaced_by != "?") {
-        compound_->SetReplacedBy(replaced_by);
+      StringRef replaced_by = item.GetValue();
+      if (! IsUndefined(replaced_by)) {
+        compound_->SetReplacedBy(replaced_by.str());
       }
     }  else if (item.GetName()==StringRef("one_letter_code", 15)) {
       if (item.GetValue().length()==1) {
         compound_->SetOneLetterCode(item.GetValue()[0]);   
       }
-    } else if (item.GetName()==StringRef("pdbx_initial_date", 17)) {        
-      compound_->SetCreationDate(Date::FromString(item.GetValue()));
+    } else if (item.GetName()==StringRef("pdbx_initial_date", 17)) {
+      StringRef pdbx_initial_date = item.GetValue();
+      if (! IsUndefined(pdbx_initial_date)) {
+        compound_->SetCreationDate(Date::FromString(pdbx_initial_date));
+      }
     } else if (item.GetName()==StringRef("pdbx_modified_date", 18)) {
-      compound_->SetModificationDate(Date::FromString(item.GetValue()));
+      StringRef pdbx_modified_date = item.GetValue();
+      if (! IsUndefined(pdbx_modified_date)) {
+        compound_->SetModificationDate(Date::FromString(pdbx_modified_date));
+      }
     }
   } else if (item.GetName()==StringRef("atom_id", 7)) {
     atom_.name=item.GetValue().str();
