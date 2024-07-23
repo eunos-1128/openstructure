@@ -89,34 +89,40 @@ int main(int argc, char const *argv[])
   if (boost::iequals(".gz", boost::filesystem::extension(argv[2]))) {
     filtered_istream.push(boost::iostreams::gzip_decompressor());
   }
-  filtered_istream.push(istream);  
-  io::ChemdictParser cdp(filtered_istream, dialect, ignore_reserved, ignore_obsolete);
-  conop::CompoundLibPtr compound_lib;
-  bool in_mem=false;
-  if (!strncmp(argv[1], "create", 6)) {
-    compound_lib=conop::CompoundLib::Create(":memory:");
-    in_mem=true;
-  } else if (!strncmp(argv[1], "update", 6)) {
-    compound_lib=conop::CompoundLib::Load(argv[3]);
-  } else {
-    PrintUsage();
-    return 0;
+  filtered_istream.push(istream);
+  try {
+    io::ChemdictParser cdp(filtered_istream, dialect, ignore_reserved, ignore_obsolete);
+    conop::CompoundLibPtr compound_lib;
+    bool in_mem=false;
+    if (!strncmp(argv[1], "create", 6)) {
+      compound_lib=conop::CompoundLib::Create(":memory:");
+      in_mem=true;
+    } else if (!strncmp(argv[1], "update", 6)) {
+      compound_lib=conop::CompoundLib::Load(argv[3]);
+    } else {
+      PrintUsage();
+      return 0;
+    }
+    if (!compound_lib) {
+      return 0;
+    }
+    assert(compound_lib);
+    conop::CompoundLibPtr in_mem_lib=in_mem ? compound_lib :
+                                     compound_lib->Copy(":memory:");
+    compound_lib.reset();
+    cdp.SetCompoundLib(in_mem_lib);
+    cdp.Parse();
+    in_mem_lib->SetChemLibInfo();
+    conop::CompoundLibPtr copy = in_mem_lib->Copy(argv[3]);
+    if (! copy) {
+        std::cout << "Cannot save " << argv[3] << ": [Errno " << errno << "] "
+                  << strerror(errno) << std::endl;
+        return 1;
+    }
   }
-  if (!compound_lib) {
-    return 0;
-  }
-  assert(compound_lib);
-  conop::CompoundLibPtr in_mem_lib=in_mem ? compound_lib :
-                                   compound_lib->Copy(":memory:");
-  compound_lib.reset();
-  cdp.SetCompoundLib(in_mem_lib);
-  cdp.Parse();
-  in_mem_lib->SetChemLibInfo();
-  conop::CompoundLibPtr copy = in_mem_lib->Copy(argv[3]);
-  if (! copy) {
-      std::cout << "Cannot save " << argv[3] << ": [Errno " << errno << "] "
-                << strerror(errno) << std::endl;
-      return 1;
+  catch (ost::Error const &err) {
+    std::cerr << "Error: " << err.what() << std::endl;
+    return 1;
   }
   return 0;
 }

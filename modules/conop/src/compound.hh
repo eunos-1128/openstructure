@@ -23,6 +23,8 @@
 #include <map>
 #include <boost/shared_ptr.hpp>
 #include <ost/string_ref.hh>
+#include <ost/message.hh>
+#include <ost/log.hh>
 #include <ost/conop/module_config.hh>
 
 #include <ost/mol/chem_class.hh>
@@ -54,19 +56,27 @@ struct DLLEXPORT_OST_CONOP Date {
   static Date FromString(const StringRef& str)
   {
     std::vector<StringRef> parts=str.split('-');
-    assert(parts.size()==3);
+    if (parts.size() != 3) {
+      std::stringstream msg;
+      msg << "Invalid date string: '" << str << "'";
+      throw ost::Error(msg.str());
+    }
     std::pair<bool, int> year=parts[0].to_int();
     std::pair<bool, int> month=parts[1].to_int();
     std::pair<bool, int> day=parts[2].to_int();
-    assert(year.first); assert(month.first); assert(day.first);
+    if (! year.first || ! month.first || ! day.first) {
+      std::stringstream msg;
+      msg << "Invalid date string: '" << str << "'";
+      throw ost::Error(msg.str());
+    }
     return Date(year.second, month.second, day.second);
   }
-  
+
   String ToString() const;
 
   int year;
   int month;
-  int day;  
+  int day;
 };
 
 struct DLLEXPORT_OST_CONOP AtomSpec {
