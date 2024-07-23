@@ -14,7 +14,7 @@ def CreateComplib(compound_dict_path, chemlib_out_path, extra_args=None):
     cmd = [chemdict_tool_path, "create", compound_dict_path, chemlib_out_path, "-q"]
     if extra_args:
         cmd += extra_args
-    subprocess.run(cmd, stdout=subprocess.PIPE)
+    subprocess.run(cmd, stdout=subprocess.PIPE, check=True)
 
 
 class TestCompLib(unittest.TestCase):
