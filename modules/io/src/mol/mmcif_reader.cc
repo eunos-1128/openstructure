@@ -690,6 +690,7 @@ void MMCifReader::ParseAndAddAtom(const std::vector<StringRef>& columns)
                     "name. Ignoring atoms for everything but the first");
       } else {
         LOG_WARNING("Residue with number " << res_num 
+                    << " in chain " << curr_chain_.GetName()
                     << " contains a microheterogeneity. Everything but atoms "
                     "for the residue '" << curr_residue_.GetName() 
                     << "' will be ignored");
