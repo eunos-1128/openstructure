@@ -811,6 +811,19 @@ namespace {
       String comp_id = res.GetName();
 
       auto at_list = res.GetAtomList();
+
+      // sanity check that we have no duplicates
+      std::set<String> anames;
+      for(auto a: at_list) {
+        if(anames.find(a.GetName()) != anames.end()) {
+          std::stringstream ss;
+          ss << "Duplicate atom \"" << a.GetName() << "\" in residue ";
+          ss << a.GetResidue() << std::endl;
+          throw ost::io::IOException(ss.str());
+        }
+        anames.insert(a.GetName());
+      }
+
       String auth_asym_id = res.GetChain().GetName();
       if(res.HasProp("pdb_auth_chain_name")) {
         auth_asym_id = res.GetStringProp("pdb_auth_chain_name");
@@ -1328,9 +1341,35 @@ namespace {
     auto chain_list = ent.GetChainList();
     for(auto chain: chain_list) {
       String cname = chain.GetName();
+
+      auto res_list = chain.GetResidueList();
+      // sanity check that residue numbers are strictly increasing and have no
+      // insertion codes which is a requirement for mmCIF conform chains
+      // (not only for polymers)
+      for(size_t i = 0; i < res_list.size(); ++i) {
+        if(res_list[i].GetNumber().GetInsCode() != '\0') {
+          std::stringstream ss;
+          ss << "Residue number insertion codes must be empty if ";
+          ss << "mmcif_conform is enabled. Got \"";
+          ss << res_list[i].GetNumber().GetInsCode() << "\" in residue ";
+          ss << res_list[i];
+          throw ost::io::IOException(ss.str());
+        }
+        if(i>0) {
+          if(res_list[i-1].GetNumber().GetNum() >=
+             res_list[i].GetNumber().GetNum()) {
+            std::stringstream ss;
+            ss << "Residue numbers must be strictly increasing in consecutive ";
+            ss << "residues if mmcif_conform is enabled. ";
+            ss << "Got " << res_list[i-1] << " followed by " << res_list[i];
+            ss << ".";
+            throw ost::io::IOException(ss.str());
+          }
+        }
+      }
+
       if(preassigned_polymer_chains.find(cname) !=
          preassigned_polymer_chains.end()) {
-        auto res_list = chain.GetResidueList();
         int entity_id = preassigned_polymer_chains[cname];
         AddAsymResnum(cname, res_list, entity_info[entity_id], true);
         Feed_atom_site(atom_site, cname, entity_id+1, entity_info[entity_id], res_list);
@@ -1338,7 +1377,6 @@ namespace {
                                   entity_info[entity_id], res_list);
       } else {
         // do automated matching
-        auto res_list = chain.GetResidueList();
         int entity_id = SetupEntity(cname,
                                     chain.GetType(),
                                     res_list,
