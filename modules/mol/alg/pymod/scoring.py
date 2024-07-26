@@ -385,7 +385,7 @@ class Scorer:
         self._rigid_n_target_not_mapped = None
         self._rigid_transform = None
 
-        self._gdt_window_sizes = [5, 7, 9, 12, 24, 36, 48]
+        self._gdt_window_sizes = [7, 9, 12, 24, 48]
         self._gdt_05 = None
         self._gdt_1 = None
         self._gdt_2 = None
@@ -1477,7 +1477,8 @@ class Scorer:
         """
         if self._gdt_05 is None:
             N = list()
-            for window_size in self._gdt_window_sizes:
+            wsizes = self._gdt_window_sizes + [len(self.rigid_mapped_model_pos)]
+            for window_size in wsizes:
                 n = GDT(self.rigid_mapped_model_pos,
                         self.rigid_mapped_target_pos,
                         window_size, 1000, 0.5)[0]
@@ -1501,7 +1502,8 @@ class Scorer:
         """
         if self._gdt_1 is None:
             N = list()
-            for window_size in self._gdt_window_sizes:
+            wsizes = self._gdt_window_sizes + [len(self.rigid_mapped_model_pos)]
+            for window_size in wsizes:
                 n = GDT(self.rigid_mapped_model_pos,
                         self.rigid_mapped_target_pos,
                         window_size, 1000, 1.0)[0]
@@ -1526,7 +1528,8 @@ class Scorer:
         """
         if self._gdt_2 is None:
             N = list()
-            for window_size in self._gdt_window_sizes:
+            wsizes = self._gdt_window_sizes + [len(self.rigid_mapped_model_pos)]
+            for window_size in wsizes:
                 n = GDT(self.rigid_mapped_model_pos,
                         self.rigid_mapped_target_pos,
                         window_size, 1000, 2.0)[0]
@@ -1550,7 +1553,8 @@ class Scorer:
         """
         if self._gdt_4 is None:
             N = list()
-            for window_size in self._gdt_window_sizes:
+            wsizes = self._gdt_window_sizes + [len(self.rigid_mapped_model_pos)]
+            for window_size in wsizes:
                 n = GDT(self.rigid_mapped_model_pos,
                         self.rigid_mapped_target_pos,
                         window_size, 1000, 4.0)[0]
@@ -1573,7 +1577,8 @@ class Scorer:
         """
         if self._gdt_8 is None:
             N = list()
-            for window_size in self._gdt_window_sizes:
+            wsizes = self._gdt_window_sizes + [len(self.rigid_mapped_model_pos)]
+            for window_size in wsizes:
                 n = GDT(self.rigid_mapped_model_pos,
                         self.rigid_mapped_target_pos,
                         window_size, 1000, 8.0)[0]
