@@ -299,11 +299,18 @@ def _ParseArgs():
         help=("lDDT inclusion radius for lDDT-PLI."))
 
     parser.add_argument(
-        "--lddt-pli-amc",
-        dest="lddt_pli_amc",
-        default=False,
+        "--lddt-pli-add-mdl-contacts",
+        dest="lddt_pli_add_mdl_contacts",
+        default=True,
         action="store_true",
-        help=("Add model contacts (amc) when computing lDDT-PLI."))
+        help=("Add model contacts when computing lDDT-PLI."))
+
+    parser.add_argument(
+        "--no-lddt-pli-add-mdl-contacts",
+        dest="lddt_pli_add_mdl_contacts",
+        default=True,
+        action="store_false",
+        help=("DO NOT add model contacts when computing lDDT-PLI."))
 
     # arguments relevant for rmsd
 
@@ -483,7 +490,7 @@ def _SetupLDDTPLIScorer(model, model_ligands, reference, reference_ligands, args
                                                 substructure_match = args.substructure_match,
                                                 coverage_delta = args.coverage_delta,
                                                 lddt_pli_radius = args.lddt_pli_radius,
-                                                add_mdl_contacts = args.lddt_pli_amc)
+                                                add_mdl_contacts = args.lddt_pli_add_mdl_contacts)
 
 def _SetupSCRMSDScorer(model, model_ligands, reference, reference_ligands, args):
     return ligand_scoring_scrmsd.SCRMSDScorer(model, reference,

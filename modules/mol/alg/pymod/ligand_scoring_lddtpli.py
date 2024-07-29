@@ -1,6 +1,6 @@
 import numpy as np
 
-from ost import LogWarning
+from ost import LogWarning, LogInfo
 from ost import geom
 from ost import mol
 from ost import seq
@@ -84,7 +84,7 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
     :type max_symmetries: :class:`int`
     :param lddt_pli_radius: lDDT inclusion radius for lDDT-PLI.
     :type lddt_pli_radius: :class:`float`
-    :param add_mdl_contacts: Whether to add mdl contacts.
+    :param add_mdl_contacts: Whether to penalize added model contacts.
     :type add_mdl_contacts: :class:`bool`
     :param lddt_pli_thresholds: Distance difference thresholds for lDDT.
     :type lddt_pli_thresholds: :class:`list` of :class:`float`
@@ -103,7 +103,7 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
                  resnum_alignments=False, rename_ligand_chain=False,
                  substructure_match=False, coverage_delta=0.2,
                  max_symmetries=1e5, lddt_pli_radius=6.0,
-                 add_mdl_contacts=False,
+                 add_mdl_contacts=True,
                  lddt_pli_thresholds = [0.5, 1.0, 2.0, 4.0],
                  lddt_pli_binding_site_radius=None):
 
@@ -141,10 +141,12 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
         """ Implements interface from parent
         """
         if self.add_mdl_contacts:
+            LogInfo("Computing lDDT-PLI with added model contacts")
             result = self._compute_lddt_pli_add_mdl_contacts(symmetries,
                                                              target_ligand,
                                                              model_ligand)
         else:
+            LogInfo("Computing lDDT-PLI without added model contacts")
             result = self._compute_lddt_pli_classic(symmetries,
                                                     target_ligand,
                                                     model_ligand)
