@@ -61,6 +61,7 @@ results:
  * "min_nuc_length"
  * "lddt_add_mdl_contacts"
  * "dockq_capri_peptide"
+ * "ost_version"
 
 The pairwise sequence alignments are computed with Needleman-Wunsch using
 BLOSUM62 (NUC44 for nucleotides). Many benchmarking scenarios preprocess the
@@ -963,6 +964,7 @@ def _Main():
         out["min_nuc_length"] = args.min_nuc_length
         out["lddt_add_mdl_contacts"] = args.lddt_add_mdl_contacts
         out["dockq_capri_peptide"] = args.dockq_capri_peptide
+        out["ost_version"] = ost.__version__
         out["status"] = "SUCCESS"
         with open(args.output, 'w') as fh:
             json.dump(out, fh, indent=4, sort_keys=False)

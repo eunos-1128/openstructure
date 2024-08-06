@@ -35,7 +35,7 @@ are exempt from this restriction, meaning any arbitrary ligand can be assessed.
 Output can be written in two format: JSON (default) or CSV, controlled by the
 --output-format/-of argument.
 
-Without additional options, the JSON ouput is a dictionary with three keys:
+Without additional options, the JSON ouput is a dictionary with four keys:
 
  * "model_ligands": A list of ligands in the model. If ligands were provided
    explicitly with --model-ligands, elements of the list will be the paths to
@@ -48,6 +48,7 @@ Without additional options, the JSON ouput is a dictionary with three keys:
  * "status": SUCCESS if everything ran through. In case of failure, the only
    content of the JSON output will be \"status\" set to FAILURE and an
    additional key: "traceback".
+ * "ost_version": The OpenStructure version used for computation.
 
 Each score is opt-in and the respective results are available in three keys:
 
@@ -850,6 +851,7 @@ def _Main():
                        cleaned_reference, cleaned_reference_ligands,
                        args)
 
+        out["ost_version"] = ost.__version__
         out["status"] = "SUCCESS"
         if args.output_format == "json":
             with open(args.output, 'w') as fh:
