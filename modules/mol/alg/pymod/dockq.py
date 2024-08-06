@@ -215,7 +215,7 @@ def _RMSDScores(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2, dist_thresh=10.0,
     # receptor is by definition the larger chain in ref
     n_ch1 = len(ref.FindChain(ref_ch1).residues)
     n_ch2 = len(ref.FindChain(ref_ch2).residues)
-    if n_ch1 > n_ch2:
+    if n_ch1 >= n_ch2:
         ref_receptor_residues = ref_ch1_residues.values()
         ref_ligand_residues = ref_ch2_residues.values()
         mdl_receptor_residues = \
