@@ -201,6 +201,9 @@ class Scorer:
                                 This flag has no influence on patch_dockq
                                 scores.
     :type dockq_capri_peptide: :class:`bool`
+    :param lddt_symmetry_settings: Passed as *symmetry_settings* parameter to
+                                   lDDT scorer. Default: None
+    :type lddt_symmetry_settings: :class:`ost.mol.alg.lddt.SymmetrySettings`
     """
     def __init__(self, model, target, resnum_alignments=False,
                  molck_settings = None, cad_score_exec = None,
@@ -208,7 +211,7 @@ class Scorer:
                  usalign_exec = None, lddt_no_stereochecks=False,
                  n_max_naive=40320, oum=False, min_pep_length = 6,
                  min_nuc_length = 4, lddt_add_mdl_contacts=False,
-                 dockq_capri_peptide=False):
+                 dockq_capri_peptide=False, lddt_symmetry_settings = None):
 
         self._target_orig = target
         self._model_orig = model
@@ -298,6 +301,7 @@ class Scorer:
         self.min_nuc_length = min_nuc_length
         self.lddt_add_mdl_contacts = lddt_add_mdl_contacts
         self.dockq_capri_peptide = dockq_capri_peptide
+        self.lddt_symmetry_settings = lddt_symmetry_settings
 
         # lazily evaluated attributes
         self._stereochecked_model = None
@@ -645,15 +649,20 @@ class Scorer:
 
     @property
     def lddt_scorer(self):
-        """ lDDT scorer for :attr:`~stereochecked_target` (default parameters)
+        """ lDDT scorer for :attr:`~target`/:attr:`~stereochecked_target`
+
+        Depending on :attr:`~lddt_no_stereocheck` and
+        :attr:`~lddt_symmetry_settings`.
 
         :type: :class:`ost.mol.alg.lddt.lDDTScorer`
         """
         if self._lddt_scorer is None:
             if self.lddt_no_stereochecks:
-                self._lddt_scorer = lDDTScorer(self.target)
+                self._lddt_scorer = lDDTScorer(self.target,
+                                               symmetry_settings = self.lddt_symmetry_settings)
             else:
-                self._lddt_scorer = lDDTScorer(self.stereochecked_target)
+                self._lddt_scorer = lDDTScorer(self.stereochecked_target,
+                                               symmetry_settings = self.lddt_symmetry_settings)
         return self._lddt_scorer
 
     @property
@@ -666,7 +675,8 @@ class Scorer:
         :type: :class:`ost.mol.alg.lddt.lDDTScorer`
         """
         if self._bb_lddt_scorer is None:
-            self._bb_lddt_scorer = lDDTScorer(self.target, bb_only=True)
+            self._bb_lddt_scorer = lDDTScorer(self.target, bb_only=True,
+                                              symmetry_settings = self.lddt_symmetry_settings)
         return self._bb_lddt_scorer
 
     @property
