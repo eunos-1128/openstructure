@@ -238,6 +238,20 @@ class Scorer:
         LogScript("Cleaning up input structures")
         Molck(self._model, conop.GetDefaultLib(), molck_settings)
         Molck(self._target, conop.GetDefaultLib(), molck_settings)
+
+        if resnum_alignments:
+            # If we're dealing with resnum alignments, we ensure that
+            # consecutive peptide and nucleotide residues are connected based
+            # on residue number information. The conop.Processor only connects
+            # these things if the bonds are actually feasible which can lead to
+            # weird behaviour in stereochemistry checks. Let's say N and C are
+            # too close, it's reported as a clash. If they're too far apart,
+            # they're not reported at all. If we're not dealing with resnum
+            # alignments, we're out of luck as we have no direct residue
+            # connectivity information from residue numbers
+            self._resnum_connect(self._model)
+            self._resnum_connect(self._target)
+
         self._model = self._model.Select("peptide=True or nucleotide=True")
         self._target = self._target.Select("peptide=True or nucleotide=True")
 
@@ -2684,6 +2698,30 @@ class Scorer:
         self._usalign_mapping = dict()
         for a,b in zip(res.ent1_mapped_chains, res.ent2_mapped_chains):
             self._usalign_mapping[b] = a
+
+    def _resnum_connect(self, ent):
+        ed = None
+        for ch in ent.chains:
+            res_list = ch.residues
+            for i in range(len(res_list) - 1):
+                ra = res_list[i]
+                rb = res_list[i+1]
+                if ra.GetNumber().GetNum() + 1 == rb.GetNumber().GetNum():
+                    if ra.IsPeptideLinking() and rb.IsPeptideLinking():
+                        c = ra.FindAtom("C")
+                        n = rb.FindAtom("N")
+                        if c.IsValid() and n.IsValid() and not mol.BondExists(c, n):
+                            if ed is None:
+                                ed = ent.EditXCS(mol.BUFFERED_EDIT)
+                            ed.Connect(c,n,1)
+                    elif ra.IsNucleotideLinking() and rb.IsNucleotideLinking():
+                        o = ra.FindAtom("O3'")
+                        p = rb.FindAtom("P")
+                        if o.IsValid() and p.IsValid()and not mol.BondExists(o, p):
+                            if ed is None:
+                                ed = ent.EditXCS(mol.BUFFERED_EDIT)
+                            ed.Connect(o,p,1)
+
 
 # specify public interface
 __all__ = ('lDDTBSScorer', 'Scorer',)
