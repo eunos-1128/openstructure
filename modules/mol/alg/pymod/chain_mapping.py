@@ -522,10 +522,9 @@ class ChainMapper:
       simply derived from residue numbers (*resnum_alignments* flag).
       In case of NW, *pep_subst_mat*, *pep_gap_open* and *pep_gap_ext*
       and their nucleotide equivalents are relevant. Two chains are
-      considered identical if they fulfill the thresholds given by
-      *pep_seqid_thr*, *pep_gap_thr*, their nucleotide equivalents
-      respectively. The grouping information is available as
-      attributes of this class.
+      considered identical if they fulfill the *pep_seqid_thr* and
+      have at least *min_pep_length* aligned residues. Same logic
+      is applied for nucleotides with respective thresholds.
 
     * Map chains in an input model to these groups. Generating alignments
       and the similarity criteria are the same as above. You can either
@@ -551,19 +550,8 @@ class ChainMapper:
                           identical. 95 percent tolerates the few mutations
                           crystallographers like to do.
     :type pep_seqid_thr:  :class:`float`
-    :param pep_gap_thr: Additional threshold to avoid gappy alignments with
-                        high seqid. By default this is disabled (set to 1.0).
-                        This threshold checks for a maximum allowed fraction
-                        of gaps in any of the two sequences after stripping
-                        terminal gaps. The reason for not just normalizing
-                        seqid by the longer sequence is that one sequence
-                        might be a perfect subsequence of the other but only
-                        cover half of it. 
-    :type pep_gap_thr:  :class:`float`
     :param nuc_seqid_thr: Nucleotide equivalent for *pep_seqid_thr*
     :type nuc_seqid_thr:  :class:`float`
-    :param nuc_gap_thr: Nucleotide equivalent for *nuc_gap_thr*
-    :type nuc_gap_thr:  :class:`float`
     :param pep_subst_mat: Substitution matrix to align peptide sequences,
                           irrelevant if *resnum_alignments* is True,
                           defaults to seq.alg.BLOSUM62
@@ -595,8 +583,7 @@ class ChainMapper:
     :type n_max_naive: :class:`int`
     """
     def __init__(self, target, resnum_alignments=False,
-                 pep_seqid_thr = 95., pep_gap_thr = 1.0,
-                 nuc_seqid_thr = 95., nuc_gap_thr = 1.0,
+                 pep_seqid_thr = 95., nuc_seqid_thr = 95., 
                  pep_subst_mat = seq.alg.BLOSUM62, pep_gap_open = -11,
                  pep_gap_ext = -1, nuc_subst_mat = seq.alg.NUC44,
                  nuc_gap_open = -4, nuc_gap_ext = -4,
@@ -606,9 +593,7 @@ class ChainMapper:
         # attributes
         self.resnum_alignments = resnum_alignments
         self.pep_seqid_thr = pep_seqid_thr
-        self.pep_gap_thr = pep_gap_thr
         self.nuc_seqid_thr = nuc_seqid_thr
-        self.nuc_gap_thr = nuc_gap_thr
         self.min_pep_length = min_pep_length
         self.min_nuc_length = min_nuc_length
         self.n_max_naive = n_max_naive
@@ -697,9 +682,9 @@ class ChainMapper:
             _GetChemGroupAlignments(self.polypep_seqs, self.polynuc_seqs,
                                     self.aligner,
                                     pep_seqid_thr=self.pep_seqid_thr,
-                                    pep_gap_thr=self.pep_gap_thr,
+                                    min_pep_length=self.min_pep_length,
                                     nuc_seqid_thr=self.nuc_seqid_thr,
-                                    nuc_gap_thr=self.nuc_gap_thr)
+                                    min_nuc_length=self.min_nuc_length)
 
         return self._chem_group_alignments
 
@@ -738,9 +723,9 @@ class ChainMapper:
             _GetChemGroupAlignments(self.polypep_seqs, self.polynuc_seqs,
                                     self.aligner,
                                     pep_seqid_thr=self.pep_seqid_thr,
-                                    pep_gap_thr=self.pep_gap_thr,
+                                    min_pep_length=self.min_pep_length,
                                     nuc_seqid_thr=self.nuc_seqid_thr,
-                                    nuc_gap_thr=self.nuc_gap_thr)
+                                    min_nuc_length=self.min_nuc_length)
 
         return self._chem_group_types
         
@@ -1760,20 +1745,17 @@ def _GetAlnPropsOne(aln):
 
     :param aln: Alignment to compute properties
     :type aln: :class:`seq.AlignmentHandle`
-    :returns: Tuple with 3 elements. 1) sequence identify in range [0, 100] 
-              considering aligned columns 2) Fraction of gaps between
-              first and last aligned column in s1 3) same for s2.
+    :returns: Tuple with 2 elements. 1) sequence identify in range [0, 100] 
+              considering aligned columns 2) Number of aligned columns.
     """
     assert(aln.GetCount() == 2)
-    n_gaps_1 = str(aln.GetSequence(0)).strip('-').count('-')
-    n_gaps_2 = str(aln.GetSequence(1)).strip('-').count('-')
-    gap_frac_1 = float(n_gaps_1)/len(aln.GetSequence(0).GetGaplessString())
-    gap_frac_2 = float(n_gaps_2)/len(aln.GetSequence(1).GetGaplessString())
-    return (seq.alg.SequenceIdentity(aln), gap_frac_1, gap_frac_2) 
+    seqid = seq.alg.SequenceIdentity(aln)
+    n_aligned = sum([1 for col in aln if (col[0] != '-' and col[1] != '-')])
+    return (seqid, n_aligned) 
 
 def _GetChemGroupAlignments(pep_seqs, nuc_seqs, aligner, pep_seqid_thr=95.,
-                            pep_gap_thr=0.1, nuc_seqid_thr=95.,
-                            nuc_gap_thr=0.1):
+                            min_pep_length=6, nuc_seqid_thr=95.,
+                            min_nuc_length=4):
     """Returns alignments with groups of chemically equivalent chains
 
     :param pep_seqs: List of polypeptide sequences
@@ -1786,17 +1768,14 @@ def _GetChemGroupAlignments(pep_seqs, nuc_seqs, aligner, pep_seqid_thr=95.,
                           identical. 95 percent tolerates the few mutations
                           crystallographers like to do.
     :type pep_seqid_thr:  :class:`float`
-    :param pep_gap_thr: Additional threshold to avoid gappy alignments with high
-                        seqid. The reason for not just normalizing seqid by the
-                        longer sequence is that one sequence might be a perfect
-                        subsequence of the other but only cover half of it. This
-                        threshold checks for a maximum allowed fraction of gaps
-                        in any of the two sequences after stripping terminal gaps.
-    :type pep_gap_thr: :class:`float`
+    :param min_pep_length: Additional threshold to avoid gappy alignments with high
+                           seqid. Number of aligned columns must be at least this
+                           number.
+    :type min_pep_length: :class:`int`
     :param nuc_seqid_thr: Nucleotide equivalent of *pep_seqid_thr*
     :type nuc_seqid_thr:  :class:`float`
-    :param nuc_gap_thr: Nucleotide equivalent of *nuc_gap_thr*
-    :type nuc_gap_thr: :class:`float`
+    :param min_nuc_length: Nucleotide equivalent of *min_pep_length*
+    :type min_nuc_length: :class:`int`
     :returns: Tuple with first element being an AlignmentList. Each alignment
               represents a group of chemically equivalent chains and the first
               sequence is the longest. Second element is a list of equivalent
@@ -1804,9 +1783,9 @@ def _GetChemGroupAlignments(pep_seqs, nuc_seqs, aligner, pep_seqid_thr=95.,
               [:class:`ost.ChemType.AMINOACIDS`,
               :class:`ost.ChemType.NUCLEOTIDES`] 
     """
-    pep_groups = _GroupSequences(pep_seqs, pep_seqid_thr, pep_gap_thr, aligner,
+    pep_groups = _GroupSequences(pep_seqs, pep_seqid_thr, min_pep_length, aligner,
                                  mol.ChemType.AMINOACIDS)
-    nuc_groups = _GroupSequences(nuc_seqs, nuc_seqid_thr, nuc_gap_thr, aligner,
+    nuc_groups = _GroupSequences(nuc_seqs, nuc_seqid_thr, min_nuc_length, aligner,
                                  mol.ChemType.NUCLEOTIDES)
     group_types = [mol.ChemType.AMINOACIDS] * len(pep_groups)
     group_types += [mol.ChemType.NUCLEOTIDES] * len(nuc_groups)
@@ -1814,18 +1793,15 @@ def _GetChemGroupAlignments(pep_seqs, nuc_seqs, aligner, pep_seqid_thr=95.,
     groups.extend(nuc_groups)
     return (groups, group_types)
 
-def _GroupSequences(seqs, seqid_thr, gap_thr, aligner, chem_type):
+def _GroupSequences(seqs, seqid_thr, min_length, aligner, chem_type):
     """Get list of alignments representing groups of equivalent sequences
 
     :param seqid_thr: Threshold used to decide when two chains are identical.
     :type seqid_thr:  :class:`float`
     :param gap_thr: Additional threshold to avoid gappy alignments with high
-                    seqid. The reason for not just normalizing seqid by the
-                    longer sequence is that one sequence might be a perfect
-                    subsequence of the other but only cover half of it. This
-                    threshold checks for a maximum allowed fraction of gaps
-                    in any of the two sequences after stripping terminal gaps.
-    :type gap_thr: :class:`float`
+                    seqid. Number of aligned columns must be at least this
+                    number.
+    :type gap_thr: :class:`int`
     :param aligner: Helper class to generate pairwise alignments
     :type aligner: :class:`_Aligner`
     :param chem_type: ChemType of seqs which is passed to *aligner*, must be in
@@ -1843,8 +1819,8 @@ def _GroupSequences(seqs, seqid_thr, gap_thr, aligner, chem_type):
             for g_s_idx in range(len(groups[g_idx])):
                 aln  = aligner.Align(seqs[s_idx], seqs[groups[g_idx][g_s_idx]],
                                      chem_type)
-                sid, frac_i, frac_j = _GetAlnPropsOne(aln)
-                if sid >= seqid_thr and frac_i < gap_thr and frac_j < gap_thr:
+                sid, n_aligned = _GetAlnPropsOne(aln)
+                if sid >= seqid_thr and n_aligned >= min_length:
                     matching_group = g_idx
                     break
             if matching_group is not None:

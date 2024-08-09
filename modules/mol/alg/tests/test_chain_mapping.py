@@ -133,13 +133,8 @@ class TestChainMapper(unittest.TestCase):
     ed.SetResidueNumber(r, mol.ResNum(r.GetNumber().GetNum() + 42))
     self.assertRaises(Exception, ChainMapper, tmp_ent, resnum_alignments=True)
 
-    # chain B has a missing Valine... set pep_gap_thr to 0.0 should give an
-    # additional chem group
-    mapper = ChainMapper(ent, pep_gap_thr=0.0)
-    self.assertEqual(len(mapper.chem_groups), 4)
-
     # introduce single point mutation in ent... increasing pep_seqid_thr to 100
-    # should give an additional chem group too
+    # should give an additional chem group
     mapper = ChainMapper(ent, pep_seqid_thr=100.)
     self.assertEqual(len(mapper.chem_groups), 3)
     tmp_ent = ent.Copy()
@@ -164,9 +159,6 @@ class TestChainMapper(unittest.TestCase):
     self.assertEqual(len(mapper.polynuc_seqs), 3)
     self.assertEqual(len(mapper.chem_groups), 3)
     mapper = ChainMapper(tmp_ent, nuc_seqid_thr=100.)
-    self.assertEqual(len(mapper.polynuc_seqs), 3)
-    self.assertEqual(len(mapper.chem_groups), 4)
-    mapper = ChainMapper(tmp_ent, nuc_gap_thr=0.0)
     self.assertEqual(len(mapper.polynuc_seqs), 3)
     self.assertEqual(len(mapper.chem_groups), 4)
 
