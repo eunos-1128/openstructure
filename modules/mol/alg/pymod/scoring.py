@@ -2674,7 +2674,7 @@ class Scorer:
     def _compute_tmscore(self):
         res = None
         if self.usalign_exec is None:
-            LogScript("Computing patch TM-score with USalign exectuable")
+            LogScript("Computing TM-score with built-in USalign")
             if self.oum:
                 flat_mapping = self.rigid_mapping.GetFlatMapping()
                 LogInfo("Overriding TM-score chain mapping")
@@ -2683,7 +2683,7 @@ class Scorer:
             else:
                 res = bindings.WrappedMMAlign(self.model, self.target)
         else:
-            LogScript("Computing patch TM-score with built-in USalign")
+            LogScript("Computing TM-score with USalign exectuable")
             if self.oum:
                 LogInfo("Overriding TM-score chain mapping")
                 flat_mapping = self.rigid_mapping.GetFlatMapping()
