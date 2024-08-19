@@ -204,7 +204,7 @@ The basic functionality of editors is implemented in the EditorBase class.
     :type is_hetatm:  bool
     :returns:         :class:`AtomHandle`
 
-  .. method:: InsertAltAtom(residue, atom_name, alt_group, pos, element="", occupancy=1.0, b_factor=0.0)
+  .. method:: InsertAltAtom(residue, atom_name, alt_group, pos, ele="", occ=1.0, b_factor=0.0)
 
     Insert new atom with alternative position indicator
 
@@ -221,14 +221,14 @@ The basic functionality of editors is implemented in the EditorBase class.
     :type alt_group:  string                 
     :param pos:       is the position of the atom in global coordinates
     :type pos:        :class:`~ost.geom.Vec3`
-    :param element:   is the atom's element. If set to a a valid element,
+    :param ele:       is the atom's element. If set to a a valid element,
                       atom properties such as mass, charge, radius are set 
                       based on default values for that element. If the element 
                       string is empty, or unknown, the properties are filled 
                       with rather meaningless default values.
-    :type element:    class:`string`
-    :param occupancy: The occupancy of the atom. between 0 and 1
-    :type occupancy:  float
+    :type ele:        class:`string`
+    :param occ:       The occupancy of the atom. between 0 and 1
+    :type occ:        float
     :param b_factor:  temperature factor.
     :type  b_factor:  float
 
