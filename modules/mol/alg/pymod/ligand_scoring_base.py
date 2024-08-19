@@ -304,7 +304,7 @@ class LigandScorer:
          1: ("identity", f"Ligands could not be matched (by {iso})"),
          2: ("symmetries", "Too many symmetries between ligand atoms were "
              "found - increasing max_symmetries might help"),
-         3: ("no_iso", "No fully isomorphic match could be found - enabling "
+         3: ("no_iso", "No full isomorphic match could be found - enabling "
              "substructure_match might allow a match"),
          4: ("disconnected", "Ligand graph is disconnected"),
          5: ("stoichiometry", "Ligand was already assigned to another ligand "
@@ -321,7 +321,7 @@ class LigandScorer:
         respective location in this matrix is 0.
         Target ligands are in rows, model ligands in columns. States are encoded
         as integers <= 9. Larger numbers encode errors for child classes.
-        Use something like ``self.state_decoding[3]`` to get a decscription.       
+        Use something like ``self.state_decoding[3]`` to get a decscription.
 
         :rtype: :class:`~numpy.ndarray`
         """
@@ -574,7 +574,27 @@ class LigandScorer:
         """ Makes an educated guess why target ligand is not assigned
 
         This either returns actual error states or custom states that are
-        derived from them.
+        derived from them. Currently, the following reasons are reported:
+
+        * `no_ligand`: there was no ligand in the model.
+        * `disconnected`: the ligand graph was disconnected.
+        * `identity`: the ligand was not found in the model (by graph
+          isomorphism). Check your ligand connectivity.
+        * `no_iso`: no full isomorphic match could be found. Try enabling
+          `substructure_match=True` if the target ligand is incomplete.
+        * `symmetries`: too many symmetries were found (by graph isomorphisms).
+          Try to increase `max_symmetries`.
+        * `stoichiometry`: there was a possible assignment in the model, but
+          the model ligand was already assigned to a different target ligand.
+          This indicates different stoichiometries.
+        * `no_contact` (lDDT-PLI only): There were no lDDT contacts between
+          the binding site and the ligand, and lDDT-PLI is undefined.
+        * `binding_site` (SCRMSD only): no residues were in proximity of the
+          target ligand.
+        * `model_representation` (SCRMSD only): no representation of
+          the reference binding site was found in the model. Either the binding
+          site was not modeled or the model ligand was positioned too far in
+          combination with `full_bs_search=False`.
 
         :param trg_lig_idx: Index of target ligand
         :type trg_lig_idx: :class:`int`
@@ -638,7 +658,29 @@ class LigandScorer:
         """ Makes an educated guess why model ligand is not assigned
 
         This either returns actual error states or custom states that are
-        derived from them.
+        derived from them. Currently, the following reasons are reported:
+
+        * `no_ligand`: there was no ligand in the target.
+        * `disconnected`: the ligand graph is disconnected.
+        * `identity`: the ligand was not found in the target (by graph or
+          subgraph isomorphism). Check your ligand connectivity.
+        * `no_iso`: no full isomorphic match could be found. Try enabling
+          `substructure_match=True` if the target ligand is incomplete.
+        * `symmetries`: too many symmetries were found (by graph isomorphisms).
+          Try to increase `max_symmetries`.
+        * `stoichiometry`: there was a possible assignment in the target, but
+          the model target was already assigned to a different model ligand.
+          This indicates different stoichiometries.
+        * `no_contact` (lDDT-PLI only): There were no lDDT contacts between
+          the binding site and the ligand, and lDDT-PLI is undefined.
+        * `binding_site` (SCRMSD only): a potential assignment was found in the
+          target, but there were no polymer residues in proximity of the ligand
+          in the target.
+        * `model_representation` (SCRMSD only): a potential assignment was
+          found in the target, but no representation of the binding site was
+          found in the model. Either the binding site was not modeled or the
+          model ligand was positioned too far in combination with
+          `full_bs_search=False`.
 
         :param mdl_lig_idx: Index of model ligand
         :type mdl_lig_idx: :class:`int`
