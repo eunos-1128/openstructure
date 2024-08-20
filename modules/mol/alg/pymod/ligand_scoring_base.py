@@ -589,12 +589,12 @@ class LigandScorer:
           This indicates different stoichiometries.
         * `no_contact` (lDDT-PLI only): There were no lDDT contacts between
           the binding site and the ligand, and lDDT-PLI is undefined.
-        * `binding_site` (SCRMSD only): no residues were in proximity of the
-          target ligand.
-        * `model_representation` (SCRMSD only): no representation of
-          the reference binding site was found in the model. Either the binding
-          site was not modeled or the model ligand was positioned too far in
-          combination with `full_bs_search=False`.
+        * `target_binding_site` (SCRMSD only): no polymer residues were in
+          proximity of the target ligand.
+        * `model_binding_site` (SCRMSD only): the binding site was not found
+          in the model. Either the binding site was not modeled or the model
+          ligand was positioned too far in combination with
+          `full_bs_search=False`.
 
         :param trg_lig_idx: Index of target ligand
         :type trg_lig_idx: :class:`int`
@@ -673,14 +673,13 @@ class LigandScorer:
           This indicates different stoichiometries.
         * `no_contact` (lDDT-PLI only): There were no lDDT contacts between
           the binding site and the ligand, and lDDT-PLI is undefined.
-        * `binding_site` (SCRMSD only): a potential assignment was found in the
-          target, but there were no polymer residues in proximity of the ligand
-          in the target.
-        * `model_representation` (SCRMSD only): a potential assignment was
-          found in the target, but no representation of the binding site was
-          found in the model. Either the binding site was not modeled or the
-          model ligand was positioned too far in combination with
-          `full_bs_search=False`.
+        * `target_binding_site` (SCRMSD only): a potential assignment was found
+          in the target, but there were no polymer residues in proximity of the
+          ligand in the target.
+        * `model_binding_site` (SCRMSD only): a potential assignment was
+          found in the target, but no binding site was found in the model.
+          Either the binding site was not modeled or the model ligand was
+          positioned too far in combination with `full_bs_search=False`.
 
         :param mdl_lig_idx: Index of model ligand
         :type mdl_lig_idx: :class:`int`

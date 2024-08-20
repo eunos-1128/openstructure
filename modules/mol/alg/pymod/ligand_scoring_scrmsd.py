@@ -146,14 +146,13 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
         self._get_repr_input = dict()
 
         # update state decoding from parent with subclass specific stuff
-        self.state_decoding[10] = ("binding_site",
+        self.state_decoding[10] = ("target_binding_site",
                                    "No residues were in proximity of the "
                                    "target ligand.")
-        self.state_decoding[11] = ("model_representation", "No representation "
-                                   "of the reference binding site was found in "
-                                   "the model, i.e. the binding site was not "
-                                   "modeled or the model ligand was positioned "
-                                   "too far in combination with "
+        self.state_decoding[11] = ("model_binding_site", "Binding site was not"
+                                   " found in the model, i.e. the binding site"
+                                   " was not modeled or the model ligand was "
+                                   "positioned too far in combination with "
                                    "full_bs_search=False.")
         self.state_decoding[20] = ("unknown",
                                    "Unknown error occured in SCRMSDScorer")
