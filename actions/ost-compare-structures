@@ -971,7 +971,7 @@ def _Main():
     except Exception as exc:
         out = dict()
         out["status"] = "FAILURE"
-        out["traceback"] = traceback.format_exc()
+        out["traceback"] = traceback.format_exc(limit=1000)
         etype, evalue, tb = sys.exc_info()
         out["exception"] = " ".join(traceback.format_exception_only(etype, evalue))
         with open(args.output, 'w') as fh:
