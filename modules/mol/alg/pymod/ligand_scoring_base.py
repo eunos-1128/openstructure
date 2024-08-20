@@ -626,7 +626,7 @@ class LigandScorer:
                     "Ligand was already assigned to an other "
                     "model ligand (different stoichiometry)")
 
-        # maybe its a symmetry issue?
+        # maybe it's a symmetry issue?
         if 2 in tmp:
             return self.state_decoding[2]
 
@@ -634,12 +634,12 @@ class LigandScorer:
         # target counterpart.
         if 6 in tmp:
             mdl_idx = np.where(self.state_matrix[trg_lig_idx,:]==6)[0]
-            # we're reporting everything except disconnected error...
-            # don't ask...
             for i in mdl_idx:
                 if self.model_ligand_states[i] == 0:
                     raise RuntimeError("This should never happen")
-                if self.model_ligand_states[i] != 4:
+                if self.model_ligand_states[i] != 4 or len(tmp) == 1:
+                    # Don't report disconnected if only 1 model ligand is
+                    # disconnected, unless that's the only reason
                     return self.state_decoding[self.model_ligand_states[i]]
 
         # get rid of remaining single ligand issues (only disconnected error)
@@ -720,12 +720,12 @@ class LigandScorer:
         # target counterpart.
         if 6 in tmp:
             trg_idx = np.where(self.state_matrix[:,mdl_lig_idx]==6)[0]
-            # we're reporting everything except disconnected error...
-            # don't ask...
             for i in trg_idx:
                 if self.target_ligand_states[i] == 0:
                     raise RuntimeError("This should never happen")
-                if self.target_ligand_states[i] != 4:
+                if self.target_ligand_states[i] != 4 or len(tmp) == 1:
+                    # Don't report disconnected if only 1 target ligand is
+                    # disconnected, unless that's the only reason
                     return self.state_decoding[self.target_ligand_states[i]]
 
         # get rid of remaining single ligand issues (only disconnected error)
