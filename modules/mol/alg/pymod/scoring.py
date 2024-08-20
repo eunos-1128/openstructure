@@ -1122,6 +1122,14 @@ class Scorer:
             interfaces = cent.interacting_chains
             interfaces = [(min(x[0],x[1]), max(x[0],x[1])) for x in interfaces]
 
+            nuc_seqs = set([s.GetName() for s in self.chain_mapper.polynuc_seqs])
+            interface_chains = {c for i in interfaces for c in i}
+            nuc_interface_chains = interface_chains.intersection(nuc_seqs)
+            if nuc_interface_chains:
+                msg = "OST doesn't support nucleic acid chains for DockQ: "
+                msg += ", ".join(nuc_interface_chains)
+                raise NotImplementedError(msg)
+
             # select the ones with only peptides involved
             pep_seqs = set([s.GetName() for s in self.chain_mapper.polypep_seqs])
             self._dockq_target_interfaces = list()
