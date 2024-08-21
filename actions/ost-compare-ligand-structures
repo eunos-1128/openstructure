@@ -432,7 +432,11 @@ def _LoadLigand(file):
     """
     Load a single ligand from file names. Return an entity.
     """
-    return ost.io.LoadEntity(file, format="sdf")
+    ent = ost.io.LoadEntity(file, format="sdf")
+    ed = ent.EditXCS()
+    ed.RenameChain(ent.chains[0], file)
+    ed.UpdateICS()
+    return ent
 
 
 def _CleanupStructure(entity):
