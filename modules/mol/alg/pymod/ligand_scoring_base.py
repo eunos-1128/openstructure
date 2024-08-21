@@ -859,7 +859,7 @@ class LigandScorer:
                                 new_chain = \
                                 new_editor.InsertChain(new_chain_name)
                                 break
-                        LogScript("Moved ligand residue %s to new chain %s" % (
+                        LogInfo("Moved ligand residue %s to new chain %s" % (
                             residue.qualified_name, new_chain.name))
                     else:
                         msg = \
@@ -961,6 +961,7 @@ class LigandScorer:
                 LogWarning(msg)
 
 
+        LogScript("Computing pairwise scores for all %s x %s ligands" % shape)
         for target_id, target_ligand in enumerate(self.target_ligands):
             LogInfo("Analyzing target ligand %s" % target_ligand)
 

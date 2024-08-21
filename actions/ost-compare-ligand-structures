@@ -273,8 +273,8 @@ def _ParseArgs():
         '--verbosity',
         dest="verbosity",
         type=int,
-        default=3,
-        help="Set verbosity level. Defaults to 3 (INFO).")
+        default=2,
+        help="Set verbosity level. Defaults to 2 (Script).")
 
     parser.add_argument(
         "--full-results",
