@@ -54,7 +54,7 @@ RUN cd ${SRC_FOLDER} && \
              -DENABLE_GUI=0 \
              -DENABLE_INFO=0 && \
     make -j ${CPUS_FOR_MAKE} && \
-    wget ftp://ftp.wwpdb.org/pub/pdb/data/monomers/components.cif.gz && \
+    wget https://files.wwpdb.org/pub/pdb/data/monomers/components.cif.gz && \
     stage/bin/chemdict_tool create components.cif.gz compounds.chemlib pdb && stage/bin/chemdict_tool update ../modules/conop/data/charmm.cif compounds.chemlib charmm && \
     cmake .. -DCOMPOUND_LIB=${SRC_FOLDER}/openstructure-${OPENSTRUCTURE_VERSION}/build/compounds.chemlib && \
              make -j ${CPUS_FOR_MAKE} && make check && make install && \
