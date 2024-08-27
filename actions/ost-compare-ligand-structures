@@ -98,7 +98,7 @@ If lDDT-PLI was enabled with --lddt-pli, the following columns are added:
 
 If BiSyRMSD was enabled with --rmsd, the following columns are added:
 
- * "rmsd", "rmsd_coverage". "rmsd_lddt_lp" "rmsd_bb_rmsd" and
+ * "rmsd", "rmsd_coverage". "lddt_lp" "bb_rmsd" and
    "rmsd_(model|reference)_ligand" are the BiSyRMSD, the corresponding
    coverage, lDDT-LP, backbone RMSD and assigned model ligand (or reference
    ligand if the --by-model-ligand-output flag was set) if an assignment
@@ -794,16 +794,15 @@ def _WriteCSV(out, args):
             })
 
     if args.rmsd:
-        fieldnames.extend(["rmsd", "rmsd_coverage", "rmsd_lddt_lp",
-                           "rmsd_bb_rmsd", "rmsd_%s" % ligand_other,
-                           "rmsd_unassigned"])
+        fieldnames.extend(["rmsd", "lddt_lp", "bb_rmsd", "rmsd_coverage",
+                           "rmsd_%s" % ligand_other, "rmsd_unassigned"])
         for score in out["rmsd"]["assigned_scores"]:
             csv_dict[score[ligand_by]].update({
                 ligand_by: score[ligand_by],
                 "rmsd": score["score"],
+                "lddt_lp": score["lddt_lp"],
+                "bb_rmsd": score["bb_rmsd"],
                 "rmsd_coverage": score["coverage"],
-                "rmsd_lddt_lp": score["lddt_lp"],
-                "rmsd_bb_rmsd": score["bb_rmsd"],
                 "rmsd_%s" % ligand_other: score[ligand_other],
             })
         for ligand, reason in out["rmsd"][
