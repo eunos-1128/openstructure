@@ -158,7 +158,9 @@ def _RMSDScores(mdl, ref, mdl_ch1, mdl_ch2, ref_ch1, ref_ch2, dist_thresh=10.0,
                 cb_mode=False):
 
     # backbone atoms used for superposition
-    sup_atoms = ['CA','C','N','O']
+    sup_atoms = ["CA","C","N","O",
+                 "P", "OP1", "OP2", "O2'", "O3'", "O4'", "O5'", "C1'", "C2'",
+                 "C3'", "C4'", "C5'"]
 
     # make mapped residues accessible by the dockq_idx property
     mapped_mdl = mdl.Select(f"cname={mol.QueryQuoteName(mdl_ch1)},{mol.QueryQuoteName(mdl_ch2)} and grdockq_mapped=1")

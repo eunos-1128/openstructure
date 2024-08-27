@@ -1104,7 +1104,9 @@ class Scorer:
         """ Interfaces in :attr:`target` that are relevant for DockQ
 
         All interfaces in :attr:`~target` with non-zero contacts that are
-        relevant for DockQ. Chain names are lexicographically sorted.
+        relevant for DockQ. Includes protein-protein, protein-nucleotide and
+        nucleotide-nucleotide interfaces. Chain names for each interface are
+        lexicographically sorted.
 
         :type: :class:`list` of :class:`tuple` with 2 elements each:
                (trg_ch1, trg_ch2)
@@ -1122,19 +1124,13 @@ class Scorer:
             interfaces = cent.interacting_chains
             interfaces = [(min(x[0],x[1]), max(x[0],x[1])) for x in interfaces]
 
-            nuc_seqs = set([s.GetName() for s in self.chain_mapper.polynuc_seqs])
-            interface_chains = {c for i in interfaces for c in i}
-            nuc_interface_chains = interface_chains.intersection(nuc_seqs)
-            if nuc_interface_chains:
-                msg = "OST doesn't support nucleic acid chains for DockQ: "
-                msg += ", ".join(nuc_interface_chains)
-                raise NotImplementedError(msg)
-
-            # select the ones with only peptides involved
             pep_seqs = set([s.GetName() for s in self.chain_mapper.polypep_seqs])
+            nuc_seqs = set([s.GetName() for s in self.chain_mapper.polynuc_seqs])
+
+            seqs = pep_seqs.union(nuc_seqs)
             self._dockq_target_interfaces = list()
             for interface in interfaces:
-                if interface[0] in pep_seqs and interface[1] in pep_seqs:
+                if interface[0] in seqs and interface[1] in seqs:
                     self._dockq_target_interfaces.append(interface)
 
         return self._dockq_target_interfaces
@@ -1217,9 +1213,11 @@ class Scorer:
     def irmsd(self):
         """ irmsd scores for interfaces in :attr:`~dockq_interfaces` 
 
-        irmsd: RMSD of interface (RMSD computed on N, CA, C, O atoms) which
+        irmsd: RMSD of interface (RMSD computed on backbone atoms) which
         consists of each residue that has at least one heavy atom within 10A of
-        other chain.
+        other chain. Backbone atoms for proteins: "CA","C","N","O", for
+        nucleotides: "P", "OP1", "OP2", "O2'", "O3'", "O4'", "O5'", "C1'",
+        "C2'", "C3'", "C4'", "C5'".
 
         :class:`list` of :class:`float`
         """
@@ -1231,11 +1229,10 @@ class Scorer:
     def lrmsd(self):
         """ lrmsd scores for interfaces in :attr:`~dockq_interfaces` 
 
-        lrmsd: The interfaces are superposed based on the receptor (rigid
-        min RMSD superposition) and RMSD for the ligand is reported.
-        Superposition and RMSD are based on N, CA, C and O positions,
-        receptor is the chain contributing to the interface with more
-        residues in total.
+        lrmsd: The two chains involved in the interface are superposed based on
+        the receptor (rigid min RMSD superposition) and the ligand RMSD is
+        reported. Receptor is the chain with more residues. Superposition and
+        RMSD is computed on same backbone atoms as :attr:`irmsd`.
 
         :class:`list` of :class:`float`
         """
@@ -2050,6 +2047,12 @@ class Scorer:
 
     def _compute_dockq_scores(self):
         LogScript("Computing DockQ")
+
+        if self.dockq_capri_peptide and len(self.chain_mapper.polynuc_seqs) > 0:
+            raise RuntimeError("Cannot compute DockQ for reference structures "
+                               "with nucleotide chains if dockq_capri_peptide "
+                               "is enabled.")
+
         # lists with values in contact_target_interfaces
         self._dockq_scores = list()
         self._fnat = list()

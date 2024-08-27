@@ -345,7 +345,8 @@ def _ParseArgs():
         help=("Compute DockQ scores and its components. Relevant interfaces "
               "with at least one contact (any atom within 5A) of the reference "
               "structure are available as key \"dockq_reference_interfaces\". "
-              "Only interfaces between peptide chains are considered here! "
+              "Protein-protein, protein-nucleotide and nucleotide-nucleotide "
+              "interfaces are considered. "
               "Key \"dockq_interfaces\" is a subset of "
               "\"dockq_reference_interfaces\" that contains interfaces that "
               "can be mapped to the model. They are stored as lists in format "
@@ -383,7 +384,8 @@ def _ParseArgs():
               "8A in combination with only considering CB atoms for "
               "protein-peptide interactions. "
               "Note that the resulting DockQ is not evaluated for these "
-              "slightly updated fnat and irmsd (lrmsd stays the same)."
+              "slightly updated fnat and irmsd (lrmsd stays the same). "
+              "Raises an error if reference contains nucleotide chains. "
               "This flag has no influence on patch_dockq scores."))
 
     parser.add_argument(

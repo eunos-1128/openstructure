@@ -252,28 +252,29 @@ Details on the usage (output of ``ost compare-structures --help``):
     --dockq               Compute DockQ scores and its components. Relevant
                           interfaces with at least one contact (any atom within
                           5A) of the reference structure are available as key
-                          "dockq_reference_interfaces". Only interfaces between
-                          peptide chains are considered here! Key
-                          "dockq_interfaces" is a subset of
-                          "dockq_reference_interfaces" that contains interfaces
-                          that can be mapped to the model. They are stored as
-                          lists in format [ref_ch1, ref_ch2, mdl_ch1, mdl_ch2].
-                          The respective DockQ scores for "dockq_interfaces" are
-                          available as key "dockq". It's components are
-                          available as keys: "fnat" (fraction of reference
-                          contacts which are also there in model) "irmsd"
-                          (interface RMSD), "lrmsd" (ligand RMSD). The DockQ
-                          score is strictly designed to score each interface
-                          individually. We also provide two averaged versions to
-                          get one full model score: "dockq_ave", "dockq_wave".
-                          The first is simply the average of "dockq_scores", the
-                          latter is a weighted average with weights derived from
-                          number of contacts in the reference interfaces. These
-                          two scores only consider interfaces that are present
-                          in both, the model and the reference. "dockq_ave_full"
-                          and "dockq_wave_full" add zeros in the average
-                          computation for each interface that is only present in
-                          the reference but not in the model.
+                          "dockq_reference_interfaces". Protein-protein,
+                          protein-nucleotide and nucleotide-nucleotide
+                          interfaces are considered. Key "dockq_interfaces" is a
+                          subset of "dockq_reference_interfaces" that contains
+                          interfaces that can be mapped to the model. They are
+                          stored as lists in format [ref_ch1, ref_ch2, mdl_ch1,
+                          mdl_ch2]. The respective DockQ scores for
+                          "dockq_interfaces" are available as key "dockq". It's
+                          components are available as keys: "fnat" (fraction of
+                          reference contacts which are also there in model)
+                          "irmsd" (interface RMSD), "lrmsd" (ligand RMSD). The
+                          DockQ score is strictly designed to score each
+                          interface individually. We also provide two averaged
+                          versions to get one full model score: "dockq_ave",
+                          "dockq_wave". The first is simply the average of
+                          "dockq_scores", the latter is a weighted average with
+                          weights derived from number of contacts in the
+                          reference interfaces. These two scores only consider
+                          interfaces that are present in both, the model and the
+                          reference. "dockq_ave_full" and "dockq_wave_full" add
+                          zeros in the average computation for each interface
+                          that is only present in the reference but not in the
+                          model.
     --dockq-capri-peptide
                           Flag that changes two things in the way DockQ and its
                           underlying scores are computed which is proposed by
@@ -289,8 +290,9 @@ Details on the usage (output of ``ost compare-structures --help``):
                           only considering CB atoms for protein-peptide
                           interactions. Note that the resulting DockQ is not
                           evaluated for these slightly updated fnat and irmsd
-                          (lrmsd stays the same).This flag has no influence on
-                          patch_dockq scores.
+                          (lrmsd stays the same). Raises an error if reference
+                          contains nucleotide chains. This flag has no influence
+                          on patch_dockq scores.
     --ics                 Computes interface contact similarity (ICS) related
                           scores. A contact between two residues of different
                           chains is defined as having at least one heavy atom
