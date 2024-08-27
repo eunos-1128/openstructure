@@ -47,7 +47,7 @@ test:ubuntu22.04:
   - make -j 2
   - echo "    ... done building OST."
   - echo "    Downloading chemical compounds..."
-  - wget ftp://ftp.wwpdb.org/pub/pdb/data/monomers/components.cif.gz
+  - wget https://files.wwpdb.org/pub/pdb/data/monomers/components.cif.gz
   - echo "    ... done downloading compounds"
   - echo "    Building a compound library..."
   - stage/bin/chemdict_tool create components.cif.gz compounds.chemlib pdb -i
