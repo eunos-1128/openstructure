@@ -635,8 +635,8 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
             for ref_lig_idx in range(shape[0]):
                 for mdl_lig_idx in range(shape[1]):
                     state = int(lddtpli_scorer.state_matrix[(ref_lig_idx, mdl_lig_idx)])
-                    target_key = out["reference_ligands"][lig_pair[0]]
-                    model_key = out["model_ligands"][lig_pair[1]]
+                    target_key = out["reference_ligands"][ref_lig_idx]
+                    model_key = out["model_ligands"][mdl_lig_idx]
                     if state == 0:                    
                         score = float(lddtpli_scorer.score_matrix[(ref_lig_idx, mdl_lig_idx)])
                         coverage = float(lddtpli_scorer.coverage_matrix[(ref_lig_idx, mdl_lig_idx)])
@@ -707,8 +707,8 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
             for ref_lig_idx in range(shape[0]):
                 for mdl_lig_idx in range(shape[1]):
                     state = int(scrmsd_scorer.state_matrix[(ref_lig_idx, mdl_lig_idx)])
-                    target_key = out["reference_ligands"][lig_pair[0]]
-                    model_key = out["model_ligands"][lig_pair[1]]
+                    target_key = out["reference_ligands"][ref_lig_idx]
+                    model_key = out["model_ligands"][mdl_lig_idx]
                     if state == 0:                    
                         score = float(scrmsd_scorer.score_matrix[(ref_lig_idx, mdl_lig_idx)])
                         coverage = float(scrmsd_scorer.coverage_matrix[(ref_lig_idx, mdl_lig_idx)])
