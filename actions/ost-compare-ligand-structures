@@ -110,6 +110,7 @@ If BiSyRMSD was enabled with --rmsd, the following columns are added:
 
 import argparse
 import csv
+from io import StringIO
 import json
 import os
 import sys
@@ -211,6 +212,22 @@ def _ParseArgs():
         help=("For CSV output, this flag changes the output so that each line "
               "reports one model ligand, instead of a reference ligand. "
               "Has no effect with JSON output."))
+
+    parser.add_argument(
+        "--csv-extra-header",
+        dest="csv_extra_header",
+        default=None,
+        type=str,
+        help=("Extra header prefix for CSV output. This allows adding "
+              "additional annotations (such as target ID, group, etc) to the "
+              "output"))
+
+    parser.add_argument(
+        "--csv-extra-data",
+        dest="csv_extra_data",
+        default=None,
+        type=str,
+        help=("Additional data (columns) for CSV output."))
 
     parser.add_argument(
         "-mb",
@@ -795,6 +812,18 @@ def _WriteCSV(out, args):
                 ligand_by: ligand,
                 "rmsd_unassigned": reason[0],
             })
+
+    if args.csv_extra_header or args.csv_extra_data:
+
+        extra_csv = StringIO(
+            args.csv_extra_header + os.linesep + args.csv_extra_data)
+        reader = csv.DictReader(extra_csv)
+        extra_data = next(iter(reader))
+        if None in extra_data:
+            raise ValueError("Not enough columns in --csv-extra-header")
+        fieldnames = reader.fieldnames + fieldnames
+        for ligand, row in csv_dict.items():
+            row.update(extra_data)
 
     with open(args.output, 'w', newline='') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
