@@ -348,7 +348,9 @@ Details on the usage (output of ``ost compare-structures --help``):
                           thresholds [0.5, 1.0, 2.0, 4.0], "rmsd": RMSD given
                           these positions and transformation, "transform": the
                           used 4x4 transformation matrix that superposes model
-                          onto reference.
+                          onto reference, "rigid_chain_mapping": equivalent of
+                          "chain_mapping" which is used for rigid scores
+                          (optimized for RMSD instead of QS-score/lDDT).
     --patch-scores        Local interface quality score used in CASP15. Scores
                           each model residue that is considered in the interface
                           (CB pos within 8A of any CB pos from another chain (CA

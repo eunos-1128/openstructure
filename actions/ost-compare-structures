@@ -454,7 +454,10 @@ def _ParseArgs():
               "8.0] given these positions and transformation, \"oligo_gdtha\": "
               "same with thresholds [0.5, 1.0, 2.0, 4.0], \"rmsd\": RMSD given "
               "these positions and transformation, \"transform\": the used 4x4 "
-              "transformation matrix that superposes model onto reference."))
+              "transformation matrix that superposes model onto reference, "
+              "\"rigid_chain_mapping\": equivalent of \"chain_mapping\" which "
+              "is used for rigid scores (optimized for RMSD instead of "
+              "QS-score/lDDT)."))
 
     parser.add_argument(
         "--patch-scores",
@@ -895,6 +898,7 @@ def _Process(model, reference, args, model_format, reference_format):
         out["rmsd"] = _RoundOrNone(scorer.rmsd)
         data = scorer.rigid_transform.data
         out["transform"] = [data[i:i + 4] for i in range(0, len(data), 4)]
+        out["rigid_chain_mapping"] = scorer.rigid_mapping.GetFlatMapping()
 
     if args.patch_scores:
         out["model_interface_residues"] = \
