@@ -893,7 +893,7 @@ def _Process(model, reference, args, model_format, reference_format):
         out["oligo_gdtts"] = _RoundOrNone(scorer.gdtts)
         out["oligo_gdtha"] = _RoundOrNone(scorer.gdtha)
         out["rmsd"] = _RoundOrNone(scorer.rmsd)
-        data = scorer.transform.data
+        data = scorer.rigid_transform.data
         out["transform"] = [data[i:i + 4] for i in range(0, len(data), 4)]
 
     if args.patch_scores:
