@@ -344,6 +344,7 @@ class Scorer:
         # lazily computed scores
         self._lddt = None
         self._local_lddt = None
+        self._aa_local_lddt = None
         self._bb_lddt = None
         self._bb_local_lddt = None
         self._ilddt = None
@@ -742,6 +743,23 @@ class Scorer:
         if self._local_lddt is None:
             self._compute_lddt()
         return self._local_lddt
+
+    @property
+    def aa_local_lddt(self):
+        """ Per atom lDDT scores in range [0.0, 1.0]
+
+        Computed based on :attr:`~stereochecked_model` but scores for all
+        atoms in :attr:`~model` are reported. If an atom has been removed
+        by stereochemistry checks, the respective score is set to 0.0. If an
+        atom is not covered by the target or is in a chain skipped by the
+        chain mapping procedure (happens for super short chains), the respective
+        score is set to None. In case of oligomers, :attr:`~mapping` is used.
+
+        :type: :class:`dict`
+        """
+        if self._aa_local_lddt is None:
+            self._compute_lddt()
+        return self._aa_local_lddt
 
     @property
     def bb_lddt(self):
@@ -1824,6 +1842,7 @@ class Scorer:
         # score variables to be set
         lddt_score = None
         local_lddt = None
+        aa_local_lddt = None
 
         if self.lddt_no_stereochecks:
             lddt_chain_mapping = dict()
@@ -1835,19 +1854,39 @@ class Scorer:
                                                residue_mapping = alns,
                                                check_resnames=False,
                                                local_lddt_prop="lddt",
-                                               add_mdl_contacts = self.lddt_add_mdl_contacts)[0]
+                                               add_mdl_contacts = self.lddt_add_mdl_contacts,
+                                               set_atom_props=True)[0]
             local_lddt = dict()
+            aa_local_lddt = dict()
             for r in self.model.residues:
+
                 cname = r.GetChain().GetName()
                 if cname not in local_lddt:
                     local_lddt[cname] = dict()
+                    aa_local_lddt[cname] = dict()
+
+                rnum = r.GetNumber()
+                if rnum not in aa_local_lddt[cname]:
+                    aa_local_lddt[cname][rnum] = dict()
+
                 if r.HasProp("lddt"):
                     score = round(r.GetFloatProp("lddt"), 3)
-                    local_lddt[cname][r.GetNumber()] = score
+                    local_lddt[cname][rnum] = score
                 else:
                     # not covered by trg or skipped in chain mapping procedure
                     # the latter happens if its part of a super short chain
-                    local_lddt[cname][r.GetNumber()] = None
+                    local_lddt[cname][rnum] = None
+
+                for a in r.atoms:
+                    if a.HasProp("lddt"):
+                        score = round(a.GetFloatProp("lddt"), 3)
+                        aa_local_lddt[cname][rnum][a.GetName()] = score
+                    else:
+                        # not covered by trg or skipped in chain mapping
+                        # procedure the latter happens if its part of a
+                        # super short chain
+                        aa_local_lddt[cname][rnum][a.GetName()] = None
+
 
         else:
             lddt_chain_mapping = dict()
@@ -1859,22 +1898,40 @@ class Scorer:
                                                residue_mapping = stereochecked_alns,
                                                check_resnames=False,
                                                local_lddt_prop="lddt",
-                                               add_mdl_contacts = self.lddt_add_mdl_contacts)[0]
+                                               add_mdl_contacts = self.lddt_add_mdl_contacts,
+                                               set_atom_props=True)[0]
             local_lddt = dict()
+            aa_local_lddt = dict()
             for r in self.model.residues:
                 cname = r.GetChain().GetName()
                 if cname not in local_lddt:
                     local_lddt[cname] = dict()
+                    aa_local_lddt[cname] = dict()
+                rnum = r.GetNumber()
+                if rnum not in aa_local_lddt[cname]:
+                    aa_local_lddt[cname][rnum] = dict()
+
                 if r.HasProp("lddt"):
                     score = round(r.GetFloatProp("lddt"), 3)
-                    local_lddt[cname][r.GetNumber()] = score
+                    local_lddt[cname][rnum] = score
+
+                    for a in r.atoms:
+                        if a.HasProp("lddt"):
+                            score = round(a.GetFloatProp("lddt"), 3)
+                            aa_local_lddt[cname][rnum][a.GetName()] = score
+                        else:
+                            # must have been removed by stereochecks
+                            aa_local_lddt[cname][rnum][a.GetName()] = 0.0
+
                 else:
                     # rsc => residue stereo checked...
-                    mdl_res = self.stereochecked_model.FindResidue(cname, r.GetNumber())
+                    mdl_res = self.stereochecked_model.FindResidue(cname, rnum)
                     if mdl_res.IsValid():
                         # not covered by trg or skipped in chain mapping procedure
                         # the latter happens if its part of a super short chain
-                        local_lddt[cname][r.GetNumber()] = None
+                        local_lddt[cname][rnum] = None
+                        for a in r.atoms:
+                            aa_local_lddt[cname][rnum][a.GetName()] = None
                     else:
                         # opt 1: removed by stereochecks => assign 0.0
                         # opt 2: removed by stereochecks AND not covered by ref
@@ -1888,12 +1945,18 @@ class Scorer:
                                         trg_r = col.GetResidue(0)
                                         break
                         if trg_r is None:
-                            local_lddt[cname][r.GetNumber()] = None
+                            local_lddt[cname][rnum] = None
+                            for a in r.atoms:
+                                aa_local_lddt[cname][rnum][a.GetName()] = None
+
                         else:
-                            local_lddt[cname][r.GetNumber()] = 0.0
+                            local_lddt[cname][rnum] = 0.0
+                            for a in r.atoms:
+                                aa_local_lddt[cname][rnum][a.GetName()] = 0.0
 
         self._lddt = lddt_score
         self._local_lddt = local_lddt
+        self._aa_local_lddt = aa_local_lddt
 
     def _compute_bb_lddt(self):
         LogScript("Computing backbone lDDT")

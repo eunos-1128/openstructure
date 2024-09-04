@@ -202,6 +202,19 @@ Details on the usage (output of ``ost compare-structures --help``):
                           counterparts. Atoms specified in there follow the
                           following format:
                           <chain_name>.<resnum>.<resnum_inscode>.<atom_name>
+    --aa-local-lddt       Compute per-atom lDDT scores with default
+                          parameterization and store as key "aa_local_lddt".
+                          Score for each atom is accessible by key
+                          <chain_name>.<resnum>.<resnum_inscode>.<aname>. Alpha
+                          carbon from residue with number 42 in chain X can be
+                          extracted with: data["aa_local_lddt"]["X.42..CA"]. If
+                          there is a residue insertion code, lets say A, the
+                          atom key becomes "X.42.A.CA". Stereochemical
+                          irregularities affecting lDDT are reported as keys
+                          "model_clashes", "model_bad_bonds", "model_bad_angles"
+                          and the respective reference counterparts. Atoms
+                          specified in there follow the following format:
+                          <chain_name>.<resnum>.<resnum_inscode>.<atom_name>
     --bb-lddt             Compute global lDDT score with default
                           parameterization and store as key "bb_lddt". lDDT in
                           this case is only computed on backbone atoms: CA for

@@ -248,6 +248,25 @@ def _ParseArgs():
               "format: <chain_name>.<resnum>.<resnum_inscode>.<atom_name>"))
 
     parser.add_argument(
+        "--aa-local-lddt",
+        dest="aa_local_lddt",
+        default=False,
+        action="store_true",
+        help=("Compute per-atom lDDT scores with default parameterization "
+              "and store as key \"aa_local_lddt\". Score for each atom is "
+              "accessible by key "
+              "<chain_name>.<resnum>.<resnum_inscode>.<aname>. "
+              "Alpha carbon from residue with number 42 in chain X can be "
+              "extracted with: data[\"aa_local_lddt\"][\"X.42..CA\"]. "
+              "If there is a residue insertion code, lets say A, the atom key "
+              "becomes \"X.42.A.CA\". "
+              "Stereochemical irregularities affecting lDDT are reported as "
+              "keys \"model_clashes\", \"model_bad_bonds\", "
+              "\"model_bad_angles\" and the respective reference "
+              "counterparts. Atoms specified in there follow the following "
+              "format: <chain_name>.<resnum>.<resnum_inscode>.<atom_name>"))
+
+    parser.add_argument(
         "--bb-lddt",
         dest="bb_lddt",
         default=False,
@@ -712,6 +731,17 @@ def _LocalScoresToJSONDict(score_dict):
             json_dict[f"{ch}.{num.num}.{ins_code}"] = _RoundOrNone(s)
     return json_dict
 
+def _LocalAAScoresToJSONDict(score_dict):
+    """ Convert ResNums and atom names to str for JSON serialization
+    """
+    json_dict = dict()
+    for ch, ch_scores in score_dict.items():
+        for num, res_scores in ch_scores.items():
+            ins_code = num.ins_code.strip("\u0000")
+            for a, s in res_scores.items():
+                json_dict[f"{ch}.{num.num}.{ins_code}.{a}"] = _RoundOrNone(s)
+    return json_dict
+
 def _InterfaceResiduesToJSONList(interface_dict):
     """ Convert ResNums to str for JSON serialization.
 
@@ -816,7 +846,10 @@ def _Process(model, reference, args, model_format, reference_format):
     if args.local_lddt:
         out["local_lddt"] = _LocalScoresToJSONDict(scorer.local_lddt)
 
-    if args.lddt or args.local_lddt:
+    if args.aa_local_lddt:
+        out["aa_local_lddt"] = _LocalAAScoresToJSONDict(scorer.aa_local_lddt)
+
+    if args.lddt or args.local_lddt or args.aa_local_lddt:
         out["model_clashes"] = [x.ToJSON() for x in scorer.model_clashes]
         out["model_bad_bonds"] = [x.ToJSON() for x in scorer.model_bad_bonds]
         out["model_bad_angles"] = [x.ToJSON() for x in scorer.model_bad_angles]
