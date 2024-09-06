@@ -701,7 +701,8 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
                                                                          aux_data["bs_ref_res_mapped"]],
                                                    "bs_mdl_res_mapped": [_QualifiedResidueNotation(r) for r in
                                                                          aux_data["bs_mdl_res_mapped"]],
-                                                   "inconsistent_residues": [_QualifiedResidueNotation(r) for r in
+                                                   "inconsistent_residues": [_QualifiedResidueNotation(r[0]) + \
+                                                                             "-" +_QualifiedResidueNotation(r[1]) for r in
                                                                              aux_data["inconsistent_residues"]],
                                                    "transform": [transform_data[i:i + 4]
                                                                  for i in range(0, len(transform_data), 4)]})
@@ -744,7 +745,8 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
                                                                                   aux_data["bs_ref_res_mapped"]],
                                                             "bs_mdl_res_mapped": [_QualifiedResidueNotation(r) for r in
                                                                                   aux_data["bs_mdl_res_mapped"]],
-                                                            "inconsistent_residues": [_QualifiedResidueNotation(r) for r in
+                                                            "inconsistent_residues": [_QualifiedResidueNotation(r[0]) + \
+                                                                             "-" +_QualifiedResidueNotation(r[1]) for r in
                                                                                       aux_data["inconsistent_residues"]],
                                                             "transform": [transform_data[i:i + 4]
                                                                           for i in range(0, len(transform_data), 4)]})
