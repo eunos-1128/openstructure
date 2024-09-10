@@ -326,6 +326,7 @@ class Scorer:
         self._target_clashes = None
         self._target_bad_bonds = None
         self._target_bad_angles = None
+        self._trimmed_model = None
         self._chain_mapper = None
         self._mapping = None
         self._rigid_mapping = None
@@ -334,12 +335,14 @@ class Scorer:
         self._aln = None
         self._stereochecked_aln = None
         self._pepnuc_aln = None
+        self._trimmed_aln = None
 
         # lazily constructed scorer objects
         self._lddt_scorer = None
         self._bb_lddt_scorer = None
         self._qs_scorer = None
         self._contact_scorer = None
+        self._trimmed_contact_scorer = None
 
         # lazily computed scores
         self._lddt = None
@@ -361,6 +364,7 @@ class Scorer:
         self._contact_model_interfaces = None
         self._native_contacts = None
         self._model_contacts = None
+        self._trimmed_model_contacts = None
         self._ics_precision = None
         self._ics_recall = None
         self._ics = None
@@ -373,6 +377,16 @@ class Scorer:
         self._per_interface_ics_precision = None
         self._per_interface_ics_recall = None
         self._per_interface_ics = None
+
+        # subset of contact scores that operate on trimmed model
+        # i.e. no contacts from model residues that are not present in
+        # target
+        self._ics_trimmed = None
+        self._ics_precision_trimmed = None
+        self._ics_recall_trimmed = None
+        self._ips_trimmed = None
+        self._ips_precision_trimmed = None
+        self._ips_recall_trimmed = None
 
         self._dockq_target_interfaces = None
         self._dockq_interfaces = None
@@ -503,6 +517,19 @@ class Scorer:
         return self._pepnuc_aln
 
     @property
+    def trimmed_aln(self):
+        """ Alignments of :attr:`trimmed_model`/:attr:`target` chains
+
+        Alignments for each pair of chains mapped in :attr:`mapping`.
+        First sequence is target sequence, second sequence the model sequence.
+
+        :type: :class:`list` of :class:`ost.seq.AlignmentHandle`
+        """
+        if self._trimmed_aln is None:
+            self._trim_model()
+        return self._trimmed_aln
+
+    @property
     def stereochecked_model(self):
         """ View of :attr:`~model` that has stereochemistry checks applied
 
@@ -591,6 +618,20 @@ class Scorer:
         if self._target_bad_angles is None:
             self._do_stereochecks()
         return self._target_bad_angles
+
+    @property
+    def trimmed_model(self):
+        """ :attr:`model` trimmed to target
+
+        Removes residues that are not covered by :class:`target` given
+        :attr:`mapping`. In other words: no model residues without experimental
+        evidence from :class:`target`. 
+
+        :type: :class:`ost.mol.EntityView`
+        """
+        if self._trimmed_model is None:
+            self._trim_model()
+        return self._trimmed_model
 
     @property
     def chain_mapper(self):
@@ -713,6 +754,14 @@ class Scorer:
             self._contact_scorer = ContactScorer.FromMappingResult(self.mapping)
         return self._contact_scorer
     
+    @property
+    def trimmed_contact_scorer(self):
+        if self._trimmed_contact_scorer is None:
+            self._trimmed_contact_scorer = ContactScorer(self.mapping.target,
+                                                         self.mapping.chem_groups,
+                                                         self.trimmed_model,
+                                                         self.trimmed_aln)
+        return self._trimmed_contact_scorer
 
     @property
     def lddt(self):
@@ -928,11 +977,19 @@ class Scorer:
 
     @property
     def model_contacts(self):
-        """ Same for model
+        """ Same for :attr:`model`
         """
         if self._model_contacts is None:
             self._model_contacts = self.contact_scorer.cent2.hr_contacts
         return self._model_contacts
+
+    @property
+    def trimmed_model_contacts(self):
+        """ Same for :attr:`trimmed_model`
+        """
+        if self._trimmed_model_contacts is None:
+            self._trimmed_model_contacts = self.trimmed_contact_scorer.cent2.hr_contacts
+        return self._trimmed_model_contacts
 
     @property
     def contact_target_interfaces(self):
@@ -1077,6 +1134,90 @@ class Scorer:
         return self._ips
 
     @property
+    def ics_trimmed(self):
+        """ Same as :attribute:`ics` but with trimmed model
+
+        Model is trimmed to residues which can me mapped to target in order
+        to not penalize contacts in the model for which we have no experimental
+        evidence.
+
+        :type: :class:`float`
+        """
+        if self._ics_trimmed is None:
+            self._compute_ics_scores_trimmed()
+        return self._ics_trimmed
+
+    @property
+    def ics_precision_trimmed(self):
+        """ Same as :attribute:`ics_precision` but with trimmed model
+
+        Model is trimmed to residues which can me mapped to target in order
+        to not penalize contacts in the model for which we have no experimental
+        evidence.
+
+        :type: :class:`float`
+        """
+        if self._ics_precision_trimmed is None:
+            self._compute_ics_scores_trimmed()
+        return self._ics_precision_trimmed
+
+    @property
+    def ics_recall_trimmed(self):
+        """ Same as :attribute:`ics_recall` but with trimmed model
+
+        Model is trimmed to residues which can me mapped to target in order
+        to not penalize contacts in the model for which we have no experimental
+        evidence.
+
+        :type: :class:`float`
+        """
+        if self._ics_recall_trimmed is None:
+            self._compute_ics_scores_trimmed()
+        return self._ics_recall_trimmed
+
+    @property
+    def ips_trimmed(self):
+        """ Same as :attribute:`ips` but with trimmed model
+
+        Model is trimmed to residues which can me mapped to target in order
+        to not penalize contacts in the model for which we have no experimental
+        evidence.
+
+        :type: :class:`float`
+        """
+        if self._ips_trimmed is None:
+            self._compute_ips_scores_trimmed()
+        return self._ips_trimmed
+
+    @property
+    def ips_precision_trimmed(self):
+        """ Same as :attribute:`ips_precision` but with trimmed model
+
+        Model is trimmed to residues which can me mapped to target in order
+        to not penalize contacts in the model for which we have no experimental
+        evidence.
+
+        :type: :class:`float`
+        """
+        if self._ips_precision_trimmed is None:
+            self._compute_ips_scores_trimmed()
+        return self._ips_precision_trimmed
+
+    @property
+    def ips_recall_trimmed(self):
+        """ Same as :attribute:`ips_recall` but with trimmed model
+
+        Model is trimmed to residues which can me mapped to target in order
+        to not penalize contacts in the model for which we have no experimental
+        evidence.
+
+        :type: :class:`float`
+        """
+        if self._ips_recall_trimmed is None:
+            self._compute_ips_scores_trimmed()
+        return self._ips_recall_trimmed
+
+    @property
     def per_interface_ips_precision(self):
         """ Per-interface IPS precision
 
@@ -1088,7 +1229,6 @@ class Scorer:
         if self._per_interface_ips_precision is None:
             self._compute_ips_scores()
         return self._per_interface_ips_precision
-
 
     @property
     def per_interface_ips_recall(self):
@@ -2081,6 +2221,51 @@ class Scorer:
                 self._per_interface_ics_recall.append(None)
                 self._per_interface_ics.append(None)
 
+    def _trim_model(self):
+        trimmed_mdl = mol.CreateEntityFromView(self.mapping.model, True)
+        trimmed_aln = dict()
+
+        for trg_cname, mdl_cname in self.mapping.GetFlatMapping().items():
+            mdl_ch = trimmed_mdl.FindChain(mdl_cname)
+            aln = self.mapping.alns[(trg_cname, mdl_cname)]
+
+            # some limited test that stuff matches
+            assert(mdl_ch.GetResidueCount() == \
+                   len(aln.GetSequence(1).GetGaplessString()))
+
+            mdl_residues = mdl_ch.residues
+            mdl_res_idx = 0
+            aligned_mdl_seq = ['-'] * aln.GetLength()
+            for col_idx, col in enumerate(aln):
+                if col[0] != '-' and col[1] != '-':
+                    mdl_res = mdl_residues[mdl_res_idx]
+                    mdl_res.SetIntProp("aligned", 1)
+                    aligned_mdl_seq[col_idx] = col[1]
+                if col[1] != '-':
+                    mdl_res_idx += 1
+            aligned_mdl_seq = ''.join(aligned_mdl_seq)
+            aligned_mdl_seq = seq.CreateSequence(mdl_cname, aligned_mdl_seq)
+
+            new_aln = seq.CreateAlignment()
+            new_aln.AddSequence(aln.GetSequence(0))
+            new_aln.AddSequence(aligned_mdl_seq)
+            trimmed_aln[(trg_cname, mdl_cname)] = new_aln
+
+        self._trimmed_model = trimmed_mdl.Select("graligned:0=1")
+        self._trimmed_aln = trimmed_aln
+
+    def _compute_ics_scores_trimmed(self):
+        LogScript("Computing ICS scores trimmed")
+
+        # this is an ugly hack without any efficiency in mind
+        # we're simply taking the entities from mapper and construct
+        # a new contact scorer from scratch
+
+        contact_scorer_res = self.trimmed_contact_scorer.ScoreICS(self.mapping.mapping)
+        self._ics_trimmed = contact_scorer_res.ics
+        self._ics_precision_trimmed = contact_scorer_res.precision
+        self._ics_recall_trimmed = contact_scorer_res.recall
+
     def _compute_ips_scores(self):
         LogScript("Computing IPS scores")
         contact_scorer_res = self.contact_scorer.ScoreIPS(self.mapping.mapping)
@@ -2107,6 +2292,17 @@ class Scorer:
                 self._per_interface_ips_precision.append(None)
                 self._per_interface_ips_recall.append(None)
                 self._per_interface_ips.append(None)
+
+    def _compute_ips_scores_trimmed(self):
+        LogScript("Computing IPS scores trimmed")
+
+        # this is an ugly hack without any efficiency in mind
+        # we're simply taking the entities from mapper and construct
+        # a new contact scorer from scratch
+        contact_scorer_res = self.trimmed_contact_scorer.ScoreIPS(self.mapping.mapping)
+        self._ips_precision_trimmed = contact_scorer_res.precision
+        self._ips_recall_trimmed = contact_scorer_res.recall
+        self._ips_trimmed = contact_scorer_res.ips
 
     def _compute_dockq_scores(self):
         LogScript("Computing DockQ")
