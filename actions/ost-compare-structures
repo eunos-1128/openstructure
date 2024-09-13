@@ -444,10 +444,20 @@ def _ParseArgs():
               "counterpart are removed. As a consequence, model contacts for "
               "which we have no experimental evidence do not affect the score. "
               "The effect of these added model contacts without mapping to "
-              "target are decreased precision and thus lower ics. Recall is "
+              "target would be decreased precision and thus lower ics. Recall is "
               "not affected. Enabling this flag adds the following keys: "
               "\"ics_trimmed\", \"ics_precision_trimmed\", "
-              "\"ics_recall_trimmed\" and \"model_contacts_trimmed\""))
+              "\"ics_recall_trimmed\", \"model_contacts_trimmed\". "
+              "The reference contacts and reference interfaces are the same "
+              "as for ics and available as keys: \"reference_contacts\", "
+              "\"contact_reference_interfaces\". "
+              "All these measures are also available on a per-interface basis "
+              "for each interface in the reference structure that are defined "
+              "as chain pairs with at least one contact (available as key "
+              " \"contact_reference_interfaces\"). The respective metrics are "
+              "available as keys \"per_interface_ics_precision_trimmed\", "
+              "\"per_interface_ics_recall_trimmed\" and "
+              "\"per_interface_ics_trimmed\"."))
 
     parser.add_argument(
         "--ips",
@@ -906,8 +916,13 @@ def _Process(model, reference, args, model_format, reference_format):
         [_RoundOrNone(x) for x in scorer.per_interface_qs_best]
 
     if args.ics or args.ips:
-        out["reference_contacts"] = scorer.native_contacts
         out["model_contacts"] = scorer.model_contacts
+
+    if args.ics_trimmed or args.ips_trimmed:
+        out["model_contacts_trimmed"] = scorer.trimmed_model_contacts
+
+    if args.ics or args.ips or args.ics_trimmed or args.ips_trimmed:
+        out["reference_contacts"] = scorer.native_contacts
         out["contact_reference_interfaces"] = scorer.contact_target_interfaces
 
     if args.ics:
@@ -932,18 +947,27 @@ def _Process(model, reference, args, model_format, reference_format):
         out["per_interface_ips"] = \
         [_RoundOrNone(x) for x in scorer.per_interface_ips]
 
-    if args.ics_trimmed or args.ips_trimmed:
-        out["model_contacts_trimmed"] = scorer.trimmed_model_contacts
-
     if args.ics_trimmed:
         out["ics_trimmed"] = _RoundOrNone(scorer.ics_trimmed)
         out["ics_precision_trimmed"] = _RoundOrNone(scorer.ics_precision_trimmed)
         out["ics_recall_trimmed"] = _RoundOrNone(scorer.ics_recall_trimmed)
+        out["per_interface_ics_precision_trimmed"] = \
+        [_RoundOrNone(x) for x in scorer.per_interface_ics_precision_trimmed]
+        out["per_interface_ics_recall_trimmed"] = \
+        [_RoundOrNone(x) for x in scorer.per_interface_ics_recall_trimmed]
+        out["per_interface_ics_trimmed"] = \
+        [_RoundOrNone(x) for x in scorer.per_interface_ics_trimmed]
 
     if args.ips_trimmed:
         out["ips_trimmed"] = _RoundOrNone(scorer.ips_trimmed)
         out["ips_precision_trimmed"] = _RoundOrNone(scorer.ips_precision_trimmed)
         out["ips_recall_trimmed"] = _RoundOrNone(scorer.ips_recall_trimmed)
+        out["per_interface_ips_precision_trimmed"] = \
+        [_RoundOrNone(x) for x in scorer.per_interface_ips_precision_trimmed]
+        out["per_interface_ips_recall_trimmed"] = \
+        [_RoundOrNone(x) for x in scorer.per_interface_ips_recall_trimmed]
+        out["per_interface_ips_trimmed"] = \
+        [_RoundOrNone(x) for x in scorer.per_interface_ips_trimmed]
 
     if args.dockq:
         out["dockq_reference_interfaces"] = scorer.dockq_target_interfaces

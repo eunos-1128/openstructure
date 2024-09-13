@@ -374,9 +374,9 @@ class Scorer:
         self._ips_precision = None
         self._ips_recall = None
         self._ips = None
-        self._per_interface_ics_precision = None
-        self._per_interface_ics_recall = None
-        self._per_interface_ics = None
+        self._per_interface_ips_precision = None
+        self._per_interface_ips_recall = None
+        self._per_interface_ips = None
 
         # subset of contact scores that operate on trimmed model
         # i.e. no contacts from model residues that are not present in
@@ -384,9 +384,15 @@ class Scorer:
         self._ics_trimmed = None
         self._ics_precision_trimmed = None
         self._ics_recall_trimmed = None
+        self._per_interface_ics_precision_trimmed = None
+        self._per_interface_ics_recall_trimmed = None
+        self._per_interface_ics_trimmed = None
         self._ips_trimmed = None
         self._ips_precision_trimmed = None
         self._ips_recall_trimmed = None
+        self._per_interface_ips_precision_trimmed = None
+        self._per_interface_ips_recall_trimmed = None
+        self._per_interface_ips_trimmed = None
 
         self._dockq_target_interfaces = None
         self._dockq_interfaces = None
@@ -1096,7 +1102,6 @@ class Scorer:
         if self._per_interface_ics is None:
             self._compute_ics_scores()
         return self._per_interface_ics
-    
 
     @property
     def ips_precision(self):
@@ -1174,6 +1179,47 @@ class Scorer:
         if self._ics_recall_trimmed is None:
             self._compute_ics_scores_trimmed()
         return self._ics_recall_trimmed
+
+    @property
+    def per_interface_ics_precision_trimmed(self):
+        """ Same as :attr:`per_interface_ics_precision` but with :attr:`trimmed_model`
+
+        :attr:`~ics_precision_trimmed` for each interface in
+        :attr:`~contact_target_interfaces`
+
+        :type: :class:`list` of :class:`float`
+        """
+        if self._per_interface_ics_precision_trimmed is None:
+            self._compute_ics_scores_trimmed()
+        return self._per_interface_ics_precision_trimmed
+
+
+    @property
+    def per_interface_ics_recall_trimmed(self):
+        """ Same as :attr:`per_interface_ics_recall` but with :attr:`trimmed_model`
+
+        :attr:`~ics_recall_trimmed` for each interface in
+        :attr:`~contact_target_interfaces`
+
+        :type: :class:`list` of :class:`float`
+        """
+        if self._per_interface_ics_recall_trimmed is None:
+            self._compute_ics_scores_trimmed()
+        return self._per_interface_ics_recall_trimmed
+
+    @property
+    def per_interface_ics_trimmed(self):
+        """ Same as :attr:`per_interface_ics` but with :attr:`trimmed_model`
+
+        :attr:`~ics` for each interface in 
+        :attr:`~contact_target_interfaces`
+
+        :type: :class:`float`
+        """
+
+        if self._per_interface_ics_trimmed is None:
+            self._compute_ics_scores_trimmed()
+        return self._per_interface_ics_trimmed
 
     @property
     def ips_trimmed(self):
@@ -1256,6 +1302,47 @@ class Scorer:
         if self._per_interface_ips is None:
             self._compute_ips_scores()
         return self._per_interface_ips
+
+    @property
+    def per_interface_ips_precision_trimmed(self):
+        """ Same as :attr:`per_interface_ips_precision` but with :attr:`trimmed_model`
+
+        :attr:`~ips_precision_trimmed` for each interface in
+        :attr:`~contact_target_interfaces`
+
+        :type: :class:`list` of :class:`float`
+        """
+        if self._per_interface_ips_precision_trimmed is None:
+            self._compute_ips_scores_trimmed()
+        return self._per_interface_ips_precision_trimmed
+
+
+    @property
+    def per_interface_ips_recall_trimmed(self):
+        """ Same as :attr:`per_interface_ips_recall` but with :attr:`trimmed_model`
+
+        :attr:`~ics_recall_trimmed` for each interface in
+        :attr:`~contact_target_interfaces`
+
+        :type: :class:`list` of :class:`float`
+        """
+        if self._per_interface_ips_recall_trimmed is None:
+            self._compute_ips_scores_trimmed()
+        return self._per_interface_ips_recall_trimmed
+
+    @property
+    def per_interface_ips_trimmed(self):
+        """ Same as :attr:`per_interface_ips` but with :attr:`trimmed_model`
+
+        :attr:`~ics` for each interface in 
+        :attr:`~contact_target_interfaces`
+
+        :type: :class:`float`
+        """
+
+        if self._per_interface_ips_trimmed is None:
+            self._compute_ips_scores_trimmed()
+        return self._per_interface_ips_trimmed
 
     @property
     def dockq_target_interfaces(self):
@@ -2266,6 +2353,26 @@ class Scorer:
         self._ics_precision_trimmed = contact_scorer_res.precision
         self._ics_recall_trimmed = contact_scorer_res.recall
 
+        self._per_interface_ics_precision_trimmed = list()
+        self._per_interface_ics_recall_trimmed = list()
+        self._per_interface_ics_trimmed = list()
+        flat_mapping = self.mapping.GetFlatMapping()
+        for trg_int in self.contact_target_interfaces:
+            trg_ch1 = trg_int[0]
+            trg_ch2 = trg_int[1]
+            if trg_ch1 in flat_mapping and trg_ch2 in flat_mapping:
+                mdl_ch1 = flat_mapping[trg_ch1]
+                mdl_ch2 = flat_mapping[trg_ch2]
+                res = self.trimmed_contact_scorer.ScoreICSInterface(trg_ch1, trg_ch2,
+                                                                    mdl_ch1, mdl_ch2)
+                self._per_interface_ics_precision_trimmed.append(res.precision)
+                self._per_interface_ics_recall_trimmed.append(res.recall)
+                self._per_interface_ics_trimmed.append(res.ics)
+            else:
+                self._per_interface_ics_precision_trimmed.append(None)
+                self._per_interface_ics_recall_trimmed.append(None)
+                self._per_interface_ics_trimmed.append(None)
+
     def _compute_ips_scores(self):
         LogScript("Computing IPS scores")
         contact_scorer_res = self.contact_scorer.ScoreIPS(self.mapping.mapping)
@@ -2303,6 +2410,26 @@ class Scorer:
         self._ips_precision_trimmed = contact_scorer_res.precision
         self._ips_recall_trimmed = contact_scorer_res.recall
         self._ips_trimmed = contact_scorer_res.ips
+
+        self._per_interface_ips_precision_trimmed = list()
+        self._per_interface_ips_recall_trimmed = list()
+        self._per_interface_ips_trimmed = list()
+        flat_mapping = self.mapping.GetFlatMapping()
+        for trg_int in self.contact_target_interfaces:
+            trg_ch1 = trg_int[0]
+            trg_ch2 = trg_int[1]
+            if trg_ch1 in flat_mapping and trg_ch2 in flat_mapping:
+                mdl_ch1 = flat_mapping[trg_ch1]
+                mdl_ch2 = flat_mapping[trg_ch2]
+                res = self.trimmed_contact_scorer.ScoreIPSInterface(trg_ch1, trg_ch2,
+                                                                    mdl_ch1, mdl_ch2)
+                self._per_interface_ips_precision_trimmed.append(res.precision)
+                self._per_interface_ips_recall_trimmed.append(res.recall)
+                self._per_interface_ips_trimmed.append(res.ips)
+            else:
+                self._per_interface_ips_precision_trimmed.append(None)
+                self._per_interface_ips_recall_trimmed.append(None)
+                self._per_interface_ips_trimmed.append(None)
 
     def _compute_dockq_scores(self):
         LogScript("Computing DockQ")
