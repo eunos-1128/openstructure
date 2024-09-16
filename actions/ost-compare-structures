@@ -60,6 +60,7 @@ results:
  * "min_pep_length"
  * "min_nuc_length"
  * "lddt_add_mdl_contacts"
+ * "lddt_inclusion_radius"
  * "dockq_capri_peptide"
  * "ost_version"
 
@@ -638,6 +639,14 @@ def _ParseArgs():
               "not necessarily in the reference. No contact will "
               "be added if the respective atom pair is not "
               "resolved in the reference."))
+
+    parser.add_argument(
+        "--lddt-inclusion-radius",
+        dest="lddt_inclusion_radius",
+        type = float,
+        default=15.0,
+        help=("Passed to lDDT scorer. Affects all lDDT scores but not "
+              "chain mapping."))
  
     return parser.parse_args()
 
@@ -848,7 +857,8 @@ def _Process(model, reference, args, model_format, reference_format):
                             min_pep_length = args.min_pep_length,
                             min_nuc_length = args.min_nuc_length,
                             lddt_add_mdl_contacts = args.lddt_add_mdl_contacts,
-                            dockq_capri_peptide = args.dockq_capri_peptide)
+                            dockq_capri_peptide = args.dockq_capri_peptide,
+                            lddt_inclusion_radius = args.lddt_inclusion_radius)
 
     ir = _GetInconsistentResidues(scorer.aln)
     if len(ir) > 0 and args.enforce_consistency:
@@ -1061,6 +1071,7 @@ def _Main():
         out["min_pep_length"] = args.min_pep_length
         out["min_nuc_length"] = args.min_nuc_length
         out["lddt_add_mdl_contacts"] = args.lddt_add_mdl_contacts
+        out["lddt_inclusion_radius"] = args.lddt_inclusion_radius
         out["dockq_capri_peptide"] = args.dockq_capri_peptide
         out["ost_version"] = ost.__version__
         out["status"] = "SUCCESS"

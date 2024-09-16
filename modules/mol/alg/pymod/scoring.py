@@ -96,11 +96,11 @@ class Scorer:
     Deals with structure cleanup, chain mapping, interface identification etc.
     Intermediate results are available as attributes.
 
-    :param model: Model structure - a deep copy is available as :attr:`model`.
+    :param model: Model structure - a deep copy is available as :attr:`~model`.
                   Additionally, :func:`ost.mol.alg.Molck` using *molck_settings*
                   is applied.
     :type model: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
-    :param target: Target structure - a deep copy is available as :attr:`target`.
+    :param target: Target structure - a deep copy is available as :attr:`~target`.
                   Additionally, :func:`ost.mol.alg.Molck` using *molck_settings*
                   is applied.
     :type target: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
@@ -204,6 +204,7 @@ class Scorer:
     :param lddt_symmetry_settings: Passed as *symmetry_settings* parameter to
                                    lDDT scorer. Default: None
     :type lddt_symmetry_settings: :class:`ost.mol.alg.lddt.SymmetrySettings`
+    :param lddt_inclusion_radius: lDDT inclusion radius.
     """
     def __init__(self, model, target, resnum_alignments=False,
                  molck_settings = None, cad_score_exec = None,
@@ -211,7 +212,8 @@ class Scorer:
                  usalign_exec = None, lddt_no_stereochecks=False,
                  n_max_naive=40320, oum=False, min_pep_length = 6,
                  min_nuc_length = 4, lddt_add_mdl_contacts=False,
-                 dockq_capri_peptide=False, lddt_symmetry_settings = None):
+                 dockq_capri_peptide=False, lddt_symmetry_settings = None,
+                 lddt_inclusion_radius = 15.0):
 
         self._target_orig = target
         self._model_orig = model
@@ -316,6 +318,7 @@ class Scorer:
         self.lddt_add_mdl_contacts = lddt_add_mdl_contacts
         self.dockq_capri_peptide = dockq_capri_peptide
         self.lddt_symmetry_settings = lddt_symmetry_settings
+        self.lddt_inclusion_radius = lddt_inclusion_radius
 
         # lazily evaluated attributes
         self._stereochecked_model = None
@@ -485,9 +488,9 @@ class Scorer:
 
     @property
     def aln(self):
-        """ Alignments of :attr:`model`/:attr:`target` chains
+        """ Alignments of :attr:`~model`/:attr:`~target` chains
 
-        Alignments for each pair of chains mapped in :attr:`mapping`.
+        Alignments for each pair of chains mapped in :attr:`~mapping`.
         First sequence is target sequence, second sequence the model sequence.
 
         :type: :class:`list` of :class:`ost.seq.AlignmentHandle`
@@ -498,7 +501,7 @@ class Scorer:
 
     @property
     def stereochecked_aln(self):
-        """ Stereochecked equivalent of :attr:`aln`
+        """ Stereochecked equivalent of :attr:`~aln`
 
         The alignments may differ, as stereochecks potentially remove residues
 
@@ -510,7 +513,7 @@ class Scorer:
 
     @property
     def pepnuc_aln(self):
-        """ Alignments of :attr:`model_orig`/:attr:`target_orig` chains
+        """ Alignments of :attr:`~model_orig`/:attr:`~target_orig` chains
 
         Selects for peptide and nucleotide residues before sequence
         extraction. Includes residues that would be removed by molck in
@@ -524,9 +527,9 @@ class Scorer:
 
     @property
     def trimmed_aln(self):
-        """ Alignments of :attr:`trimmed_model`/:attr:`target` chains
+        """ Alignments of :attr:`~trimmed_model`/:attr:`~target` chains
 
-        Alignments for each pair of chains mapped in :attr:`mapping`.
+        Alignments for each pair of chains mapped in :attr:`~mapping`.
         First sequence is target sequence, second sequence the model sequence.
 
         :type: :class:`list` of :class:`ost.seq.AlignmentHandle`
@@ -627,10 +630,10 @@ class Scorer:
 
     @property
     def trimmed_model(self):
-        """ :attr:`model` trimmed to target
+        """ :attr:`~model` trimmed to target
 
         Removes residues that are not covered by :class:`target` given
-        :attr:`mapping`. In other words: no model residues without experimental
+        :attr:`~mapping`. In other words: no model residues without experimental
         evidence from :class:`target`. 
 
         :type: :class:`ost.mol.EntityView`
@@ -641,7 +644,7 @@ class Scorer:
 
     @property
     def chain_mapper(self):
-        """ Chain mapper object for given :attr:`target`
+        """ Chain mapper object for given :attr:`~target`
 
         :type: :class:`ost.mol.alg.chain_mapping.ChainMapper`
         """
@@ -655,7 +658,7 @@ class Scorer:
 
     @property
     def mapping(self):
-        """ Full chain mapping result for :attr:`target`/:attr:`model`
+        """ Full chain mapping result for :attr:`~target`/:attr:`~model`
 
         Computed with :func:`ost.mol.alg.ChainMapper.GetMapping`
 
@@ -670,7 +673,7 @@ class Scorer:
 
     @property
     def rigid_mapping(self):
-        """ Full chain mapping result for :attr:`target`/:attr:`model`
+        """ Full chain mapping result for :attr:`~target`/:attr:`~model`
 
         Computed with :func:`ost.mol.alg.ChainMapper.GetRMSDMapping`
 
@@ -721,10 +724,12 @@ class Scorer:
         if self._lddt_scorer is None:
             if self.lddt_no_stereochecks:
                 self._lddt_scorer = lDDTScorer(self.target,
-                                               symmetry_settings = self.lddt_symmetry_settings)
+                                               symmetry_settings = self.lddt_symmetry_settings,
+                                               inclusion_radius = self.lddt_inclusion_radius)
             else:
                 self._lddt_scorer = lDDTScorer(self.stereochecked_target,
-                                               symmetry_settings = self.lddt_symmetry_settings)
+                                               symmetry_settings = self.lddt_symmetry_settings,
+                                               inclusion_radius = self.lddt_inclusion_radius)
         return self._lddt_scorer
 
     @property
@@ -738,7 +743,8 @@ class Scorer:
         """
         if self._bb_lddt_scorer is None:
             self._bb_lddt_scorer = lDDTScorer(self.target, bb_only=True,
-                                              symmetry_settings = self.lddt_symmetry_settings)
+                                              symmetry_settings = self.lddt_symmetry_settings,
+                                              inclusion_radius = self.lddt_inclusion_radius)
         return self._bb_lddt_scorer
 
     @property
@@ -868,7 +874,7 @@ class Scorer:
     def qs_global(self):
         """  Global QS-score
 
-        Computed based on :attr:`model` using :attr:`mapping`
+        Computed based on :attr:`~model` using :attr:`~mapping`
 
         :type: :class:`float`
         """
@@ -880,7 +886,7 @@ class Scorer:
     def qs_best(self):
         """  Global QS-score - only computed on aligned residues
 
-        Computed based on :attr:`model` using :attr:`mapping`. The QS-score
+        Computed based on :attr:`~model` using :attr:`~mapping`. The QS-score
         computation only considers contacts between residues with a mapping
         between target and model. As a result, the score won't be lowered in
         case of additional chains/residues in any of the structures.
@@ -946,7 +952,7 @@ class Scorer:
     
     @property
     def per_interface_qs_global(self):
-        """ QS-score for each interface in :attr:`qs_interfaces`
+        """ QS-score for each interface in :attr:`~qs_interfaces`
 
         :type: :class:`list` of :class:`float`
         """
@@ -956,7 +962,7 @@ class Scorer:
     
     @property
     def per_interface_qs_best(self):
-        """ QS-score for each interface in :attr:`qs_interfaces`
+        """ QS-score for each interface in :attr:`~qs_interfaces`
 
         Only computed on aligned residues
 
@@ -983,7 +989,7 @@ class Scorer:
 
     @property
     def model_contacts(self):
-        """ Same for :attr:`model`
+        """ Same for :attr:`~model`
         """
         if self._model_contacts is None:
             self._model_contacts = self.contact_scorer.cent2.hr_contacts
@@ -991,7 +997,7 @@ class Scorer:
 
     @property
     def trimmed_model_contacts(self):
-        """ Same for :attr:`trimmed_model`
+        """ Same for :attr:`~trimmed_model`
         """
         if self._trimmed_model_contacts is None:
             self._trimmed_model_contacts = self.trimmed_contact_scorer.cent2.hr_contacts
@@ -1140,7 +1146,7 @@ class Scorer:
 
     @property
     def ics_trimmed(self):
-        """ Same as :attribute:`ics` but with trimmed model
+        """ Same as :attr:`~ics` but with trimmed model
 
         Model is trimmed to residues which can me mapped to target in order
         to not penalize contacts in the model for which we have no experimental
@@ -1154,7 +1160,7 @@ class Scorer:
 
     @property
     def ics_precision_trimmed(self):
-        """ Same as :attribute:`ics_precision` but with trimmed model
+        """ Same as :attr:`~ics_precision` but with trimmed model
 
         Model is trimmed to residues which can me mapped to target in order
         to not penalize contacts in the model for which we have no experimental
@@ -1168,7 +1174,7 @@ class Scorer:
 
     @property
     def ics_recall_trimmed(self):
-        """ Same as :attribute:`ics_recall` but with trimmed model
+        """ Same as :attr:`~ics_recall` but with trimmed model
 
         Model is trimmed to residues which can me mapped to target in order
         to not penalize contacts in the model for which we have no experimental
@@ -1182,7 +1188,7 @@ class Scorer:
 
     @property
     def per_interface_ics_precision_trimmed(self):
-        """ Same as :attr:`per_interface_ics_precision` but with :attr:`trimmed_model`
+        """ Same as :attr:`~per_interface_ics_precision` but with :attr:`~trimmed_model`
 
         :attr:`~ics_precision_trimmed` for each interface in
         :attr:`~contact_target_interfaces`
@@ -1196,7 +1202,7 @@ class Scorer:
 
     @property
     def per_interface_ics_recall_trimmed(self):
-        """ Same as :attr:`per_interface_ics_recall` but with :attr:`trimmed_model`
+        """ Same as :attr:`~per_interface_ics_recall` but with :attr:`~trimmed_model`
 
         :attr:`~ics_recall_trimmed` for each interface in
         :attr:`~contact_target_interfaces`
@@ -1209,7 +1215,7 @@ class Scorer:
 
     @property
     def per_interface_ics_trimmed(self):
-        """ Same as :attr:`per_interface_ics` but with :attr:`trimmed_model`
+        """ Same as :attr:`~per_interface_ics` but with :attr:`~trimmed_model`
 
         :attr:`~ics` for each interface in 
         :attr:`~contact_target_interfaces`
@@ -1223,7 +1229,7 @@ class Scorer:
 
     @property
     def ips_trimmed(self):
-        """ Same as :attribute:`ips` but with trimmed model
+        """ Same as :attr:`~ips` but with trimmed model
 
         Model is trimmed to residues which can me mapped to target in order
         to not penalize contacts in the model for which we have no experimental
@@ -1237,7 +1243,7 @@ class Scorer:
 
     @property
     def ips_precision_trimmed(self):
-        """ Same as :attribute:`ips_precision` but with trimmed model
+        """ Same as :attr:`~ips_precision` but with trimmed model
 
         Model is trimmed to residues which can me mapped to target in order
         to not penalize contacts in the model for which we have no experimental
@@ -1251,7 +1257,7 @@ class Scorer:
 
     @property
     def ips_recall_trimmed(self):
-        """ Same as :attribute:`ips_recall` but with trimmed model
+        """ Same as :attr:`~ips_recall` but with trimmed model
 
         Model is trimmed to residues which can me mapped to target in order
         to not penalize contacts in the model for which we have no experimental
@@ -1305,7 +1311,7 @@ class Scorer:
 
     @property
     def per_interface_ips_precision_trimmed(self):
-        """ Same as :attr:`per_interface_ips_precision` but with :attr:`trimmed_model`
+        """ Same as :attr:`~per_interface_ips_precision` but with :attr:`~trimmed_model`
 
         :attr:`~ips_precision_trimmed` for each interface in
         :attr:`~contact_target_interfaces`
@@ -1319,7 +1325,7 @@ class Scorer:
 
     @property
     def per_interface_ips_recall_trimmed(self):
-        """ Same as :attr:`per_interface_ips_recall` but with :attr:`trimmed_model`
+        """ Same as :attr:`~per_interface_ips_recall` but with :attr:`~trimmed_model`
 
         :attr:`~ics_recall_trimmed` for each interface in
         :attr:`~contact_target_interfaces`
@@ -1332,7 +1338,7 @@ class Scorer:
 
     @property
     def per_interface_ips_trimmed(self):
-        """ Same as :attr:`per_interface_ips` but with :attr:`trimmed_model`
+        """ Same as :attr:`~per_interface_ips` but with :attr:`~trimmed_model`
 
         :attr:`~ics` for each interface in 
         :attr:`~contact_target_interfaces`
@@ -1346,7 +1352,7 @@ class Scorer:
 
     @property
     def dockq_target_interfaces(self):
-        """ Interfaces in :attr:`target` that are relevant for DockQ
+        """ Interfaces in :attr:`~target` that are relevant for DockQ
 
         All interfaces in :attr:`~target` with non-zero contacts that are
         relevant for DockQ. Includes protein-protein, protein-nucleotide and
@@ -1382,7 +1388,7 @@ class Scorer:
 
     @property
     def dockq_interfaces(self):
-        """ Interfaces in :attr:`dockq_target_interfaces` that can be mapped
+        """ Interfaces in :attr:`~dockq_target_interfaces` that can be mapped
         to model
 
         Target chain names are lexicographically sorted
@@ -1477,7 +1483,7 @@ class Scorer:
         lrmsd: The two chains involved in the interface are superposed based on
         the receptor (rigid min RMSD superposition) and the ligand RMSD is
         reported. Receptor is the chain with more residues. Superposition and
-        RMSD is computed on same backbone atoms as :attr:`irmsd`.
+        RMSD is computed on same backbone atoms as :attr:`~irmsd`.
 
         :class:`list` of :class:`float`
         """
@@ -1487,7 +1493,7 @@ class Scorer:
         
     @property
     def dockq_ave(self):
-        """ Average of DockQ scores in :attr:`dockq_scores`
+        """ Average of DockQ scores in :attr:`~dockq_scores`
 
         In its original implementation, DockQ only operates on single
         interfaces. Thus the requirement to combine scores for higher order
@@ -1501,7 +1507,7 @@ class Scorer:
     
     @property
     def dockq_wave(self):
-        """ Same as :attr:`dockq_ave`, weighted by native contacts
+        """ Same as :attr:`~dockq_ave`, weighted by native contacts
 
         :type: :class:`float`
         """
@@ -1552,9 +1558,9 @@ class Scorer:
     def mapped_target_pos_full_bb(self):
         """ Mapped representative positions in target
 
-        Thats the equivalent of :attr:`mapped_target_pos` but containing more
+        Thats the equivalent of :attr:`~mapped_target_pos` but containing more
         backbone atoms (N, CA, C for peptide residues and O5', C5', C4', C3', O3
-        for nucleotide residues). mapping is based on :attr:`mapping`.
+        for nucleotide residues). mapping is based on :attr:`~mapping`.
 
         :type: :class:`ost.geom.Vec3List`
         """
@@ -1580,9 +1586,9 @@ class Scorer:
     def mapped_model_pos_full_bb(self):
         """ Mapped representative positions in model
 
-        Thats the equivalent of :attr:`mapped_model_pos` but containing more
+        Thats the equivalent of :attr:`~mapped_model_pos` but containing more
         backbone atoms (N, CA, C for peptide residues and O5', C5', C4', C3', O3
-        for nucleotide residues). mapping is based on :attr:`mapping`.
+        for nucleotide residues). mapping is based on :attr:`~mapping`.
 
         :type: :class:`ost.geom.Vec3List`
         """
@@ -1655,9 +1661,9 @@ class Scorer:
     def rigid_mapped_target_pos_full_bb(self):
         """ Mapped representative positions in target
 
-        Thats the equivalent of :attr:`rigid_mapped_target_pos` but containing
+        Thats the equivalent of :attr:`~rigid_mapped_target_pos` but containing
         more backbone atoms (N, CA, C for peptide residues and O5', C5', C4',
-        C3', O3 for nucleotide residues). mapping is based on :attr:`mapping`.
+        C3', O3 for nucleotide residues). mapping is based on :attr:`~mapping`.
 
         :type: :class:`ost.geom.Vec3List`
         """
@@ -1683,9 +1689,9 @@ class Scorer:
     def rigid_mapped_model_pos_full_bb(self):
         """ Mapped representative positions in model
 
-        Thats the equivalent of :attr:`rigid_mapped_model_pos` but containing
+        Thats the equivalent of :attr:`~rigid_mapped_model_pos` but containing
         more backbone atoms (N, CA, C for peptide residues and O5', C5', C4',
-        C3', O3 for nucleotide residues). mapping is based on :attr:`mapping`.
+        C3', O3 for nucleotide residues). mapping is based on :attr:`~mapping`.
 
         :type: :class:`ost.geom.Vec3List`
         """
@@ -1893,7 +1899,7 @@ class Scorer:
         """ RMSD
 
         Computed on :attr:`~rigid_transformed_mapped_model_pos` and
-        :attr:`rigid_mapped_target_pos`
+        :attr:`~rigid_mapped_target_pos`
 
         :type: :class:`float`
         """
@@ -1931,7 +1937,7 @@ class Scorer:
 
     @property
     def patch_qs(self):
-        """ Patch QS-scores for each residue in :attr:`model_interface_residues`
+        """ Patch QS-scores for each residue in :attr:`~model_interface_residues`
 
         Representative patches for each residue r in chain c are computed as
         follows:
@@ -1947,11 +1953,11 @@ class Scorer:
           mdl_patch_two
 
         Results are stored in the same manner as
-        :attr:`model_interface_residues`, with corresponding scores instead of
+        :attr:`~model_interface_residues`, with corresponding scores instead of
         residue numbers. Scores for residues which are not
         :class:`mol.ChemType.AMINOACIDS` are set to None. Additionally,
-        interface patches are derived from :attr:`model`. If they contain
-        residues which are not covered by :attr:`target`, the score is set to
+        interface patches are derived from :attr:`~model`. If they contain
+        residues which are not covered by :attr:`~target`, the score is set to
         None too.
 
         :type: :class:`dict` with chain names as key and and :class:`list`
@@ -1963,7 +1969,7 @@ class Scorer:
 
     @property
     def patch_dockq(self):
-        """ Same as :attr:`patch_qs` but for DockQ scores
+        """ Same as :attr:`~patch_qs` but for DockQ scores
         """
         if self._patch_dockq is None:
             self._compute_patchdockq_scores()
