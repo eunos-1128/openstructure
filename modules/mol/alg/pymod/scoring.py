@@ -2148,16 +2148,53 @@ class Scorer:
                     score = round(r.GetFloatProp("lddt"), 3)
                     local_lddt[cname][rnum] = score
 
+                    trg_r = None
+                    mdl_r = None
+
                     for a in r.atoms:
                         if a.HasProp("lddt"):
                             score = round(a.GetFloatProp("lddt"), 3)
                             aa_local_lddt[cname][rnum][a.GetName()] = score
                         else:
-                            # must have been removed by stereochecks
-                            aa_local_lddt[cname][rnum][a.GetName()] = 0.0
+                            # the target residue is there since we have a score
+                            # for the residue.
+                            # opt 1: The atom was never there in the
+                            #        stereochecked target => None
+                            # opt 2: The atom has been removed in the model
+                            #        stereochecks but is there in stereochecked
+                            #        target => 0.0
+                            if trg_r is None:
+                                if cname in flat_mapping:
+                                    for col in alns[cname]:
+                                        if col[0] != '-' and col[1] != '-':
+                                            if col.GetResidue(1).number == r.number:
+                                                trg_r = col.GetResidue(0)
+                                                break
+                                if trg_r is not None:
+                                    trg_cname = trg_r.GetChain().GetName()
+                                    trg_rnum = trg_r.GetNumber()
+                                    tmp = self.stereochecked_target.FindResidue(trg_cname,
+                                                                                trg_rnum)
+                                    if tmp.IsValid():
+                                        trg_r = tmp
+
+                            if mdl_r is None:
+                                tmp = self.stereochecked_model.FindResidue(cname, rnum)
+                                if tmp.IsValid():
+                                    mdl_r = tmp
+
+                            if trg_r is not None and not trg_r.FindAtom(a.GetName()).IsValid():
+                                # opt 1
+                                aa_local_lddt[cname][rnum][a.GetName()] = None
+                            elif trg_r is not None and trg_r.FindAtom(a.GetName()).IsValid() and \
+                                 mdl_r is not None and not mdl_r.FindAtom(a.GetName()).IsValid():
+                                # opt 2
+                                aa_local_lddt[cname][rnum][a.GetName()] = 0.0
+                            else:
+                                # unknown issue
+                                aa_local_lddt[cname][rnum][a.GetName()] = None
 
                 else:
-                    # rsc => residue stereo checked...
                     mdl_res = self.stereochecked_model.FindResidue(cname, rnum)
                     if mdl_res.IsValid():
                         # not covered by trg or skipped in chain mapping procedure
@@ -2177,15 +2214,25 @@ class Scorer:
                                     if col.GetResidue(1).number == r.number:
                                         trg_r = col.GetResidue(0)
                                         break
+                            if trg_r is not None:
+                                trg_cname = trg_r.GetChain().GetName()
+                                trg_rnum = trg_r.GetNumber()
+                                tmp = self.stereochecked_target.FindResidue(trg_cname,
+                                                                            trg_rnum)
+                                if tmp.IsValid():
+                                    trg_r = tmp
+
                         if trg_r is None:
                             local_lddt[cname][rnum] = None
                             for a in r.atoms:
                                 aa_local_lddt[cname][rnum][a.GetName()] = None
-
                         else:
                             local_lddt[cname][rnum] = 0.0
                             for a in r.atoms:
-                                aa_local_lddt[cname][rnum][a.GetName()] = 0.0
+                                if trg_r.FindAtom(a.GetName()).IsValid():
+                                    aa_local_lddt[cname][rnum][a.GetName()] = 0.0
+                                else:
+                                    aa_local_lddt[cname][rnum][a.GetName()] = None
 
         self._lddt = lddt_score
         self._local_lddt = local_lddt
