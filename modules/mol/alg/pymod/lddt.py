@@ -693,9 +693,10 @@ class lDDTScorer:
                 # the only place where actually need to compute per-atom lDDT
                 # scores
                 for a_idx in range(len(atom_list)):
-                    tmp = summed_per_atom_conserved[a_idx] / per_atom_exp[a_idx]
-                    tmp = tmp / n_thresh
-                    atom_list[a_idx].SetFloatProp(local_lddt_prop, tmp)
+                    if per_atom_exp[a_idx] != 0:
+                        tmp = summed_per_atom_conserved[a_idx] / per_atom_exp[a_idx]
+                        tmp = tmp / n_thresh
+                        atom_list[a_idx].SetFloatProp(local_lddt_prop, tmp)
 
             if local_contact_prop:
                 conserved_prop = local_contact_prop + "_cons"
