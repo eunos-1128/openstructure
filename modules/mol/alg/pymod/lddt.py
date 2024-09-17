@@ -682,7 +682,7 @@ class lDDTScorer:
                 r = residues[res_indices[i]]
                 r_idx = ref_res_indices[i]
                 res_start_idx = self.res_start_indices[r_idx]
-                anames = self.compound_anames[r.GetName()]
+                anames = self.compound_anames[self.compound_names[r_idx]]
                 for a_i in indices:
                     a = r.FindAtom(anames[a_i - res_start_idx])
                     assert(a.IsValid())
