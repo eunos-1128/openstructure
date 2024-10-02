@@ -193,10 +193,6 @@ class ReprResult:
         self._transform = None
         self._superposed_mdl_bb_pos = None
         self._bb_rmsd = None
-        self._gdt_8 = None
-        self._gdt_4 = None
-        self._gdt_2 = None
-        self._gdt_1 = None
         self._ost_query = None
         self._flat_mapping = None
         self._inconsistent_residues = None
@@ -358,45 +354,6 @@ class ReprResult:
             self._bb_rmsd = self.ref_bb_pos.GetRMSD(self.superposed_mdl_bb_pos)
         return self._bb_rmsd
 
-    @property
-    def gdt_8(self):
-        """ GDT with one single threshold: 8.0
-
-        :type: :class:`float`
-        """
-        if self._gdt_8 is None:
-            self._gdt_8 = self.ref_bb_pos.GetGDT(self.superposed_mdl_bb_pos, 8.0)
-        return self._gdt_8
-
-    @property
-    def gdt_4(self):
-        """ GDT with one single threshold: 4.0
-
-        :type: :class:`float`
-        """
-        if self._gdt_4 is None:
-            self._gdt_4 = self.ref_bb_pos.GetGDT(self.superposed_mdl_bb_pos, 4.0)
-        return self._gdt_4
-
-    @property
-    def gdt_2(self):
-        """ GDT with one single threshold: 2.0
-
-        :type: :class:`float`
-        """
-        if self._gdt_2 is None:
-            self._gdt_2 = self.ref_bb_pos.GetGDT(self.superposed_mdl_bb_pos, 2.0)
-        return self._gdt_2
-
-    @property
-    def gdt_1(self):
-        """ GDT with one single threshold: 1.0
-
-        :type: :class:`float`
-        """
-        if self._gdt_1 is None:
-            self._gdt_1 = self.ref_bb_pos.GetGDT(self.superposed_mdl_bb_pos, 1.0)
-        return self._gdt_1
 
     @property
     def ost_query(self):
@@ -435,10 +392,6 @@ class ReprResult:
                                      self.mdl_residues]
         json_dict["transform"] = list(self.transform.data)
         json_dict["bb_rmsd"] = self.bb_rmsd
-        json_dict["gdt_8"] = self.gdt_8
-        json_dict["gdt_4"] = self.gdt_4
-        json_dict["gdt_2"] = self.gdt_2
-        json_dict["gdt_1"] = self.gdt_1
         json_dict["ost_query"] = self.ost_query
         json_dict["flat_mapping"] = self.GetFlatChainMapping()
         return json_dict
