@@ -92,7 +92,7 @@ void MMCifReader::SetRestrictChains(const String& restrict_chains)
 
 bool MMCifReader::OnBeginData(const StringRef& data_name) 
 {
-  LOG_DEBUG("MCIFFReader: " << profile_);
+  LOG_DEBUG("MMCifReader: " << profile_);
   Profile profile_import("MMCifReader::OnBeginData");
   if (chain_count_ > 0) {
       std::stringstream ss;
