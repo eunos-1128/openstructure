@@ -190,9 +190,8 @@ class ReprResult:
         self._mdl_bb_pos = None
         self._ref_full_bb_pos = None
         self._mdl_full_bb_pos = None
-        self._transform = None
+        self._superposition = None
         self._superposed_mdl_bb_pos = None
-        self._bb_rmsd = None
         self._ost_query = None
         self._flat_mapping = None
         self._inconsistent_residues = None
@@ -314,24 +313,33 @@ class ReprResult:
             self._mdl_full_bb_pos = self._GetFullBBPos(self.mdl_residues)
         return self._mdl_full_bb_pos
 
+
     @property
-    def transform(self):
-        """ Transformation to superpose mdl residues onto ref residues
+    def superposition(self):
+        """ Superposition of mdl residues onto ref residues
 
         Superposition computed as minimal RMSD superposition on
         :attr:`ref_bb_pos` and :attr:`mdl_bb_pos`. If number of positions is
         smaller 3, the full_bb_pos equivalents are used instead.
 
-        :type: :class:`ost.geom.Mat4`
+        :type: :class:`ost.mol.alg.SuperpositionResult`
         """
-        if self._transform is None:
+        if self._superposition is None:
             if len(self.mdl_bb_pos) < 3:
-                self._transform = _GetTransform(self.mdl_full_bb_pos,
+                self._superposition = _GetSuperposition(self.mdl_full_bb_pos,
                                                 self.ref_full_bb_pos, False)
             else:
-                self._transform = _GetTransform(self.mdl_bb_pos,
+                self._superposition = _GetSuperposition(self.mdl_bb_pos,
                                                 self.ref_bb_pos, False)
-        return self._transform
+        return self._superposition
+
+    @property
+    def transform(self):
+        """ Transformation to superpose mdl residues onto ref residues
+
+        :type: :class:`ost.geom.Mat4`
+        """
+        return self.superposition.transformation
 
     @property
     def superposed_mdl_bb_pos(self):
@@ -346,13 +354,11 @@ class ReprResult:
 
     @property
     def bb_rmsd(self):
-        """ RMSD between :attr:`ref_bb_pos` and :attr:`superposed_mdl_bb_pos`
+        """ RMSD of the binding site backbone atoms after :attr:`superposition`
 
         :type: :class:`float`
         """
-        if self._bb_rmsd is None:
-            self._bb_rmsd = self.ref_bb_pos.GetRMSD(self.superposed_mdl_bb_pos)
-        return self._bb_rmsd
+        return self.superposition.rmsd
 
 
     @property
@@ -1114,7 +1120,8 @@ class ChainMapper:
               for t_pos, t in zip(trg_pos, trg_chains):
                   for m_pos, m in zip(mdl_pos, mdl_chains):
                       if len(t_pos) >= 3 and len(m_pos) >= 3:
-                          transform = _GetTransform(m_pos, t_pos, False)
+                          transform = _GetSuperposition(m_pos, t_pos,
+                                                        False).transformation
                           initial_transforms.append(transform)
                           initial_mappings.append((t,m))
 
@@ -2903,8 +2910,8 @@ def _IterativeRigidRMSD(initial_transforms, initial_mappings, chem_groups,
                 trg_chain_groups[best_sc_group_idx].remove(best_sc_mapping[0])
                 mdl_chain_groups[best_sc_group_idx].remove(best_sc_mapping[1])
 
-                transform = _GetTransform(mapped_mdl_pos, mapped_trg_pos,
-                                          False)
+                transform = _GetSuperposition(mapped_mdl_pos, mapped_trg_pos,
+                                              False).transformation
 
         # compute overall RMSD for current transform
         mapped_mdl_pos.ApplyTransform(transform)
@@ -3219,7 +3226,7 @@ def _ChainMappings(ref_chains, mdl_chains, n_max=None):
     return _ConcatIterators(iterators)
 
 
-def _GetTransform(pos_one, pos_two, iterative):
+def _GetSuperposition(pos_one, pos_two, iterative):
     """ Computes minimal RMSD superposition for pos_one onto pos_two
 
     :param pos_one: Positions that should be superposed onto *pos_two*
@@ -3230,7 +3237,7 @@ def _GetTransform(pos_one, pos_two, iterative):
                 potentially raises, uses standard superposition as fallback.
     :type iterative: :class:`bool`
     :returns: Transformation matrix to superpose *pos_one* onto *pos_two*
-    :rtype: :class:`geom.Mat4`
+    :rtype: :class:`ost.mol.alg.SuperpositionResult`
     """
     res = None
     if iterative:
@@ -3240,7 +3247,7 @@ def _GetTransform(pos_one, pos_two, iterative):
             pass # triggers fallback below
     if res is None:
         res = mol.alg.SuperposeSVD(pos_one, pos_two)
-    return res.transformation
+    return res
 
 # specify public interface
 __all__ = ('ChainMapper', 'ReprResult', 'MappingResult')
