@@ -2,6 +2,15 @@ Changes in Release 2.9.0
 --------------------------------------------------------------------------------
  
  * lDDT-PLI now penalizes added model contacts by default.
+ * Updated unassigned reasons (model and target) to better reflect changes
+   to ligand scoring made in OST 2.8.0.
+ * Added CSV output (--output-format csv) and by model (rather than target)
+   ligand output (--by-model-ligand-output) to compare-ligand-structures 
+   action.
+ * Residue SetChemType() is now exposed in Python.
+ * Allow reading of BIRD compounds in PRDCC format in the compound library.
+   Compounds in PRD formats cannot be read and are rejected cleanly.
+ * Several bug fixes and improvements.
 
 Changes in Release 2.8.0
 --------------------------------------------------------------------------------
