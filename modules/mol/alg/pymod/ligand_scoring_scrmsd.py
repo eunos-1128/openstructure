@@ -15,7 +15,7 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
 
     The returned RMSD is based on a binding site superposition.
     The binding site of the target structure is defined as all residues with at
-    least one atom within *bs_radius* around the target ligand.
+    least one atom within `bs_radius` around the target ligand.
     It only contains protein and nucleic acid residues from chains that
     pass the criteria for the
     :class:`chain mapping <ost.mol.alg.chain_mapping>`. This means ignoring
@@ -24,10 +24,10 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
     The respective model binding site for superposition is identified by
     naively enumerating all possible mappings of model chains onto their
     chemically equivalent target counterparts from the target binding site.
-    The *binding_sites_topn* with respect to lDDT score are evaluated and 
+    The `binding_sites_topn` with respect to lDDT score are evaluated and 
     an RMSD is computed.
     You can either try to map ALL model chains onto the target binding site by
-    enabling *full_bs_search* or restrict the model chains for a specific
+    enabling `full_bs_search` or restrict the model chains for a specific
     target/model ligand pair to the chains with at least one atom within
     *model_bs_radius* around the model ligand. The latter can be significantly
     faster in case of large complexes.
@@ -38,14 +38,15 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
     Populates :attr:`LigandScorer.aux_data` with following :class:`dict` keys:
 
     * rmsd: The BiSyRMSD score
-    * lddt_lp: lDDT of the binding pocket used for superposition
+    * lddt_lp: lDDT of the binding pocket used for superposition (lDDT-LP)
     * bs_ref_res: :class:`list` of binding site residues in target
     * bs_ref_res_mapped: :class:`list` of target binding site residues that
       are mapped to model
     * bs_mdl_res_mapped: :class:`list` of same length with respective model
       residues
-    * bb_rmsd: Backbone RMSD (CA, C3' for nucleotides) for mapped residues
-      given transform
+    * bb_rmsd: Backbone RMSD (CA, C3' for nucleotides; full backbone for 
+      binding sites with fewer than 3 residues) for mapped binding site
+      residues after superposition
     * target_ligand: The actual target ligand for which the score was computed
     * model_ligand: The actual model ligand for which the score was computed
     * chain_mapping: :class:`dict` with a chain mapping of chains involved in

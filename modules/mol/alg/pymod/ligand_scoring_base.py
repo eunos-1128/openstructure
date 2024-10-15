@@ -66,7 +66,7 @@ class LigandScorer:
 
     A common use case is to derive a one-to-one mapping between ligands in
     the model and the target for which :class:`LigandScorer` provides an
-    automated assignment procedure.
+    automated :attr:`assignment` procedure.
     By default, only exact matches between target and model ligands are
     considered. This is a problem when the target only contains a subset
     of the expected atoms (for instance if atoms are missing in an
@@ -86,7 +86,7 @@ class LigandScorer:
 
     :class:`LigandScorer` generally assumes that the
     :attr:`~ost.mol.ResidueHandle.is_ligand` property is properly set on all
-    the ligand atoms, and only ligand atoms. This is typically the case for
+    the ligand residues, and only ligand atoms. This is typically the case for
     entities loaded from mmCIF (tested with mmCIF files from the PDB and
     SWISS-MODEL). Legacy PDB files must contain `HET` headers (which is usually
     the case for files downloaded from the PDB but not elsewhere).
