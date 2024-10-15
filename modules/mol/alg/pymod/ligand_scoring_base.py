@@ -43,9 +43,10 @@ class LigandScorer:
 
     * :class:`ost.mol.alg.ligand_scoring_lddtpli.LDDTPLIScorer`
       that assesses the conservation of protein-ligand
-      contacts
+      contacts (lDDT-PLI);
     * :class:`ost.mol.alg.ligand_scoring_scrmsd.SCRMSDScorer`
-      that computes a binding-site superposed, symmetry-corrected RMSD.
+      that computes a binding-site superposed, symmetry-corrected RMSD
+      (BiSyRMSD) and ligand pocket lDDT (lDDT-LP).
 
     All versus all scores are available through the lazily computed
     :attr:`score_matrix`. However, many things can go wrong... be it even

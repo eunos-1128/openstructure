@@ -8,7 +8,7 @@ from ost.mol.alg import ligand_scoring_base
 
 
 class SCRMSDScorer(ligand_scoring_base.LigandScorer):
-    """ :class:`LigandScorer` implementing symmetry corrected RMSD.
+    """ :class:`LigandScorer` implementing symmetry corrected RMSD (BiSyRMSD).
 
     :class:`SCRMSDScorer` computes a score for a specific pair of target/model
     ligands.
@@ -33,12 +33,12 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
     faster in case of large complexes.
     Symmetry correction is achieved by simply computing an RMSD value for
     each symmetry, i.e. atom-atom assignments of the ligand as given by
-    :class:`LigandScorer`. The lowest RMSD value is returned
+    :class:`LigandScorer`. The lowest RMSD value is returned.
 
     Populates :attr:`LigandScorer.aux_data` with following :class:`dict` keys:
 
-    * rmsd: The score
-    * lddt_lp: lDDT of the binding site used for superposition
+    * rmsd: The BiSyRMSD score
+    * lddt_lp: lDDT of the binding pocket used for superposition
     * bs_ref_res: :class:`list` of binding site residues in target
     * bs_ref_res_mapped: :class:`list` of target binding site residues that
       are mapped to model
