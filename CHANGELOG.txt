@@ -18,6 +18,18 @@ Changes in Release 2.9.0
  * The mmCIF reader now refuses to read in files with multiple data blocks
    (except in fault tolerant mode), and warns about mmCIF files containing
    more than one model (atom_site.pdbx_PDB_model_num).
+ * GDT produces slightly higher scores. It's an optimization problem in the
+   end to find the highest possible fraction of CA atoms that superpose within
+   a specified threshold. OpenStructure GDTTS scores are now on average 0.21
+   points lower (range [0, 100]) than LGA when computed on all CASP15 TS models.
+ * Enable DockQ on protein-nucleotide and nucleotide-nucleotide interfaces.
+ * Enable per-atom lDDT scores.
+ * Optionally compute ICS/IPS scores on trimmed model. Reason for that is
+   scoring with incomplete target structures. The full ICS/IPS scores may
+   consider contacts between residues that are not resolved as false positives,
+   even though there is no experimental evidence. The approach with trimmed
+   models removes any model residue that cannot be mapped to the target
+   structure before scoring.
  * Several bug fixes and improvements.
 
 Changes in Release 2.8.0
