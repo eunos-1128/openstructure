@@ -1,15 +1,23 @@
 Changes in Release 2.9.0
 --------------------------------------------------------------------------------
- 
+
  * lDDT-PLI now penalizes added model contacts by default.
  * Updated unassigned reasons (model and target) to better reflect changes
    to ligand scoring made in OST 2.8.0.
  * Added CSV output (--output-format csv) and by model (rather than target)
-   ligand output (--by-model-ligand-output) to compare-ligand-structures 
+   ligand output (--by-model-ligand-output) to compare-ligand-structures
    action.
+ * Improved logging and output of compare-ligand-structures action.
  * Residue SetChemType() is now exposed in Python.
  * Allow reading of BIRD compounds in PRDCC format in the compound library.
    Compounds in PRD formats cannot be read and are rejected cleanly.
+ * The chemdict_tool executable now exits with an error status if no compound
+   were imported.
+ * The SDF writer populates the program name and time line (2) as per SDF
+   specification.
+ * The mmCIF reader now refuses to read in files with multiple data blocks
+   (except in fault tolerant mode), and warns about mmCIF files containing
+   more than one model (atom_site.pdbx_PDB_model_num).
  * Several bug fixes and improvements.
 
 Changes in Release 2.8.0
