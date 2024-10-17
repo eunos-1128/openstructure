@@ -30,6 +30,8 @@ Changes in Release 2.9.0
    even though there is no experimental evidence. The approach with trimmed
    models removes any model residue that cannot be mapped to the target
    structure before scoring.
+ * The SDF reader is now aware of IOProfiles and can read files with invalid
+   bond types (order) from RDKit in fault tolerant mode.
  * Several bug fixes and improvements.
 
 Changes in Release 2.8.0

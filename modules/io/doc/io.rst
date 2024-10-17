@@ -119,21 +119,17 @@ behaviour.
 
   :rtype: :class:`~ost.mol.EntityHandle`.
 
+.. autofunction:: ost.io.LoadSDF
 
-.. function:: LoadSDF(filename)
-
-  Load an SDF file and return an entity.
-
-  :param filename: File to be loaded
-  :type filename: :class:`str`
-
-  :rtype: :class:`~ost.mol.EntityHandle`
-
-.. function:: SDFStrToEntity(sdf_string)
+.. function:: SDFStrToEntity(sdf_string, profile=IOProfile())
 
   Load entity from a string in SDF format.
 
   :param pdb_string: A SDF file as a string.
+
+  :param profile: The IO Profile to read the entity with. For more information
+      on the IO Profiles available, see :doc:`profile`.
+  :type profile: :class:`ost.io.IOProfile`
 
   :rtype: :class:`~ost.mol.EntityHandle`.
 
