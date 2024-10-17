@@ -206,7 +206,7 @@ void SDFReader::ParseHeader(const String& line, int line_num,
         version_=version_str;
       }
       else {
-        String msg="Unsupported SDF version: %s.";
+        String msg="Invalid SDF file or unsupported SDF version: %s.";
         throw IOException(str(format(msg) % version_str));
       }
       // Counts will be overridden in V3000
