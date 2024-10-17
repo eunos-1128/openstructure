@@ -21,6 +21,7 @@
  */
 
 #include <ost/log.hh>
+#include <ost/profile.hh>
 #include <ost/io/mol/sdf_writer.hh>
 #include <ost/io/mol/sdf_reader.hh>
 
@@ -37,14 +38,14 @@ bool EntityIOSDFHandler::RequiresProcessor() const
 void EntityIOSDFHandler::Import(mol::EntityHandle& ent,
                                 std::istream& instream)
 {
-  SDFReader reader(instream);
+  SDFReader reader(instream, IOProfileRegistry::Instance().GetDefault());
   reader.Import(ent);
 }
 
 void EntityIOSDFHandler::Import(mol::EntityHandle& ent,
                                 const boost::filesystem::path& loc)
 {
-  SDFReader reader(loc);
+  SDFReader reader(loc, IOProfileRegistry::Instance().GetDefault());
   reader.Import(ent);
 }
 

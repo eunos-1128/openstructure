@@ -22,6 +22,7 @@
 #include <ost/io/module_config.hh>
 #include <ost/mol/entity_view.hh>
 #include <ost/mol/entity_handle.hh>
+#include <ost/io/mol/io_profile.hh>
 
 namespace ost { namespace io {
 
@@ -33,7 +34,7 @@ String DLLEXPORT_OST_IO
 EntityToSDFString(const mol::EntityView& ent);
 
 mol::EntityHandle DLLEXPORT_OST_IO
-SDFStringToEntity(const String& pdb);
+SDFStringToEntity(const String& pdb, const IOProfile& profile);
 
 }}
 
