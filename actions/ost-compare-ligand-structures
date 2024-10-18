@@ -283,6 +283,7 @@ def _ParseArgs():
         "--coverage-delta",
         dest="coverage_delta",
         default=0.2,
+        type=float,
         help=("Coverage delta for partial ligand assignment."))
 
     parser.add_argument(
@@ -314,6 +315,7 @@ def _ParseArgs():
         "--lddt-pli-radius",
         dest="lddt_pli_radius",
         default=6.0,
+        type=float,
         help=("lDDT inclusion radius for lDDT-PLI."))
 
     parser.add_argument(
@@ -343,6 +345,7 @@ def _ParseArgs():
         "--radius",
         dest="radius",
         default=4.0,
+        type=float,
         help=("Inclusion radius to extract reference binding site that is used "
               "for RMSD computation. Any residue with atoms within this "
               "distance of the ligand will be included in the binding site."))
@@ -351,6 +354,7 @@ def _ParseArgs():
         "--lddt-lp-radius",
         dest="lddt_lp_radius",
         default=15.0,
+        type=float,
         help=("lDDT inclusion radius for lDDT-LP."))
 
     parser.add_argument(
