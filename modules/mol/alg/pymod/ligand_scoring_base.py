@@ -1226,7 +1226,7 @@ def ComputeSymmetries(model_ligand, target_ligand, substructure_match=False,
             symmetries.append((list(isomorphism.values()),
                                list(isomorphism.keys())))
         assert len(symmetries) > 0
-        LogDebug("Found %s isomorphic mappings (symmetries)" % len(symmetries))
+        LogVerbose("Found %s isomorphic mappings (symmetries)" % len(symmetries))
     elif gm.subgraph_is_isomorphic() and substructure_match:
         if not return_symmetries:
             return True
@@ -1242,14 +1242,14 @@ def ComputeSymmetries(model_ligand, target_ligand, substructure_match=False,
         # Assert that all the atoms in the target are part of the substructure
         assert len(symmetries[0][0]) == len(target_ligand.atoms)
         n_sym = len(symmetries)
-        LogDebug("Found %s subgraph isomorphisms (symmetries)" % n_sym)
+        LogVerbose("Found %s subgraph isomorphisms (symmetries)" % n_sym)
     elif gm.subgraph_is_isomorphic():
-        LogDebug("Found subgraph isomorphisms (symmetries), but"
+        LogVerbose("Found subgraph isomorphisms (symmetries), but"
                  " ignoring because substructure_match=False")
         raise NoIsomorphicSymmetryError("No symmetry between %s and %s" % (
             str(model_ligand), str(target_ligand)))
     else:
-        LogDebug("Found no isomorphic mappings (symmetries)")
+        LogVerbose("Found no isomorphic mappings (symmetries)")
         raise NoSymmetryError("No symmetry between %s and %s" % (
             str(model_ligand), str(target_ligand)))
 
