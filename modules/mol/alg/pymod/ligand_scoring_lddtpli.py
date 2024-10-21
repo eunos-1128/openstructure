@@ -98,7 +98,7 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
     def __init__(self, model, target, model_ligands=None, target_ligands=None,
                  resnum_alignments=False, rename_ligand_chain=False,
                  substructure_match=False, coverage_delta=0.2,
-                 max_symmetries=1e5, lddt_pli_radius=6.0,
+                 max_symmetries=1e4, lddt_pli_radius=6.0,
                  add_mdl_contacts=True,
                  lddt_pli_thresholds = [0.5, 1.0, 2.0, 4.0],
                  lddt_pli_binding_site_radius=None):
