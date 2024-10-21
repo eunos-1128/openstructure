@@ -366,6 +366,15 @@ def _ParseArgs():
         help=("Enumerate all potential binding sites in the model when "
               "searching rigid superposition for RMSD computation"))
 
+    parser.add_argument(
+        "-ms",
+        "--max--symmetries",
+        dest="max_symmetries",
+        default=1e4,
+        type=int,
+        help=("If more than that many isomorphisms exist for a target-ligand "
+              "pair, it will be ignored and reported as unassigned."))
+
     args = parser.parse_args()
     if args.output is None:
         args.output = "out.%s" % args.output_format
@@ -516,7 +525,8 @@ def _SetupLDDTPLIScorer(model, model_ligands, reference, reference_ligands, args
                                                 substructure_match = args.substructure_match,
                                                 coverage_delta = args.coverage_delta,
                                                 lddt_pli_radius = args.lddt_pli_radius,
-                                                add_mdl_contacts = args.lddt_pli_add_mdl_contacts)
+                                                add_mdl_contacts = args.lddt_pli_add_mdl_contacts,
+                                                max_symmetries = args.max_symmetries)
 
 def _SetupSCRMSDScorer(model, model_ligands, reference, reference_ligands, args):
     return ligand_scoring_scrmsd.SCRMSDScorer(model, reference,
@@ -528,7 +538,8 @@ def _SetupSCRMSDScorer(model, model_ligands, reference, reference_ligands, args)
                                               coverage_delta = args.coverage_delta,
                                               bs_radius = args.radius,
                                               lddt_lp_radius = args.lddt_lp_radius,
-                                              full_bs_search = args.full_bs_search)
+                                              full_bs_search = args.full_bs_search,
+                                              max_symmetries = args.max_symmetries)
 
 def _Process(model, model_ligands, reference, reference_ligands, args):
 
