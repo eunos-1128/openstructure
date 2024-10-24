@@ -283,6 +283,7 @@ def _ParseArgs():
         "--coverage-delta",
         dest="coverage_delta",
         default=0.2,
+        type=float,
         help=("Coverage delta for partial ligand assignment."))
 
     parser.add_argument(
@@ -314,6 +315,7 @@ def _ParseArgs():
         "--lddt-pli-radius",
         dest="lddt_pli_radius",
         default=6.0,
+        type=float,
         help=("lDDT inclusion radius for lDDT-PLI."))
 
     parser.add_argument(
@@ -343,6 +345,7 @@ def _ParseArgs():
         "--radius",
         dest="radius",
         default=4.0,
+        type=float,
         help=("Inclusion radius to extract reference binding site that is used "
               "for RMSD computation. Any residue with atoms within this "
               "distance of the ligand will be included in the binding site."))
@@ -351,6 +354,7 @@ def _ParseArgs():
         "--lddt-lp-radius",
         dest="lddt_lp_radius",
         default=15.0,
+        type=float,
         help=("lDDT inclusion radius for lDDT-LP."))
 
     parser.add_argument(
@@ -361,6 +365,15 @@ def _ParseArgs():
         action="store_true",
         help=("Enumerate all potential binding sites in the model when "
               "searching rigid superposition for RMSD computation"))
+
+    parser.add_argument(
+        "-ms",
+        "--max--symmetries",
+        dest="max_symmetries",
+        default=1e4,
+        type=int,
+        help=("If more than that many isomorphisms exist for a target-ligand "
+              "pair, it will be ignored and reported as unassigned."))
 
     args = parser.parse_args()
     if args.output is None:
@@ -512,7 +525,8 @@ def _SetupLDDTPLIScorer(model, model_ligands, reference, reference_ligands, args
                                                 substructure_match = args.substructure_match,
                                                 coverage_delta = args.coverage_delta,
                                                 lddt_pli_radius = args.lddt_pli_radius,
-                                                add_mdl_contacts = args.lddt_pli_add_mdl_contacts)
+                                                add_mdl_contacts = args.lddt_pli_add_mdl_contacts,
+                                                max_symmetries = args.max_symmetries)
 
 def _SetupSCRMSDScorer(model, model_ligands, reference, reference_ligands, args):
     return ligand_scoring_scrmsd.SCRMSDScorer(model, reference,
@@ -524,7 +538,8 @@ def _SetupSCRMSDScorer(model, model_ligands, reference, reference_ligands, args)
                                               coverage_delta = args.coverage_delta,
                                               bs_radius = args.radius,
                                               lddt_lp_radius = args.lddt_lp_radius,
-                                              full_bs_search = args.full_bs_search)
+                                              full_bs_search = args.full_bs_search,
+                                              max_symmetries = args.max_symmetries)
 
 def _Process(model, model_ligands, reference, reference_ligands, args):
 

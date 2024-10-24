@@ -30,9 +30,7 @@ using namespace boost::python;
 #include <ost/io/mol/entity_io_crd_handler.hh>
 #include <ost/io/mol/entity_io_pqr_handler.hh>
 #include <ost/io/mol/entity_io_mae_handler.hh>
-#include <ost/io/mol/entity_io_sdf_handler.hh>
 #include <ost/io/mol/pdb_reader.hh>
-#include <ost/io/mol/sdf_str.hh>
 #include <ost/io/mol/dcd_io.hh>
 #include <ost/io/stereochemical_params_reader.hh>
 using namespace ost;
@@ -66,18 +64,13 @@ BOOST_PYTHON_FUNCTION_OVERLOADS(save_entity_view_ov,
 ost::mol::alg::StereoChemicalProps (*read_props_a)(String filename, bool check) = &ReadStereoChemicalPropsFile;
 ost::mol::alg::StereoChemicalProps (*read_props_b)(bool check) = &ReadStereoChemicalPropsFile;
 
-String (*sdf_str_a)(const mol::EntityHandle&)=&EntityToSDFString;
-String (*sdf_str_b)(const mol::EntityView&)=&EntityToSDFString;
-
-void (*save_sdf_handle)(const mol::EntityHandle& entity, const String& filename)=&SaveSDF;
-void (*save_sdf_view)(const mol::EntityView& entity, const String& filename)=&SaveSDF;
-
 }
 
 void export_pdb_io();
 void export_mmcif_io();
 void export_omf_io();
 void export_map_io();
+void export_sdf_io();
 BOOST_PYTHON_MODULE(_ost_io)
 {
   class_<IOManager, boost::noncopyable>("IOManager", no_init)
@@ -122,14 +115,6 @@ BOOST_PYTHON_MODULE(_ost_io)
       (arg("seq_list"), arg("filename"), arg("format")="auto"));
   def("SaveSequence", &SaveSequence,
       (arg("sequence"), arg("filename"), arg("format")="auto"));
-  def("LoadSDF", &LoadSDF);
-  def("SaveSDF", save_sdf_view);
-  def("SaveSDF", save_sdf_handle);
-
-  def("EntityToSDFStr", sdf_str_a);
-  def("EntityToSDFStr", sdf_str_b);
-
-  def("SDFStrToEntity", &SDFStringToEntity);
 
   def("LoadCRD", &LoadCRD);
   def("LoadCHARMMTraj_", &LoadCHARMMTraj, (arg("ent"), arg("trj_filename"), 
@@ -149,6 +134,7 @@ BOOST_PYTHON_MODULE(_ost_io)
   export_mmcif_io();
   export_omf_io();
   export_map_io();
+  export_sdf_io();
   def("SaveCHARMMTraj", &SaveCHARMMTraj, 
       (arg("traj"), arg("pdb_filename"), arg("dcd_filename"), arg("stride")=1, 
        arg("profile")=IOProfile()));

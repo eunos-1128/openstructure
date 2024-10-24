@@ -2,6 +2,7 @@
 --------------------------------------------------------------------------------
 
 .. module:: ost.mol.alg.qsscore
+   :noindex:
    :synopsis: New QS score implementation
 
 .. note::

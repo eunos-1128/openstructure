@@ -37,20 +37,22 @@ Details on the usage (output of ``ost compare-structures --help``):
                                 [-mb MODEL_BIOUNIT] [-rb REFERENCE_BIOUNIT]
                                 [-rna] [-ec] [-d] [-ds DUMP_SUFFIX] [-ft]
                                 [-c CHAIN_MAPPING [CHAIN_MAPPING ...]] [--lddt]
-                                [--local-lddt] [--bb-lddt] [--bb-local-lddt]
-                                [--ilddt] [--cad-score] [--local-cad-score]
-                                [--cad-exec CAD_EXEC]
+                                [--local-lddt] [--aa-local-lddt] [--bb-lddt]
+                                [--bb-local-lddt] [--ilddt] [--cad-score]
+                                [--local-cad-score] [--cad-exec CAD_EXEC]
                                 [--usalign-exec USALIGN_EXEC]
                                 [--override-usalign-mapping] [--qs-score]
                                 [--dockq] [--dockq-capri-peptide] [--ics]
-                                [--ips] [--rigid-scores] [--patch-scores]
-                                [--tm-score] [--lddt-no-stereochecks]
+                                [--ics-trimmed] [--ips] [--ips-trimmed]
+                                [--rigid-scores] [--patch-scores] [--tm-score]
+                                [--lddt-no-stereochecks]
                                 [--n-max-naive N_MAX_NAIVE]
                                 [--dump-aligned-residues] [--dump-pepnuc-alns]
                                 [--dump-pepnuc-aligned-residues]
                                 [--min-pep-length MIN_PEP_LENGTH]
                                 [--min-nuc-length MIN_NUC_LENGTH] [-v VERBOSITY]
                                 [--lddt-add-mdl-contacts]
+                                [--lddt-inclusion-radius LDDT_INCLUSION_RADIUS]
   
   Evaluate model against reference 
   
@@ -113,7 +115,9 @@ Details on the usage (output of ``ost compare-structures --help``):
    * "min_pep_length"
    * "min_nuc_length"
    * "lddt_add_mdl_contacts"
+   * "lddt_inclusion_radius"
    * "dockq_capri_peptide"
+   * "ost_version"
   
   The pairwise sequence alignments are computed with Needleman-Wunsch using
   BLOSUM62 (NUC44 for nucleotides). Many benchmarking scenarios preprocess the
@@ -329,6 +333,29 @@ Details on the usage (output of ``ost compare-structures --help``):
                           metrics are available as keys
                           "per_interface_ics_precision",
                           "per_interface_ics_recall" and "per_interface_ics".
+    --ics-trimmed         Computes interface contact similarity (ICS) related
+                          scores but on a trimmed model. That means that a
+                          mapping between model and reference is performed and
+                          all model residues without reference counterpart are
+                          removed. As a consequence, model contacts for which we
+                          have no experimental evidence do not affect the score.
+                          The effect of these added model contacts without
+                          mapping to target would be decreased precision and
+                          thus lower ics. Recall is not affected. Enabling this
+                          flag adds the following keys: "ics_trimmed",
+                          "ics_precision_trimmed", "ics_recall_trimmed",
+                          "model_contacts_trimmed". The reference contacts and
+                          reference interfaces are the same as for ics and
+                          available as keys: "reference_contacts",
+                          "contact_reference_interfaces". All these measures are
+                          also available on a per-interface basis for each
+                          interface in the reference structure that are defined
+                          as chain pairs with at least one contact (available as
+                          key "contact_reference_interfaces"). The respective
+                          metrics are available as keys
+                          "per_interface_ics_precision_trimmed",
+                          "per_interface_ics_recall_trimmed" and
+                          "per_interface_ics_trimmed".
     --ips                 Computes interface patch similarity (IPS) related
                           scores. They focus on interface residues. They are
                           defined as having at least one contact to a residue
@@ -352,6 +379,7 @@ Details on the usage (output of ``ost compare-structures --help``):
                           metrics are available as keys
                           "per_interface_ips_precision",
                           "per_interface_ips_recall" and "per_interface_ips".
+    --ips-trimmed         The IPS equivalent of ICS on trimmed models.
     --rigid-scores        Computes rigid superposition based scores. They're
                           based on a Kabsch superposition of all mapped CA
                           positions (C3' for nucleotides). Makes the following
@@ -425,7 +453,7 @@ Details on the usage (output of ``ost compare-structures --help``):
                           sequences can be problematic as they may produce high
                           sequence identity alignments by pure chance.
     -v VERBOSITY, --verbosity VERBOSITY
-                          Set verbosity level. Defaults to 3 (Script).
+                          Set verbosity level. Defaults to 2 (Script).
     --lddt-add-mdl-contacts
                           Only using contacts in lDDT thatare within a certain
                           distance threshold in the reference does not penalize
@@ -435,6 +463,9 @@ Details on the usage (output of ``ost compare-structures --help``):
                           necessarily in the reference. No contact will be added
                           if the respective atom pair is not resolved in the
                           reference.
+    --lddt-inclusion-radius LDDT_INCLUSION_RADIUS
+                          Passed to lDDT scorer. Affects all lDDT scores but not
+                          chain mapping.
 
 .. _ost compare ligand structures:
 
@@ -456,14 +487,19 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
                                        [-rl [REFERENCE_LIGANDS ...]] [-o OUTPUT]
                                        [-mf {pdb,cif,mmcif}]
                                        [-rf {pdb,cif,mmcif}] [-of {json,csv}]
-                                       [-csvm] [-mb MODEL_BIOUNIT]
+                                       [-csvm]
+                                       [--csv-extra-header CSV_EXTRA_HEADER]
+                                       [--csv-extra-data CSV_EXTRA_DATA]
+                                       [-mb MODEL_BIOUNIT]
                                        [-rb REFERENCE_BIOUNIT] [-ft] [-rna]
                                        [-sm] [-cd COVERAGE_DELTA] [-v VERBOSITY]
                                        [--full-results] [--lddt-pli]
                                        [--lddt-pli-radius LDDT_PLI_RADIUS]
-                                       [--lddt-pli-amc] [--rmsd]
+                                       [--lddt-pli-add-mdl-contacts]
+                                       [--no-lddt-pli-add-mdl-contacts] [--rmsd]
                                        [--radius RADIUS]
                                        [--lddt-lp-radius LDDT_LP_RADIUS] [-fbs]
+                                       [-ms MAX_SYMMETRIES]
   
   Evaluate model with non-polymer/small molecule ligands against reference.
   
@@ -500,8 +536,8 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
   
   Output can be written in two format: JSON (default) or CSV, controlled by the
   --output-format/-of argument.
-
-  Without additional options, the JSON ouput is a dictionary with three keys:
+  
+  Without additional options, the JSON ouput is a dictionary with four keys:
   
    * "model_ligands": A list of ligands in the model. If ligands were provided
      explicitly with --model-ligands, elements of the list will be the paths to
@@ -514,6 +550,7 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
    * "status": SUCCESS if everything ran through. In case of failure, the only
      content of the JSON output will be "status" set to FAILURE and an
      additional key: "traceback".
+   * "ost_version": The OpenStructure version used for computation.
   
   Each score is opt-in and the respective results are available in three keys:
   
@@ -538,32 +575,32 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
   items follow the same structure as in "assigned_scores". If no score for a
   specific pair of ligands could be computed, "score" and "coverage" are set to
   null and a key "reason" is added giving an educated guess why this happened.
-
+  
   CSV output is a table of comma-separated values, with one line for each
   reference ligand (or one model ligand if the --by-model-ligand-output flag was
   set).
-
+  
   The following column is always available:
-
+  
    * reference_ligand/model_ligand: If reference ligands were provided explicitly
      with --reference-ligands, elements of the list will be the paths to the
      ligand SDF file(s). Otherwise, they will be the chain name, residue number
      and insertion code of the ligand, separated by a dot. If the
      --by-model-ligand-output flag was set, this will be model ligand instead,
      following the same rules.
-
+  
   If lDDT-PLI was enabled with --lddt-pli, the following columns are added:
-
+  
    * "lddt_pli", "lddt_pli_coverage" and "lddt_pli_(model|reference)_ligand"
      are the lDDT-PLI score result, the corresponding coverage and assigned model
      ligand (or reference ligand if the --by-model-ligand-output flag was set)
      if an assignment was found, respectively, empty otherwise.
    * "lddt_pli_unassigned" is empty if an assignment was found, otherwise it
      lists the short reason this reference ligand was unassigned.
-
+  
   If BiSyRMSD was enabled with --rmsd, the following columns are added:
-
-   * "rmsd", "rmsd_coverage". "rmsd_lddt_lp" "rmsd_bb_rmsd" and
+  
+   * "rmsd", "rmsd_coverage". "lddt_lp" "bb_rmsd" and
      "rmsd_(model|reference)_ligand" are the BiSyRMSD, the corresponding
      coverage, lDDT-LP, backbone RMSD and assigned model ligand (or reference
      ligand if the --by-model-ligand-output flag was set) if an assignment
@@ -582,8 +619,8 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
     -rl [REFERENCE_LIGANDS ...], --ref-ligands [REFERENCE_LIGANDS ...], --reference-ligands [REFERENCE_LIGANDS ...]
                           Path to reference ligand files.
     -o OUTPUT, --out OUTPUT, --output OUTPUT
-                          Output file name. Default depends on format: out.json or
-                          out.csv
+                          Output file name. Default depends on format: out.json
+                          or out.csv
     -mf {pdb,cif,mmcif}, --mdl-format {pdb,cif,mmcif}, --model-format {pdb,cif,mmcif}
                           Format of model file. pdb reads pdb but also pdb.gz,
                           same applies to cif/mmcif. Inferred from filepath if
@@ -593,11 +630,18 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
                           pdb.gz, same applies to cif/mmcif. Inferred from
                           filepath if not given.
     -of {json,csv}, --out-format {json,csv}, --output-format {json,csv}
-                          Output format, JSON or CSV, in lowercase. default: json
+                          Output format, JSON or CSV, in lowercase. default:
+                          json
     -csvm, --by-model-ligand, --by-model-ligand-output
                           For CSV output, this flag changes the output so that
                           each line reports one model ligand, instead of a
                           reference ligand. Has no effect with JSON output.
+    --csv-extra-header CSV_EXTRA_HEADER
+                          Extra header prefix for CSV output. This allows adding
+                          additional annotations (such as target ID, group, etc)
+                          to the output
+    --csv-extra-data CSV_EXTRA_DATA
+                          Additional data (columns) for CSV output.
     -mb MODEL_BIOUNIT, --model-biounit MODEL_BIOUNIT
                           Only has an effect if model is in mmcif format. By
                           default, the asymmetric unit (AU) is used for scoring.
@@ -622,13 +666,16 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
     -cd COVERAGE_DELTA, --coverage-delta COVERAGE_DELTA
                           Coverage delta for partial ligand assignment.
     -v VERBOSITY, --verbosity VERBOSITY
-                          Set verbosity level. Defaults to 3 (INFO).
+                          Set verbosity level. Defaults to 2 (Script).
     --full-results        Outputs scoring results for all model/reference ligand
                           pairs and store as key "full_results"
     --lddt-pli            Compute lDDT-PLI scores and store as key "lddt_pli".
     --lddt-pli-radius LDDT_PLI_RADIUS
                           lDDT inclusion radius for lDDT-PLI.
-    --lddt-pli-amc        Add model contacts (amc) when computing lDDT-PLI.
+    --lddt-pli-add-mdl-contacts
+                          Add model contacts when computing lDDT-PLI.
+    --no-lddt-pli-add-mdl-contacts
+                          DO NOT add model contacts when computing lDDT-PLI.
     --rmsd                Compute RMSD scores and store as key "rmsd".
     --radius RADIUS       Inclusion radius to extract reference binding site
                           that is used for RMSD computation. Any residue with
@@ -640,3 +687,8 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
                           Enumerate all potential binding sites in the model
                           when searching rigid superposition for RMSD
                           computation
+    -ms MAX_SYMMETRIES, --max--symmetries MAX_SYMMETRIES
+                          If more than that many isomorphisms exist for a
+                          target-ligand pair, it will be ignored and reported as
+                          unassigned.
+

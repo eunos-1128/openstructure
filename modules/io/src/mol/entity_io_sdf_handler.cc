@@ -21,6 +21,7 @@
  */
 
 #include <ost/log.hh>
+#include <ost/profile.hh>
 #include <ost/io/mol/sdf_writer.hh>
 #include <ost/io/mol/sdf_reader.hh>
 
@@ -37,14 +38,14 @@ bool EntityIOSDFHandler::RequiresProcessor() const
 void EntityIOSDFHandler::Import(mol::EntityHandle& ent,
                                 std::istream& instream)
 {
-  SDFReader reader(instream);
+  SDFReader reader(instream, IOProfileRegistry::Instance().GetDefault());
   reader.Import(ent);
 }
 
 void EntityIOSDFHandler::Import(mol::EntityHandle& ent,
                                 const boost::filesystem::path& loc)
 {
-  SDFReader reader(loc);
+  SDFReader reader(loc, IOProfileRegistry::Instance().GetDefault());
   reader.Import(ent);
 }
 
@@ -69,7 +70,8 @@ bool sdf_handler_is_responsible_for(const boost::filesystem::path& loc,
   if(type=="auto") {
 	String match_suf_string=loc.string();
     std::transform(match_suf_string.begin(),match_suf_string.end(),match_suf_string.begin(),tolower);
-    if(detail::FilenameEndsWith(match_suf_string,".sdf") || detail::FilenameEndsWith(match_suf_string,".sdf.gz")) {
+    if(detail::FilenameEndsWith(match_suf_string,".sdf") || detail::FilenameEndsWith(match_suf_string,".sdf.gz") ||
+       detail::FilenameEndsWith(match_suf_string,".mol") || detail::FilenameEndsWith(match_suf_string,".mol.gz")) {
       return true;
     }
 

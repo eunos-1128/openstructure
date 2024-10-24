@@ -43,9 +43,10 @@ class LigandScorer:
 
     * :class:`ost.mol.alg.ligand_scoring_lddtpli.LDDTPLIScorer`
       that assesses the conservation of protein-ligand
-      contacts
+      contacts (lDDT-PLI);
     * :class:`ost.mol.alg.ligand_scoring_scrmsd.SCRMSDScorer`
-      that computes a binding-site superposed, symmetry-corrected RMSD.
+      that computes a binding-site superposed, symmetry-corrected RMSD
+      (BiSyRMSD) and ligand pocket lDDT (lDDT-LP).
 
     All versus all scores are available through the lazily computed
     :attr:`score_matrix`. However, many things can go wrong... be it even
@@ -65,7 +66,7 @@ class LigandScorer:
 
     A common use case is to derive a one-to-one mapping between ligands in
     the model and the target for which :class:`LigandScorer` provides an
-    automated assignment procedure.
+    automated :attr:`assignment` procedure.
     By default, only exact matches between target and model ligands are
     considered. This is a problem when the target only contains a subset
     of the expected atoms (for instance if atoms are missing in an
@@ -85,7 +86,7 @@ class LigandScorer:
 
     :class:`LigandScorer` generally assumes that the
     :attr:`~ost.mol.ResidueHandle.is_ligand` property is properly set on all
-    the ligand atoms, and only ligand atoms. This is typically the case for
+    the ligand residues, and only ligand atoms. This is typically the case for
     entities loaded from mmCIF (tested with mmCIF files from the PDB and
     SWISS-MODEL). Legacy PDB files must contain `HET` headers (which is usually
     the case for files downloaded from the PDB but not elsewhere).
@@ -1225,7 +1226,7 @@ def ComputeSymmetries(model_ligand, target_ligand, substructure_match=False,
             symmetries.append((list(isomorphism.values()),
                                list(isomorphism.keys())))
         assert len(symmetries) > 0
-        LogDebug("Found %s isomorphic mappings (symmetries)" % len(symmetries))
+        LogVerbose("Found %s isomorphic mappings (symmetries)" % len(symmetries))
     elif gm.subgraph_is_isomorphic() and substructure_match:
         if not return_symmetries:
             return True
@@ -1241,14 +1242,14 @@ def ComputeSymmetries(model_ligand, target_ligand, substructure_match=False,
         # Assert that all the atoms in the target are part of the substructure
         assert len(symmetries[0][0]) == len(target_ligand.atoms)
         n_sym = len(symmetries)
-        LogDebug("Found %s subgraph isomorphisms (symmetries)" % n_sym)
+        LogVerbose("Found %s subgraph isomorphisms (symmetries)" % n_sym)
     elif gm.subgraph_is_isomorphic():
-        LogDebug("Found subgraph isomorphisms (symmetries), but"
+        LogVerbose("Found subgraph isomorphisms (symmetries), but"
                  " ignoring because substructure_match=False")
         raise NoIsomorphicSymmetryError("No symmetry between %s and %s" % (
             str(model_ligand), str(target_ligand)))
     else:
-        LogDebug("Found no isomorphic mappings (symmetries)")
+        LogVerbose("Found no isomorphic mappings (symmetries)")
         raise NoSymmetryError("No symmetry between %s and %s" % (
             str(model_ligand), str(target_ligand)))
 

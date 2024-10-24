@@ -37,9 +37,9 @@ String EntityToSDFString(const mol::EntityView& ent) {
   return stream.str();
 }
 
-mol::EntityHandle SDFStringToEntity(const String& sdf) {
+mol::EntityHandle SDFStringToEntity(const String& sdf, const IOProfile& profile) {
   std::stringstream stream(sdf);
-  SDFReader reader(stream);
+  SDFReader reader(stream, profile);
   mol::EntityHandle ent = mol::CreateEntity();
   reader.Import(ent);
   return ent;
