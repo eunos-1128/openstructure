@@ -348,9 +348,10 @@ def LoadCHARMMTraj(crd, dcd_file=None, profile='CHARMM',
 def LoadMMCIF(filename, fault_tolerant=None, calpha_only=None,
               profile='DEFAULT', remote=False, seqres=False, info=False):
   """
-  Load a mmCIF file and return one or more entities. Several options allow to
-  customize the exact behaviour of the mmCIF import. For more information on
-  these options, see :doc:`profile`.
+  Load an mmCIF file and return the first model as an entity.
+
+  Several options allow to customize the exact behaviour of the mmCIF import.
+  For more information on these options, see :doc:`profile`.
   
   Residues are flagged as ligand if they are not waters nor covered by an
   ``entity_poly`` record (ie. they are non-polymer entities in
@@ -555,3 +556,46 @@ def _PDBize(biounit, asu, seqres=None, min_polymer_size=None,
   return pdb_bu
 
 MMCifInfoBioUnit.PDBize = _PDBize
+
+
+def LoadSDF(filename, fault_tolerant=None, profile='DEFAULT'):
+  """
+  Load SDF file from disk and return an entity.
+
+  :param filename: File to be loaded
+  :type filename: :class:`str`
+
+  :param fault_tolerant: Enable/disable fault-tolerant import. If set, overrides
+                         the value of :attr:`IOProfile.fault_tolerant`.
+  :type fault_tolerant: :class:`bool`
+
+  :param profile: Aggregation of flags and algorithms to control import and
+                  processing of molecular structures. Can either be a
+                  :class:`str` specifying one of the default profiles
+                  ['DEFAULT', 'SLOPPY', 'CHARMM', 'STRICT'] or an actual object
+                  of type :class:`ost.io.IOProfile`.
+                  See :doc:`profile` for more info.
+  :type profile: :class:`str`/:class:`ost.io.IOProfile`
+
+  :raises: :exc:`~ost.io.IOException` if the import fails due to an erroneous or
+      inexistent file
+  """
+  def _override(val1, val2):
+    if val2 != None:
+      return val2
+    else:
+      return val1
+
+  if isinstance(profile, str):
+    prof = profiles.Get(profile)
+  elif isinstance(profile, IOProfile):
+    prof = profile.Copy()
+  else:
+    raise TypeError('profile must be of type string or IOProfile, ' + \
+                    'instead of %s' % type(profile))
+  prof.fault_tolerant = _override(prof.fault_tolerant, fault_tolerant)
+
+  reader = SDFReader(filename, prof)
+  ent = mol.CreateEntity()
+  reader.Import(ent)
+  return ent

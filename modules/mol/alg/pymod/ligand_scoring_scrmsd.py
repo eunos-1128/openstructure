@@ -1,20 +1,21 @@
 import numpy as np
 
-from ost import LogWarning
+from ost import LogWarning, LogScript, LogInfo, LogVerbose
 from ost import geom
 from ost import mol
 
 from ost.mol.alg import ligand_scoring_base
 
+
 class SCRMSDScorer(ligand_scoring_base.LigandScorer):
-    """ :class:`LigandScorer` implementing symmetry corrected RMSD.
+    """ :class:`LigandScorer` implementing symmetry corrected RMSD (BiSyRMSD).
 
     :class:`SCRMSDScorer` computes a score for a specific pair of target/model
     ligands.
 
     The returned RMSD is based on a binding site superposition.
     The binding site of the target structure is defined as all residues with at
-    least one atom within *bs_radius* around the target ligand.
+    least one atom within `bs_radius` around the target ligand.
     It only contains protein and nucleic acid residues from chains that
     pass the criteria for the
     :class:`chain mapping <ost.mol.alg.chain_mapping>`. This means ignoring
@@ -23,28 +24,29 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
     The respective model binding site for superposition is identified by
     naively enumerating all possible mappings of model chains onto their
     chemically equivalent target counterparts from the target binding site.
-    The *binding_sites_topn* with respect to lDDT score are evaluated and 
+    The `binding_sites_topn` with respect to lDDT score are evaluated and 
     an RMSD is computed.
     You can either try to map ALL model chains onto the target binding site by
-    enabling *full_bs_search* or restrict the model chains for a specific
+    enabling `full_bs_search` or restrict the model chains for a specific
     target/model ligand pair to the chains with at least one atom within
     *model_bs_radius* around the model ligand. The latter can be significantly
     faster in case of large complexes.
     Symmetry correction is achieved by simply computing an RMSD value for
     each symmetry, i.e. atom-atom assignments of the ligand as given by
-    :class:`LigandScorer`. The lowest RMSD value is returned
+    :class:`LigandScorer`. The lowest RMSD value is returned.
 
     Populates :attr:`LigandScorer.aux_data` with following :class:`dict` keys:
 
-    * rmsd: The score
-    * lddt_lp: lDDT of the binding site used for superposition
+    * rmsd: The BiSyRMSD score
+    * lddt_lp: lDDT of the binding pocket used for superposition (lDDT-LP)
     * bs_ref_res: :class:`list` of binding site residues in target
     * bs_ref_res_mapped: :class:`list` of target binding site residues that
       are mapped to model
     * bs_mdl_res_mapped: :class:`list` of same length with respective model
       residues
-    * bb_rmsd: Backbone RMSD (CA, C3' for nucleotides) for mapped residues
-      given transform
+    * bb_rmsd: Backbone RMSD (CA, C3' for nucleotides; full backbone for 
+      binding sites with fewer than 3 residues) for mapped binding site
+      residues after superposition
     * target_ligand: The actual target ligand for which the score was computed
     * model_ligand: The actual model ligand for which the score was computed
     * chain_mapping: :class:`dict` with a chain mapping of chains involved in
@@ -145,14 +147,13 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
         self._get_repr_input = dict()
 
         # update state decoding from parent with subclass specific stuff
-        self.state_decoding[10] = ("binding_site",
+        self.state_decoding[10] = ("target_binding_site",
                                    "No residues were in proximity of the "
                                    "target ligand.")
-        self.state_decoding[11] = ("model_representation", "No representation "
-                                   "of the reference binding site was found in "
-                                   "the model, i.e. the binding site was not "
-                                   "modeled or the model ligand was positioned "
-                                   "too far in combination with "
+        self.state_decoding[11] = ("model_binding_site", "Binding site was not"
+                                   " found in the model, i.e. the binding site"
+                                   " was not modeled or the model ligand was "
+                                   "positioned too far in combination with "
                                    "full_bs_search=False.")
         self.state_decoding[20] = ("unknown",
                                    "Unknown error occured in SCRMSDScorer")
@@ -174,6 +175,9 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
                            "inconsistent_residues": list()}
 
         representations = self._get_repr(target_ligand, model_ligand)
+        # This step can be slow so give some hints in logs
+        msg = "Computing BiSyRMSD with %d chain mappings" % len(representations)
+        (LogWarning if len(representations) > 10000 else LogInfo)(msg)
 
         for r in representations:
             rmsd = _SCRMSD_symmetries(symmetries, model_ligand, 
@@ -231,6 +235,8 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
 
         if key not in self._repr:
             ref_bs = self._get_target_binding_site(target_ligand)
+            LogVerbose("%d chains are in proximity of the target ligand: %s" % (
+                ref_bs.chain_count, ", ".join([c.name for c in ref_bs.chains])))
             if self.full_bs_search:
                 reprs = self._chain_mapper.GetRepr(
                     ref_bs, self.model, inclusion_radius=self.lddt_lp_radius,
@@ -262,7 +268,8 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
                     h = ref_res.handle.GetHashCode()
                     if h not in ref_residues_hashes and \
                             h not in ignored_residue_hashes:
-                        view = self._chain_mapper.target.ViewForHandle(ref_res) 
+                        with ligand_scoring_base._SinkVerbosityLevel(1):
+                            view = self._chain_mapper.target.ViewForHandle(ref_res) 
                         if view.IsValid():
                             h = ref_res.handle.GetHashCode()
                             ref_residues_hashes.add(h)
@@ -341,12 +348,15 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
             radius = self.model_bs_radius
             chains = set()
             for at in mdl_ligand.atoms:
-                close_atoms = self._chain_mapping_mdl.FindWithin(at.GetPos(),
-                                                                 radius)
+                with ligand_scoring_base._SinkVerbosityLevel(1):
+                    close_atoms = self._chain_mapping_mdl.FindWithin(at.GetPos(),
+                                                                     radius)
                 for close_at in close_atoms:
                     chains.add(close_at.GetChain().GetName())
 
             if len(chains) > 0:
+                LogVerbose("%d chains are in proximity of the model ligand: %s" % (
+                    len(chains), ", ".join(chains)))
 
                 # the chain mapping model which only contains close chains
                 query = "cname="

@@ -96,11 +96,11 @@ class Scorer:
     Deals with structure cleanup, chain mapping, interface identification etc.
     Intermediate results are available as attributes.
 
-    :param model: Model structure - a deep copy is available as :attr:`model`.
+    :param model: Model structure - a deep copy is available as :attr:`~model`.
                   Additionally, :func:`ost.mol.alg.Molck` using *molck_settings*
                   is applied.
     :type model: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
-    :param target: Target structure - a deep copy is available as :attr:`target`.
+    :param target: Target structure - a deep copy is available as :attr:`~target`.
                   Additionally, :func:`ost.mol.alg.Molck` using *molck_settings*
                   is applied.
     :type target: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
@@ -201,6 +201,10 @@ class Scorer:
                                 This flag has no influence on patch_dockq
                                 scores.
     :type dockq_capri_peptide: :class:`bool`
+    :param lddt_symmetry_settings: Passed as *symmetry_settings* parameter to
+                                   lDDT scorer. Default: None
+    :type lddt_symmetry_settings: :class:`ost.mol.alg.lddt.SymmetrySettings`
+    :param lddt_inclusion_radius: lDDT inclusion radius.
     """
     def __init__(self, model, target, resnum_alignments=False,
                  molck_settings = None, cad_score_exec = None,
@@ -208,7 +212,8 @@ class Scorer:
                  usalign_exec = None, lddt_no_stereochecks=False,
                  n_max_naive=40320, oum=False, min_pep_length = 6,
                  min_nuc_length = 4, lddt_add_mdl_contacts=False,
-                 dockq_capri_peptide=False):
+                 dockq_capri_peptide=False, lddt_symmetry_settings = None,
+                 lddt_inclusion_radius = 15.0):
 
         self._target_orig = target
         self._model_orig = model
@@ -235,6 +240,20 @@ class Scorer:
         LogScript("Cleaning up input structures")
         Molck(self._model, conop.GetDefaultLib(), molck_settings)
         Molck(self._target, conop.GetDefaultLib(), molck_settings)
+
+        if resnum_alignments:
+            # If we're dealing with resnum alignments, we ensure that
+            # consecutive peptide and nucleotide residues are connected based
+            # on residue number information. The conop.Processor only connects
+            # these things if the bonds are actually feasible which can lead to
+            # weird behaviour in stereochemistry checks. Let's say N and C are
+            # too close, it's reported as a clash. If they're too far apart,
+            # they're not reported at all. If we're not dealing with resnum
+            # alignments, we're out of luck as we have no direct residue
+            # connectivity information from residue numbers
+            self._resnum_connect(self._model)
+            self._resnum_connect(self._target)
+
         self._model = self._model.Select("peptide=True or nucleotide=True")
         self._target = self._target.Select("peptide=True or nucleotide=True")
 
@@ -298,6 +317,8 @@ class Scorer:
         self.min_nuc_length = min_nuc_length
         self.lddt_add_mdl_contacts = lddt_add_mdl_contacts
         self.dockq_capri_peptide = dockq_capri_peptide
+        self.lddt_symmetry_settings = lddt_symmetry_settings
+        self.lddt_inclusion_radius = lddt_inclusion_radius
 
         # lazily evaluated attributes
         self._stereochecked_model = None
@@ -308,6 +329,7 @@ class Scorer:
         self._target_clashes = None
         self._target_bad_bonds = None
         self._target_bad_angles = None
+        self._trimmed_model = None
         self._chain_mapper = None
         self._mapping = None
         self._rigid_mapping = None
@@ -316,16 +338,19 @@ class Scorer:
         self._aln = None
         self._stereochecked_aln = None
         self._pepnuc_aln = None
+        self._trimmed_aln = None
 
         # lazily constructed scorer objects
         self._lddt_scorer = None
         self._bb_lddt_scorer = None
         self._qs_scorer = None
         self._contact_scorer = None
+        self._trimmed_contact_scorer = None
 
         # lazily computed scores
         self._lddt = None
         self._local_lddt = None
+        self._aa_local_lddt = None
         self._bb_lddt = None
         self._bb_local_lddt = None
         self._ilddt = None
@@ -342,6 +367,7 @@ class Scorer:
         self._contact_model_interfaces = None
         self._native_contacts = None
         self._model_contacts = None
+        self._trimmed_model_contacts = None
         self._ics_precision = None
         self._ics_recall = None
         self._ics = None
@@ -351,9 +377,25 @@ class Scorer:
         self._ips_precision = None
         self._ips_recall = None
         self._ips = None
-        self._per_interface_ics_precision = None
-        self._per_interface_ics_recall = None
-        self._per_interface_ics = None
+        self._per_interface_ips_precision = None
+        self._per_interface_ips_recall = None
+        self._per_interface_ips = None
+
+        # subset of contact scores that operate on trimmed model
+        # i.e. no contacts from model residues that are not present in
+        # target
+        self._ics_trimmed = None
+        self._ics_precision_trimmed = None
+        self._ics_recall_trimmed = None
+        self._per_interface_ics_precision_trimmed = None
+        self._per_interface_ics_recall_trimmed = None
+        self._per_interface_ics_trimmed = None
+        self._ips_trimmed = None
+        self._ips_precision_trimmed = None
+        self._ips_recall_trimmed = None
+        self._per_interface_ips_precision_trimmed = None
+        self._per_interface_ips_recall_trimmed = None
+        self._per_interface_ips_trimmed = None
 
         self._dockq_target_interfaces = None
         self._dockq_interfaces = None
@@ -371,16 +413,21 @@ class Scorer:
 
         self._mapped_target_pos = None
         self._mapped_model_pos = None
+        self._mapped_target_pos_full_bb = None
+        self._mapped_model_pos_full_bb = None
         self._transformed_mapped_model_pos = None
         self._n_target_not_mapped = None
         self._transform = None
 
         self._rigid_mapped_target_pos = None
         self._rigid_mapped_model_pos = None
+        self._rigid_mapped_target_pos_full_bb = None
+        self._rigid_mapped_model_pos_full_bb = None
         self._rigid_transformed_mapped_model_pos = None
         self._rigid_n_target_not_mapped = None
         self._rigid_transform = None
 
+        self._gdt_window_sizes = [7, 9, 12, 24, 48]
         self._gdt_05 = None
         self._gdt_1 = None
         self._gdt_2 = None
@@ -441,9 +488,9 @@ class Scorer:
 
     @property
     def aln(self):
-        """ Alignments of :attr:`model`/:attr:`target` chains
+        """ Alignments of :attr:`~model`/:attr:`~target` chains
 
-        Alignments for each pair of chains mapped in :attr:`mapping`.
+        Alignments for each pair of chains mapped in :attr:`~mapping`.
         First sequence is target sequence, second sequence the model sequence.
 
         :type: :class:`list` of :class:`ost.seq.AlignmentHandle`
@@ -454,7 +501,7 @@ class Scorer:
 
     @property
     def stereochecked_aln(self):
-        """ Stereochecked equivalent of :attr:`aln`
+        """ Stereochecked equivalent of :attr:`~aln`
 
         The alignments may differ, as stereochecks potentially remove residues
 
@@ -466,7 +513,7 @@ class Scorer:
 
     @property
     def pepnuc_aln(self):
-        """ Alignments of :attr:`model_orig`/:attr:`target_orig` chains
+        """ Alignments of :attr:`~model_orig`/:attr:`~target_orig` chains
 
         Selects for peptide and nucleotide residues before sequence
         extraction. Includes residues that would be removed by molck in
@@ -477,6 +524,19 @@ class Scorer:
         if self._pepnuc_aln is None:
             self._compute_pepnuc_aln()
         return self._pepnuc_aln
+
+    @property
+    def trimmed_aln(self):
+        """ Alignments of :attr:`~trimmed_model`/:attr:`~target` chains
+
+        Alignments for each pair of chains mapped in :attr:`~mapping`.
+        First sequence is target sequence, second sequence the model sequence.
+
+        :type: :class:`list` of :class:`ost.seq.AlignmentHandle`
+        """
+        if self._trimmed_aln is None:
+            self._trim_model()
+        return self._trimmed_aln
 
     @property
     def stereochecked_model(self):
@@ -569,8 +629,22 @@ class Scorer:
         return self._target_bad_angles
 
     @property
+    def trimmed_model(self):
+        """ :attr:`~model` trimmed to target
+
+        Removes residues that are not covered by :class:`target` given
+        :attr:`~mapping`. In other words: no model residues without experimental
+        evidence from :class:`target`. 
+
+        :type: :class:`ost.mol.EntityView`
+        """
+        if self._trimmed_model is None:
+            self._trim_model()
+        return self._trimmed_model
+
+    @property
     def chain_mapper(self):
-        """ Chain mapper object for given :attr:`target`
+        """ Chain mapper object for given :attr:`~target`
 
         :type: :class:`ost.mol.alg.chain_mapping.ChainMapper`
         """
@@ -584,7 +658,7 @@ class Scorer:
 
     @property
     def mapping(self):
-        """ Full chain mapping result for :attr:`target`/:attr:`model`
+        """ Full chain mapping result for :attr:`~target`/:attr:`~model`
 
         Computed with :func:`ost.mol.alg.ChainMapper.GetMapping`
 
@@ -599,7 +673,7 @@ class Scorer:
 
     @property
     def rigid_mapping(self):
-        """ Full chain mapping result for :attr:`target`/:attr:`model`
+        """ Full chain mapping result for :attr:`~target`/:attr:`~model`
 
         Computed with :func:`ost.mol.alg.ChainMapper.GetRMSDMapping`
 
@@ -640,15 +714,22 @@ class Scorer:
 
     @property
     def lddt_scorer(self):
-        """ lDDT scorer for :attr:`~stereochecked_target` (default parameters)
+        """ lDDT scorer for :attr:`~target`/:attr:`~stereochecked_target`
+
+        Depending on :attr:`~lddt_no_stereocheck` and
+        :attr:`~lddt_symmetry_settings`.
 
         :type: :class:`ost.mol.alg.lddt.lDDTScorer`
         """
         if self._lddt_scorer is None:
             if self.lddt_no_stereochecks:
-                self._lddt_scorer = lDDTScorer(self.target)
+                self._lddt_scorer = lDDTScorer(self.target,
+                                               symmetry_settings = self.lddt_symmetry_settings,
+                                               inclusion_radius = self.lddt_inclusion_radius)
             else:
-                self._lddt_scorer = lDDTScorer(self.stereochecked_target)
+                self._lddt_scorer = lDDTScorer(self.stereochecked_target,
+                                               symmetry_settings = self.lddt_symmetry_settings,
+                                               inclusion_radius = self.lddt_inclusion_radius)
         return self._lddt_scorer
 
     @property
@@ -661,7 +742,9 @@ class Scorer:
         :type: :class:`ost.mol.alg.lddt.lDDTScorer`
         """
         if self._bb_lddt_scorer is None:
-            self._bb_lddt_scorer = lDDTScorer(self.target, bb_only=True)
+            self._bb_lddt_scorer = lDDTScorer(self.target, bb_only=True,
+                                              symmetry_settings = self.lddt_symmetry_settings,
+                                              inclusion_radius = self.lddt_inclusion_radius)
         return self._bb_lddt_scorer
 
     @property
@@ -683,6 +766,14 @@ class Scorer:
             self._contact_scorer = ContactScorer.FromMappingResult(self.mapping)
         return self._contact_scorer
     
+    @property
+    def trimmed_contact_scorer(self):
+        if self._trimmed_contact_scorer is None:
+            self._trimmed_contact_scorer = ContactScorer(self.mapping.target,
+                                                         self.mapping.chem_groups,
+                                                         self.trimmed_model,
+                                                         self.trimmed_aln)
+        return self._trimmed_contact_scorer
 
     @property
     def lddt(self):
@@ -713,6 +804,23 @@ class Scorer:
         if self._local_lddt is None:
             self._compute_lddt()
         return self._local_lddt
+
+    @property
+    def aa_local_lddt(self):
+        """ Per atom lDDT scores in range [0.0, 1.0]
+
+        Computed based on :attr:`~stereochecked_model` but scores for all
+        atoms in :attr:`~model` are reported. If an atom has been removed
+        by stereochemistry checks, the respective score is set to 0.0. If an
+        atom is not covered by the target or is in a chain skipped by the
+        chain mapping procedure (happens for super short chains), the respective
+        score is set to None. In case of oligomers, :attr:`~mapping` is used.
+
+        :type: :class:`dict`
+        """
+        if self._aa_local_lddt is None:
+            self._compute_lddt()
+        return self._aa_local_lddt
 
     @property
     def bb_lddt(self):
@@ -766,7 +874,7 @@ class Scorer:
     def qs_global(self):
         """  Global QS-score
 
-        Computed based on :attr:`model` using :attr:`mapping`
+        Computed based on :attr:`~model` using :attr:`~mapping`
 
         :type: :class:`float`
         """
@@ -778,7 +886,7 @@ class Scorer:
     def qs_best(self):
         """  Global QS-score - only computed on aligned residues
 
-        Computed based on :attr:`model` using :attr:`mapping`. The QS-score
+        Computed based on :attr:`~model` using :attr:`~mapping`. The QS-score
         computation only considers contacts between residues with a mapping
         between target and model. As a result, the score won't be lowered in
         case of additional chains/residues in any of the structures.
@@ -844,7 +952,7 @@ class Scorer:
     
     @property
     def per_interface_qs_global(self):
-        """ QS-score for each interface in :attr:`qs_interfaces`
+        """ QS-score for each interface in :attr:`~qs_interfaces`
 
         :type: :class:`list` of :class:`float`
         """
@@ -854,7 +962,7 @@ class Scorer:
     
     @property
     def per_interface_qs_best(self):
-        """ QS-score for each interface in :attr:`qs_interfaces`
+        """ QS-score for each interface in :attr:`~qs_interfaces`
 
         Only computed on aligned residues
 
@@ -881,11 +989,19 @@ class Scorer:
 
     @property
     def model_contacts(self):
-        """ Same for model
+        """ Same for :attr:`~model`
         """
         if self._model_contacts is None:
             self._model_contacts = self.contact_scorer.cent2.hr_contacts
         return self._model_contacts
+
+    @property
+    def trimmed_model_contacts(self):
+        """ Same for :attr:`~trimmed_model`
+        """
+        if self._trimmed_model_contacts is None:
+            self._trimmed_model_contacts = self.trimmed_contact_scorer.cent2.hr_contacts
+        return self._trimmed_model_contacts
 
     @property
     def contact_target_interfaces(self):
@@ -992,7 +1108,6 @@ class Scorer:
         if self._per_interface_ics is None:
             self._compute_ics_scores()
         return self._per_interface_ics
-    
 
     @property
     def ips_precision(self):
@@ -1030,6 +1145,131 @@ class Scorer:
         return self._ips
 
     @property
+    def ics_trimmed(self):
+        """ Same as :attr:`~ics` but with trimmed model
+
+        Model is trimmed to residues which can me mapped to target in order
+        to not penalize contacts in the model for which we have no experimental
+        evidence.
+
+        :type: :class:`float`
+        """
+        if self._ics_trimmed is None:
+            self._compute_ics_scores_trimmed()
+        return self._ics_trimmed
+
+    @property
+    def ics_precision_trimmed(self):
+        """ Same as :attr:`~ics_precision` but with trimmed model
+
+        Model is trimmed to residues which can me mapped to target in order
+        to not penalize contacts in the model for which we have no experimental
+        evidence.
+
+        :type: :class:`float`
+        """
+        if self._ics_precision_trimmed is None:
+            self._compute_ics_scores_trimmed()
+        return self._ics_precision_trimmed
+
+    @property
+    def ics_recall_trimmed(self):
+        """ Same as :attr:`~ics_recall` but with trimmed model
+
+        Model is trimmed to residues which can me mapped to target in order
+        to not penalize contacts in the model for which we have no experimental
+        evidence.
+
+        :type: :class:`float`
+        """
+        if self._ics_recall_trimmed is None:
+            self._compute_ics_scores_trimmed()
+        return self._ics_recall_trimmed
+
+    @property
+    def per_interface_ics_precision_trimmed(self):
+        """ Same as :attr:`~per_interface_ics_precision` but with :attr:`~trimmed_model`
+
+        :attr:`~ics_precision_trimmed` for each interface in
+        :attr:`~contact_target_interfaces`
+
+        :type: :class:`list` of :class:`float`
+        """
+        if self._per_interface_ics_precision_trimmed is None:
+            self._compute_ics_scores_trimmed()
+        return self._per_interface_ics_precision_trimmed
+
+
+    @property
+    def per_interface_ics_recall_trimmed(self):
+        """ Same as :attr:`~per_interface_ics_recall` but with :attr:`~trimmed_model`
+
+        :attr:`~ics_recall_trimmed` for each interface in
+        :attr:`~contact_target_interfaces`
+
+        :type: :class:`list` of :class:`float`
+        """
+        if self._per_interface_ics_recall_trimmed is None:
+            self._compute_ics_scores_trimmed()
+        return self._per_interface_ics_recall_trimmed
+
+    @property
+    def per_interface_ics_trimmed(self):
+        """ Same as :attr:`~per_interface_ics` but with :attr:`~trimmed_model`
+
+        :attr:`~ics` for each interface in 
+        :attr:`~contact_target_interfaces`
+
+        :type: :class:`float`
+        """
+
+        if self._per_interface_ics_trimmed is None:
+            self._compute_ics_scores_trimmed()
+        return self._per_interface_ics_trimmed
+
+    @property
+    def ips_trimmed(self):
+        """ Same as :attr:`~ips` but with trimmed model
+
+        Model is trimmed to residues which can me mapped to target in order
+        to not penalize contacts in the model for which we have no experimental
+        evidence.
+
+        :type: :class:`float`
+        """
+        if self._ips_trimmed is None:
+            self._compute_ips_scores_trimmed()
+        return self._ips_trimmed
+
+    @property
+    def ips_precision_trimmed(self):
+        """ Same as :attr:`~ips_precision` but with trimmed model
+
+        Model is trimmed to residues which can me mapped to target in order
+        to not penalize contacts in the model for which we have no experimental
+        evidence.
+
+        :type: :class:`float`
+        """
+        if self._ips_precision_trimmed is None:
+            self._compute_ips_scores_trimmed()
+        return self._ips_precision_trimmed
+
+    @property
+    def ips_recall_trimmed(self):
+        """ Same as :attr:`~ips_recall` but with trimmed model
+
+        Model is trimmed to residues which can me mapped to target in order
+        to not penalize contacts in the model for which we have no experimental
+        evidence.
+
+        :type: :class:`float`
+        """
+        if self._ips_recall_trimmed is None:
+            self._compute_ips_scores_trimmed()
+        return self._ips_recall_trimmed
+
+    @property
     def per_interface_ips_precision(self):
         """ Per-interface IPS precision
 
@@ -1041,7 +1281,6 @@ class Scorer:
         if self._per_interface_ips_precision is None:
             self._compute_ips_scores()
         return self._per_interface_ips_precision
-
 
     @property
     def per_interface_ips_recall(self):
@@ -1071,11 +1310,54 @@ class Scorer:
         return self._per_interface_ips
 
     @property
+    def per_interface_ips_precision_trimmed(self):
+        """ Same as :attr:`~per_interface_ips_precision` but with :attr:`~trimmed_model`
+
+        :attr:`~ips_precision_trimmed` for each interface in
+        :attr:`~contact_target_interfaces`
+
+        :type: :class:`list` of :class:`float`
+        """
+        if self._per_interface_ips_precision_trimmed is None:
+            self._compute_ips_scores_trimmed()
+        return self._per_interface_ips_precision_trimmed
+
+
+    @property
+    def per_interface_ips_recall_trimmed(self):
+        """ Same as :attr:`~per_interface_ips_recall` but with :attr:`~trimmed_model`
+
+        :attr:`~ics_recall_trimmed` for each interface in
+        :attr:`~contact_target_interfaces`
+
+        :type: :class:`list` of :class:`float`
+        """
+        if self._per_interface_ips_recall_trimmed is None:
+            self._compute_ips_scores_trimmed()
+        return self._per_interface_ips_recall_trimmed
+
+    @property
+    def per_interface_ips_trimmed(self):
+        """ Same as :attr:`~per_interface_ips` but with :attr:`~trimmed_model`
+
+        :attr:`~ics` for each interface in 
+        :attr:`~contact_target_interfaces`
+
+        :type: :class:`float`
+        """
+
+        if self._per_interface_ips_trimmed is None:
+            self._compute_ips_scores_trimmed()
+        return self._per_interface_ips_trimmed
+
+    @property
     def dockq_target_interfaces(self):
-        """ Interfaces in :attr:`target` that are relevant for DockQ
+        """ Interfaces in :attr:`~target` that are relevant for DockQ
 
         All interfaces in :attr:`~target` with non-zero contacts that are
-        relevant for DockQ. Chain names are lexicographically sorted.
+        relevant for DockQ. Includes protein-protein, protein-nucleotide and
+        nucleotide-nucleotide interfaces. Chain names for each interface are
+        lexicographically sorted.
 
         :type: :class:`list` of :class:`tuple` with 2 elements each:
                (trg_ch1, trg_ch2)
@@ -1093,18 +1375,20 @@ class Scorer:
             interfaces = cent.interacting_chains
             interfaces = [(min(x[0],x[1]), max(x[0],x[1])) for x in interfaces]
 
-            # select the ones with only peptides involved
             pep_seqs = set([s.GetName() for s in self.chain_mapper.polypep_seqs])
+            nuc_seqs = set([s.GetName() for s in self.chain_mapper.polynuc_seqs])
+
+            seqs = pep_seqs.union(nuc_seqs)
             self._dockq_target_interfaces = list()
             for interface in interfaces:
-                if interface[0] in pep_seqs and interface[1] in pep_seqs:
+                if interface[0] in seqs and interface[1] in seqs:
                     self._dockq_target_interfaces.append(interface)
 
         return self._dockq_target_interfaces
 
     @property
     def dockq_interfaces(self):
-        """ Interfaces in :attr:`dockq_target_interfaces` that can be mapped
+        """ Interfaces in :attr:`~dockq_target_interfaces` that can be mapped
         to model
 
         Target chain names are lexicographically sorted
@@ -1180,9 +1464,11 @@ class Scorer:
     def irmsd(self):
         """ irmsd scores for interfaces in :attr:`~dockq_interfaces` 
 
-        irmsd: RMSD of interface (RMSD computed on N, CA, C, O atoms) which
+        irmsd: RMSD of interface (RMSD computed on backbone atoms) which
         consists of each residue that has at least one heavy atom within 10A of
-        other chain.
+        other chain. Backbone atoms for proteins: "CA","C","N","O", for
+        nucleotides: "P", "OP1", "OP2", "O2'", "O3'", "O4'", "O5'", "C1'",
+        "C2'", "C3'", "C4'", "C5'".
 
         :class:`list` of :class:`float`
         """
@@ -1194,11 +1480,10 @@ class Scorer:
     def lrmsd(self):
         """ lrmsd scores for interfaces in :attr:`~dockq_interfaces` 
 
-        lrmsd: The interfaces are superposed based on the receptor (rigid
-        min RMSD superposition) and RMSD for the ligand is reported.
-        Superposition and RMSD are based on N, CA, C and O positions,
-        receptor is the chain contributing to the interface with more
-        residues in total.
+        lrmsd: The two chains involved in the interface are superposed based on
+        the receptor (rigid min RMSD superposition) and the ligand RMSD is
+        reported. Receptor is the chain with more residues. Superposition and
+        RMSD is computed on same backbone atoms as :attr:`~irmsd`.
 
         :class:`list` of :class:`float`
         """
@@ -1208,7 +1493,7 @@ class Scorer:
         
     @property
     def dockq_ave(self):
-        """ Average of DockQ scores in :attr:`dockq_scores`
+        """ Average of DockQ scores in :attr:`~dockq_scores`
 
         In its original implementation, DockQ only operates on single
         interfaces. Thus the requirement to combine scores for higher order
@@ -1222,7 +1507,7 @@ class Scorer:
     
     @property
     def dockq_wave(self):
-        """ Same as :attr:`dockq_ave`, weighted by native contacts
+        """ Same as :attr:`~dockq_ave`, weighted by native contacts
 
         :type: :class:`float`
         """
@@ -1270,6 +1555,20 @@ class Scorer:
         return self._mapped_target_pos
 
     @property
+    def mapped_target_pos_full_bb(self):
+        """ Mapped representative positions in target
+
+        Thats the equivalent of :attr:`~mapped_target_pos` but containing more
+        backbone atoms (N, CA, C for peptide residues and O5', C5', C4', C3', O3
+        for nucleotide residues). mapping is based on :attr:`~mapping`.
+
+        :type: :class:`ost.geom.Vec3List`
+        """
+        if self._mapped_target_pos_full_bb is None:
+            self._extract_mapped_pos_full_bb()
+        return self._mapped_target_pos_full_bb
+
+    @property
     def mapped_model_pos(self):
         """ Mapped representative positions in model
 
@@ -1282,6 +1581,20 @@ class Scorer:
         if self._mapped_model_pos is None:
             self._extract_mapped_pos()
         return self._mapped_model_pos
+
+    @property
+    def mapped_model_pos_full_bb(self):
+        """ Mapped representative positions in model
+
+        Thats the equivalent of :attr:`~mapped_model_pos` but containing more
+        backbone atoms (N, CA, C for peptide residues and O5', C5', C4', C3', O3
+        for nucleotide residues). mapping is based on :attr:`~mapping`.
+
+        :type: :class:`ost.geom.Vec3List`
+        """
+        if self._mapped_model_pos_full_bb is None:
+            self._extract_mapped_pos_full_bb()
+        return self._mapped_model_pos_full_bb
 
     @property
     def transformed_mapped_model_pos(self):
@@ -1309,17 +1622,25 @@ class Scorer:
     def transform(self):
         """ Transform: :attr:`~mapped_model_pos` onto :attr:`~mapped_target_pos`
 
-        Computed using Kabsch minimal rmsd algorithm
+        Computed using Kabsch minimal rmsd algorithm. If number of positions
+        is too small (< 3), :attr:`~mapped_model_pos_full_bb` and
+        :attr:`~mapped_target_pos_full_bb` are used.
 
         :type: :class:`ost.geom.Mat4`
         """
         if self._transform is None:
-            try:
+            if len(self.mapped_model_pos) < 3:
+                if len(self.mapped_model_pos_full_bb) >=3:
+                    res = mol.alg.SuperposeSVD(self.mapped_model_pos_full_bb,
+                                               self.mapped_target_pos_full_bb)
+                    self._transform = res.transformation
+                else:
+                    # there is really nothing we can do => set identity matrix
+                    self._transform = geom.Mat4()
+            else:
                 res = mol.alg.SuperposeSVD(self.mapped_model_pos,
                                            self.mapped_target_pos)
                 self._transform = res.transformation
-            except:
-                self._transform = geom.Mat4()
         return self._transform
 
     @property
@@ -1337,6 +1658,20 @@ class Scorer:
         return self._rigid_mapped_target_pos
 
     @property
+    def rigid_mapped_target_pos_full_bb(self):
+        """ Mapped representative positions in target
+
+        Thats the equivalent of :attr:`~rigid_mapped_target_pos` but containing
+        more backbone atoms (N, CA, C for peptide residues and O5', C5', C4',
+        C3', O3 for nucleotide residues). mapping is based on :attr:`~mapping`.
+
+        :type: :class:`ost.geom.Vec3List`
+        """
+        if self._rigid_mapped_target_pos_full_bb is None:
+            self._extract_rigid_mapped_pos_full_bb()
+        return self._rigid_mapped_target_pos_full_bb
+
+    @property
     def rigid_mapped_model_pos(self):
         """ Mapped representative positions in model
 
@@ -1349,6 +1684,20 @@ class Scorer:
         if self._rigid_mapped_model_pos is None:
             self._extract_rigid_mapped_pos()
         return self._rigid_mapped_model_pos
+
+    @property
+    def rigid_mapped_model_pos_full_bb(self):
+        """ Mapped representative positions in model
+
+        Thats the equivalent of :attr:`~rigid_mapped_model_pos` but containing
+        more backbone atoms (N, CA, C for peptide residues and O5', C5', C4',
+        C3', O3 for nucleotide residues). mapping is based on :attr:`~mapping`.
+
+        :type: :class:`ost.geom.Vec3List`
+        """
+        if self._rigid_mapped_model_pos_full_bb is None:
+            self._extract_rigid_mapped_pos_full_bb()
+        return self._rigid_mapped_model_pos_full_bb
 
     @property
     def rigid_transformed_mapped_model_pos(self):
@@ -1376,17 +1725,25 @@ class Scorer:
     def rigid_transform(self):
         """ Transform: :attr:`~rigid_mapped_model_pos` onto :attr:`~rigid_mapped_target_pos`
 
-        Computed using Kabsch minimal rmsd algorithm
+        Computed using Kabsch minimal rmsd algorithm. If number of positions
+        is too small (< 3), :attr:`~rigid_mapped_model_pos_full_bb` and
+        :attr:`~rigid_mapped_target_pos_full_bb` are used.
 
         :type: :class:`ost.geom.Mat4`
         """
         if self._rigid_transform is None:
-            try:
+            if len(self.rigid_mapped_model_pos) < 3:
+                if len(self.rigid_mapped_model_pos_full_bb) >= 3:
+                    res = mol.alg.SuperposeSVD(self.rigid_mapped_model_pos_full_bb,
+                                               self.rigid_mapped_target_pos_full_bb)
+                    self._rigid_transform = res.transformation
+                else:
+                    # there is really nothing we can do => set identity matrix
+                    self._rigid_transform = geom.Mat4()
+            else:
                 res = mol.alg.SuperposeSVD(self.rigid_mapped_model_pos,
                                            self.rigid_mapped_target_pos)
                 self._rigid_transform = res.transformation
-            except:
-                self._rigid_transform = geom.Mat4()
         return self._rigid_transform
 
     @property
@@ -1399,7 +1756,14 @@ class Scorer:
         :type: :class:`float` 
         """
         if self._gdt_05 is None:
-            n, m = GDT(self.rigid_mapped_model_pos, self.rigid_mapped_target_pos, 7, 1000, 0.5)
+            N = list()
+            wsizes = self._gdt_window_sizes + [len(self.rigid_mapped_model_pos)]
+            for window_size in wsizes:
+                n = GDT(self.rigid_mapped_model_pos,
+                        self.rigid_mapped_target_pos,
+                        window_size, 1000, 0.5)[0]
+                N.append(n)
+            n = max(N)
             n_full = len(self.rigid_mapped_target_pos) + self.rigid_n_target_not_mapped
             if n_full > 0:
                 self._gdt_05 = float(n) / n_full
@@ -1417,7 +1781,14 @@ class Scorer:
         :type: :class:`float` 
         """
         if self._gdt_1 is None:
-            n, m = GDT(self.rigid_mapped_model_pos, self.rigid_mapped_target_pos, 7, 1000, 1.0)
+            N = list()
+            wsizes = self._gdt_window_sizes + [len(self.rigid_mapped_model_pos)]
+            for window_size in wsizes:
+                n = GDT(self.rigid_mapped_model_pos,
+                        self.rigid_mapped_target_pos,
+                        window_size, 1000, 1.0)[0]
+                N.append(n)
+            n = max(N)
             n_full = len(self.rigid_mapped_target_pos) + self.rigid_n_target_not_mapped
             if n_full > 0:
                 self._gdt_1 = float(n) / n_full
@@ -1436,7 +1807,14 @@ class Scorer:
         :type: :class:`float` 
         """
         if self._gdt_2 is None:
-            n, m = GDT(self.rigid_mapped_model_pos, self.rigid_mapped_target_pos, 7, 1000, 2.0)
+            N = list()
+            wsizes = self._gdt_window_sizes + [len(self.rigid_mapped_model_pos)]
+            for window_size in wsizes:
+                n = GDT(self.rigid_mapped_model_pos,
+                        self.rigid_mapped_target_pos,
+                        window_size, 1000, 2.0)[0]
+                N.append(n)
+            n = max(N)
             n_full = len(self.rigid_mapped_target_pos) + self.rigid_n_target_not_mapped
             if n_full > 0:
                 self._gdt_2 = float(n) / n_full
@@ -1454,7 +1832,14 @@ class Scorer:
         :type: :class:`float` 
         """
         if self._gdt_4 is None:
-            n, m = GDT(self.rigid_mapped_model_pos, self.rigid_mapped_target_pos, 7, 1000, 4.0)
+            N = list()
+            wsizes = self._gdt_window_sizes + [len(self.rigid_mapped_model_pos)]
+            for window_size in wsizes:
+                n = GDT(self.rigid_mapped_model_pos,
+                        self.rigid_mapped_target_pos,
+                        window_size, 1000, 4.0)[0]
+                N.append(n)
+            n = max(N)
             n_full = len(self.rigid_mapped_target_pos) + self.rigid_n_target_not_mapped
             if n_full > 0:
                 self._gdt_4 = float(n) / n_full
@@ -1471,7 +1856,14 @@ class Scorer:
         :type: :class:`float` 
         """
         if self._gdt_8 is None:
-            n, m = GDT(self.rigid_mapped_model_pos, self.rigid_mapped_target_pos, 7, 1000, 8.0)
+            N = list()
+            wsizes = self._gdt_window_sizes + [len(self.rigid_mapped_model_pos)]
+            for window_size in wsizes:
+                n = GDT(self.rigid_mapped_model_pos,
+                        self.rigid_mapped_target_pos,
+                        window_size, 1000, 8.0)[0]
+                N.append(n)
+            n = max(N)
             n_full = len(self.rigid_mapped_target_pos) + self.rigid_n_target_not_mapped
             if n_full > 0:
                 self._gdt_8 = float(n) / n_full
@@ -1507,7 +1899,7 @@ class Scorer:
         """ RMSD
 
         Computed on :attr:`~rigid_transformed_mapped_model_pos` and
-        :attr:`rigid_mapped_target_pos`
+        :attr:`~rigid_mapped_target_pos`
 
         :type: :class:`float`
         """
@@ -1545,7 +1937,7 @@ class Scorer:
 
     @property
     def patch_qs(self):
-        """ Patch QS-scores for each residue in :attr:`model_interface_residues`
+        """ Patch QS-scores for each residue in :attr:`~model_interface_residues`
 
         Representative patches for each residue r in chain c are computed as
         follows:
@@ -1561,11 +1953,11 @@ class Scorer:
           mdl_patch_two
 
         Results are stored in the same manner as
-        :attr:`model_interface_residues`, with corresponding scores instead of
+        :attr:`~model_interface_residues`, with corresponding scores instead of
         residue numbers. Scores for residues which are not
         :class:`mol.ChemType.AMINOACIDS` are set to None. Additionally,
-        interface patches are derived from :attr:`model`. If they contain
-        residues which are not covered by :attr:`target`, the score is set to
+        interface patches are derived from :attr:`~model`. If they contain
+        residues which are not covered by :attr:`~target`, the score is set to
         None too.
 
         :type: :class:`dict` with chain names as key and and :class:`list`
@@ -1577,7 +1969,7 @@ class Scorer:
 
     @property
     def patch_dockq(self):
-        """ Same as :attr:`patch_qs` but for DockQ scores
+        """ Same as :attr:`~patch_qs` but for DockQ scores
         """
         if self._patch_dockq is None:
             self._compute_patchdockq_scores()
@@ -1683,6 +2075,7 @@ class Scorer:
         # score variables to be set
         lddt_score = None
         local_lddt = None
+        aa_local_lddt = None
 
         if self.lddt_no_stereochecks:
             lddt_chain_mapping = dict()
@@ -1694,19 +2087,39 @@ class Scorer:
                                                residue_mapping = alns,
                                                check_resnames=False,
                                                local_lddt_prop="lddt",
-                                               add_mdl_contacts = self.lddt_add_mdl_contacts)[0]
+                                               add_mdl_contacts = self.lddt_add_mdl_contacts,
+                                               set_atom_props=True)[0]
             local_lddt = dict()
+            aa_local_lddt = dict()
             for r in self.model.residues:
+
                 cname = r.GetChain().GetName()
                 if cname not in local_lddt:
                     local_lddt[cname] = dict()
+                    aa_local_lddt[cname] = dict()
+
+                rnum = r.GetNumber()
+                if rnum not in aa_local_lddt[cname]:
+                    aa_local_lddt[cname][rnum] = dict()
+
                 if r.HasProp("lddt"):
                     score = round(r.GetFloatProp("lddt"), 3)
-                    local_lddt[cname][r.GetNumber()] = score
+                    local_lddt[cname][rnum] = score
                 else:
                     # not covered by trg or skipped in chain mapping procedure
                     # the latter happens if its part of a super short chain
-                    local_lddt[cname][r.GetNumber()] = None
+                    local_lddt[cname][rnum] = None
+
+                for a in r.atoms:
+                    if a.HasProp("lddt"):
+                        score = round(a.GetFloatProp("lddt"), 3)
+                        aa_local_lddt[cname][rnum][a.GetName()] = score
+                    else:
+                        # not covered by trg or skipped in chain mapping
+                        # procedure the latter happens if its part of a
+                        # super short chain
+                        aa_local_lddt[cname][rnum][a.GetName()] = None
+
 
         else:
             lddt_chain_mapping = dict()
@@ -1718,22 +2131,77 @@ class Scorer:
                                                residue_mapping = stereochecked_alns,
                                                check_resnames=False,
                                                local_lddt_prop="lddt",
-                                               add_mdl_contacts = self.lddt_add_mdl_contacts)[0]
+                                               add_mdl_contacts = self.lddt_add_mdl_contacts,
+                                               set_atom_props=True)[0]
             local_lddt = dict()
+            aa_local_lddt = dict()
             for r in self.model.residues:
                 cname = r.GetChain().GetName()
                 if cname not in local_lddt:
                     local_lddt[cname] = dict()
+                    aa_local_lddt[cname] = dict()
+                rnum = r.GetNumber()
+                if rnum not in aa_local_lddt[cname]:
+                    aa_local_lddt[cname][rnum] = dict()
+
                 if r.HasProp("lddt"):
                     score = round(r.GetFloatProp("lddt"), 3)
-                    local_lddt[cname][r.GetNumber()] = score
+                    local_lddt[cname][rnum] = score
+
+                    trg_r = None
+                    mdl_r = None
+
+                    for a in r.atoms:
+                        if a.HasProp("lddt"):
+                            score = round(a.GetFloatProp("lddt"), 3)
+                            aa_local_lddt[cname][rnum][a.GetName()] = score
+                        else:
+                            # the target residue is there since we have a score
+                            # for the residue.
+                            # opt 1: The atom was never there in the
+                            #        stereochecked target => None
+                            # opt 2: The atom has been removed in the model
+                            #        stereochecks but is there in stereochecked
+                            #        target => 0.0
+                            if trg_r is None:
+                                if cname in flat_mapping:
+                                    for col in alns[cname]:
+                                        if col[0] != '-' and col[1] != '-':
+                                            if col.GetResidue(1).number == r.number:
+                                                trg_r = col.GetResidue(0)
+                                                break
+                                if trg_r is not None:
+                                    trg_cname = trg_r.GetChain().GetName()
+                                    trg_rnum = trg_r.GetNumber()
+                                    tmp = self.stereochecked_target.FindResidue(trg_cname,
+                                                                                trg_rnum)
+                                    if tmp.IsValid():
+                                        trg_r = tmp
+
+                            if mdl_r is None:
+                                tmp = self.stereochecked_model.FindResidue(cname, rnum)
+                                if tmp.IsValid():
+                                    mdl_r = tmp
+
+                            if trg_r is not None and not trg_r.FindAtom(a.GetName()).IsValid():
+                                # opt 1
+                                aa_local_lddt[cname][rnum][a.GetName()] = None
+                            elif trg_r is not None and trg_r.FindAtom(a.GetName()).IsValid() and \
+                                 mdl_r is not None and not mdl_r.FindAtom(a.GetName()).IsValid():
+                                # opt 2
+                                aa_local_lddt[cname][rnum][a.GetName()] = 0.0
+                            else:
+                                # unknown issue
+                                aa_local_lddt[cname][rnum][a.GetName()] = None
+
                 else:
-                    # rsc => residue stereo checked...
-                    mdl_res = self.stereochecked_model.FindResidue(cname, r.GetNumber())
+                    mdl_res = self.stereochecked_model.FindResidue(cname, rnum)
                     if mdl_res.IsValid():
                         # not covered by trg or skipped in chain mapping procedure
                         # the latter happens if its part of a super short chain
-                        local_lddt[cname][r.GetNumber()] = None
+                        local_lddt[cname][rnum] = None
+                        for a in r.atoms:
+                            aa_local_lddt[cname][rnum][a.GetName()] = None
                     else:
                         # opt 1: removed by stereochecks => assign 0.0
                         # opt 2: removed by stereochecks AND not covered by ref
@@ -1746,13 +2214,29 @@ class Scorer:
                                     if col.GetResidue(1).number == r.number:
                                         trg_r = col.GetResidue(0)
                                         break
+                            if trg_r is not None:
+                                trg_cname = trg_r.GetChain().GetName()
+                                trg_rnum = trg_r.GetNumber()
+                                tmp = self.stereochecked_target.FindResidue(trg_cname,
+                                                                            trg_rnum)
+                                if tmp.IsValid():
+                                    trg_r = tmp
+
                         if trg_r is None:
-                            local_lddt[cname][r.GetNumber()] = None
+                            local_lddt[cname][rnum] = None
+                            for a in r.atoms:
+                                aa_local_lddt[cname][rnum][a.GetName()] = None
                         else:
-                            local_lddt[cname][r.GetNumber()] = 0.0
+                            local_lddt[cname][rnum] = 0.0
+                            for a in r.atoms:
+                                if trg_r.FindAtom(a.GetName()).IsValid():
+                                    aa_local_lddt[cname][rnum][a.GetName()] = 0.0
+                                else:
+                                    aa_local_lddt[cname][rnum][a.GetName()] = None
 
         self._lddt = lddt_score
         self._local_lddt = local_lddt
+        self._aa_local_lddt = aa_local_lddt
 
     def _compute_bb_lddt(self):
         LogScript("Computing backbone lDDT")
@@ -1877,6 +2361,71 @@ class Scorer:
                 self._per_interface_ics_recall.append(None)
                 self._per_interface_ics.append(None)
 
+    def _trim_model(self):
+        trimmed_mdl = mol.CreateEntityFromView(self.mapping.model, True)
+        trimmed_aln = dict()
+
+        for trg_cname, mdl_cname in self.mapping.GetFlatMapping().items():
+            mdl_ch = trimmed_mdl.FindChain(mdl_cname)
+            aln = self.mapping.alns[(trg_cname, mdl_cname)]
+
+            # some limited test that stuff matches
+            assert(mdl_ch.GetResidueCount() == \
+                   len(aln.GetSequence(1).GetGaplessString()))
+
+            mdl_residues = mdl_ch.residues
+            mdl_res_idx = 0
+            aligned_mdl_seq = ['-'] * aln.GetLength()
+            for col_idx, col in enumerate(aln):
+                if col[0] != '-' and col[1] != '-':
+                    mdl_res = mdl_residues[mdl_res_idx]
+                    mdl_res.SetIntProp("aligned", 1)
+                    aligned_mdl_seq[col_idx] = col[1]
+                if col[1] != '-':
+                    mdl_res_idx += 1
+            aligned_mdl_seq = ''.join(aligned_mdl_seq)
+            aligned_mdl_seq = seq.CreateSequence(mdl_cname, aligned_mdl_seq)
+
+            new_aln = seq.CreateAlignment()
+            new_aln.AddSequence(aln.GetSequence(0))
+            new_aln.AddSequence(aligned_mdl_seq)
+            trimmed_aln[(trg_cname, mdl_cname)] = new_aln
+
+        self._trimmed_model = trimmed_mdl.Select("graligned:0=1")
+        self._trimmed_aln = trimmed_aln
+
+    def _compute_ics_scores_trimmed(self):
+        LogScript("Computing ICS scores trimmed")
+
+        # this is an ugly hack without any efficiency in mind
+        # we're simply taking the entities from mapper and construct
+        # a new contact scorer from scratch
+
+        contact_scorer_res = self.trimmed_contact_scorer.ScoreICS(self.mapping.mapping)
+        self._ics_trimmed = contact_scorer_res.ics
+        self._ics_precision_trimmed = contact_scorer_res.precision
+        self._ics_recall_trimmed = contact_scorer_res.recall
+
+        self._per_interface_ics_precision_trimmed = list()
+        self._per_interface_ics_recall_trimmed = list()
+        self._per_interface_ics_trimmed = list()
+        flat_mapping = self.mapping.GetFlatMapping()
+        for trg_int in self.contact_target_interfaces:
+            trg_ch1 = trg_int[0]
+            trg_ch2 = trg_int[1]
+            if trg_ch1 in flat_mapping and trg_ch2 in flat_mapping:
+                mdl_ch1 = flat_mapping[trg_ch1]
+                mdl_ch2 = flat_mapping[trg_ch2]
+                res = self.trimmed_contact_scorer.ScoreICSInterface(trg_ch1, trg_ch2,
+                                                                    mdl_ch1, mdl_ch2)
+                self._per_interface_ics_precision_trimmed.append(res.precision)
+                self._per_interface_ics_recall_trimmed.append(res.recall)
+                self._per_interface_ics_trimmed.append(res.ics)
+            else:
+                self._per_interface_ics_precision_trimmed.append(None)
+                self._per_interface_ics_recall_trimmed.append(None)
+                self._per_interface_ics_trimmed.append(None)
+
     def _compute_ips_scores(self):
         LogScript("Computing IPS scores")
         contact_scorer_res = self.contact_scorer.ScoreIPS(self.mapping.mapping)
@@ -1904,8 +2453,45 @@ class Scorer:
                 self._per_interface_ips_recall.append(None)
                 self._per_interface_ips.append(None)
 
+    def _compute_ips_scores_trimmed(self):
+        LogScript("Computing IPS scores trimmed")
+
+        # this is an ugly hack without any efficiency in mind
+        # we're simply taking the entities from mapper and construct
+        # a new contact scorer from scratch
+        contact_scorer_res = self.trimmed_contact_scorer.ScoreIPS(self.mapping.mapping)
+        self._ips_precision_trimmed = contact_scorer_res.precision
+        self._ips_recall_trimmed = contact_scorer_res.recall
+        self._ips_trimmed = contact_scorer_res.ips
+
+        self._per_interface_ips_precision_trimmed = list()
+        self._per_interface_ips_recall_trimmed = list()
+        self._per_interface_ips_trimmed = list()
+        flat_mapping = self.mapping.GetFlatMapping()
+        for trg_int in self.contact_target_interfaces:
+            trg_ch1 = trg_int[0]
+            trg_ch2 = trg_int[1]
+            if trg_ch1 in flat_mapping and trg_ch2 in flat_mapping:
+                mdl_ch1 = flat_mapping[trg_ch1]
+                mdl_ch2 = flat_mapping[trg_ch2]
+                res = self.trimmed_contact_scorer.ScoreIPSInterface(trg_ch1, trg_ch2,
+                                                                    mdl_ch1, mdl_ch2)
+                self._per_interface_ips_precision_trimmed.append(res.precision)
+                self._per_interface_ips_recall_trimmed.append(res.recall)
+                self._per_interface_ips_trimmed.append(res.ips)
+            else:
+                self._per_interface_ips_precision_trimmed.append(None)
+                self._per_interface_ips_recall_trimmed.append(None)
+                self._per_interface_ips_trimmed.append(None)
+
     def _compute_dockq_scores(self):
         LogScript("Computing DockQ")
+
+        if self.dockq_capri_peptide and len(self.chain_mapper.polynuc_seqs) > 0:
+            raise RuntimeError("Cannot compute DockQ for reference structures "
+                               "with nucleotide chains if dockq_capri_peptide "
+                               "is enabled.")
+
         # lists with values in contact_target_interfaces
         self._dockq_scores = list()
         self._fnat = list()
@@ -2019,6 +2605,37 @@ class Scorer:
             if ch.GetName() not in processed_trg_chains:
                 self._n_target_not_mapped += len(ch.residues)
 
+    def _extract_mapped_pos_full_bb(self):
+        self._mapped_target_pos_full_bb = geom.Vec3List()
+        self._mapped_model_pos_full_bb = geom.Vec3List()
+        exp_pep_atoms = ["N", "CA", "C"]
+        exp_nuc_atoms = ["\"O5'\"", "\"C5'\"", "\"C4'\"", "\"C3'\"", "\"O3'\""]
+        trg_pep_chains = [s.GetName() for s in self.chain_mapper.polypep_seqs]
+        trg_nuc_chains = [s.GetName() for s in self.chain_mapper.polynuc_seqs]
+        for trg_ch, mdl_ch in self.mapping.GetFlatMapping().items():
+            aln = self.mapping.alns[(trg_ch, mdl_ch)]
+            trg_ch = aln.GetSequence(0).GetName()
+            if trg_ch in trg_pep_chains:
+                exp_atoms = exp_pep_atoms
+            elif trg_ch in trg_nuc_chains:
+                exp_atoms = exp_nuc_atoms
+            else:
+                # this should be guaranteed by the chain mapper
+                raise RuntimeError("Unexpected error - contact OST developer")
+            for col in aln:
+                if col[0] != '-' and col[1] != '-':
+                    trg_res = col.GetResidue(0)
+                    mdl_res = col.GetResidue(1)
+                    for aname in exp_atoms:
+                        trg_at = trg_res.FindAtom(aname)
+                        mdl_at = mdl_res.FindAtom(aname)
+                        if not (trg_at.IsValid() and mdl_at.IsValid()):
+                            # this should be guaranteed by the chain mapper
+                            raise RuntimeError("Unexpected error - contact OST "
+                                               "developer")
+                        self._mapped_target_pos_full_bb.append(trg_at.GetPos())
+                        self._mapped_model_pos_full_bb.append(mdl_at.GetPos())
+
 
     def _extract_rigid_mapped_pos(self):
         self._rigid_mapped_target_pos = geom.Vec3List()
@@ -2047,6 +2664,36 @@ class Scorer:
             if ch.GetName() not in processed_trg_chains:
                 self._rigid_n_target_not_mapped += len(ch.residues)
 
+    def _extract_rigid_mapped_pos_full_bb(self):
+        self._rigid_mapped_target_pos_full_bb = geom.Vec3List()
+        self._rigid_mapped_model_pos_full_bb = geom.Vec3List()
+        exp_pep_atoms = ["N", "CA", "C"]
+        exp_nuc_atoms = ["\"O5'\"", "\"C5'\"", "\"C4'\"", "\"C3'\"", "\"O3'\""]
+        trg_pep_chains = [s.GetName() for s in self.chain_mapper.polypep_seqs]
+        trg_nuc_chains = [s.GetName() for s in self.chain_mapper.polynuc_seqs]
+        for trg_ch, mdl_ch in self.rigid_mapping.GetFlatMapping().items():
+            aln = self.mapping.alns[(trg_ch, mdl_ch)]
+            trg_ch = aln.GetSequence(0).GetName()
+            if trg_ch in trg_pep_chains:
+                exp_atoms = exp_pep_atoms
+            elif trg_ch in trg_nuc_chains:
+                exp_atoms = exp_nuc_atoms
+            else:
+                # this should be guaranteed by the chain mapper
+                raise RuntimeError("Unexpected error - contact OST developer")
+            for col in aln:
+                if col[0] != '-' and col[1] != '-':
+                    trg_res = col.GetResidue(0)
+                    mdl_res = col.GetResidue(1)
+                    for aname in exp_atoms:
+                        trg_at = trg_res.FindAtom(aname)
+                        mdl_at = mdl_res.FindAtom(aname)
+                        if not (trg_at.IsValid() and mdl_at.IsValid()):
+                            # this should be guaranteed by the chain mapper
+                            raise RuntimeError("Unexpected error - contact OST "
+                                               "developer")
+                        self._rigid_mapped_target_pos_full_bb.append(trg_at.GetPos())
+                        self._rigid_mapped_model_pos_full_bb.append(mdl_at.GetPos())
 
     def _compute_cad_score(self):
         if not self.resnum_alignments:
@@ -2477,7 +3124,7 @@ class Scorer:
     def _compute_tmscore(self):
         res = None
         if self.usalign_exec is None:
-            LogScript("Computing patch TM-score with USalign exectuable")
+            LogScript("Computing TM-score with built-in USalign")
             if self.oum:
                 flat_mapping = self.rigid_mapping.GetFlatMapping()
                 LogInfo("Overriding TM-score chain mapping")
@@ -2486,7 +3133,7 @@ class Scorer:
             else:
                 res = bindings.WrappedMMAlign(self.model, self.target)
         else:
-            LogScript("Computing patch TM-score with built-in USalign")
+            LogScript("Computing TM-score with USalign exectuable")
             if self.oum:
                 LogInfo("Overriding TM-score chain mapping")
                 flat_mapping = self.rigid_mapping.GetFlatMapping()
@@ -2501,6 +3148,30 @@ class Scorer:
         self._usalign_mapping = dict()
         for a,b in zip(res.ent1_mapped_chains, res.ent2_mapped_chains):
             self._usalign_mapping[b] = a
+
+    def _resnum_connect(self, ent):
+        ed = None
+        for ch in ent.chains:
+            res_list = ch.residues
+            for i in range(len(res_list) - 1):
+                ra = res_list[i]
+                rb = res_list[i+1]
+                if ra.GetNumber().GetNum() + 1 == rb.GetNumber().GetNum():
+                    if ra.IsPeptideLinking() and rb.IsPeptideLinking():
+                        c = ra.FindAtom("C")
+                        n = rb.FindAtom("N")
+                        if c.IsValid() and n.IsValid() and not mol.BondExists(c, n):
+                            if ed is None:
+                                ed = ent.EditXCS(mol.BUFFERED_EDIT)
+                            ed.Connect(c,n,1)
+                    elif ra.IsNucleotideLinking() and rb.IsNucleotideLinking():
+                        o = ra.FindAtom("O3'")
+                        p = rb.FindAtom("P")
+                        if o.IsValid() and p.IsValid()and not mol.BondExists(o, p):
+                            if ed is None:
+                                ed = ent.EditXCS(mol.BUFFERED_EDIT)
+                            ed.Connect(o,p,1)
+
 
 # specify public interface
 __all__ = ('lDDTBSScorer', 'Scorer',)

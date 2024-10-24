@@ -2,12 +2,10 @@ FROM ubuntu:22.04
 
 # ARGUMENTS
 ###########
-ARG OPENSTRUCTURE_VERSION="2.8.0"
+ARG OPENSTRUCTURE_VERSION="2.9.0"
 ARG SRC_FOLDER="/usr/local/src"
 ARG CPUS_FOR_MAKE=2
-ARG OPENMM_VERSION="7.7.0"
-ARG OPENMM_INCLUDE_PATH="/usr/local/openmm/include/"
-ARG OPENMM_LIB_PATH="/usr/local/openmm/lib/"
+
 ARG DEBIAN_FRONTEND=noninteractive
 
 # INSTALL SYSTEM DEPS
@@ -29,29 +27,15 @@ RUN apt-get update -y && apt-get install -y cmake \
                                             python3-scipy \
                                             python3-pandas \
                                             python3-networkx \
-                                            doxygen \
-                                            swig \
                                             clustalw \
-                                            cython3 \
                                             voronota \
+                                            libopenmm-dev \
+                                            libopenmm-plugins \
+                                            libparasail-dev \
                                             locales && \
                                             # CLEANUP
                                             rm -rf /var/lib/apt/lists/*
-
-# INSTALL OPENMM
-################
-RUN cd ${SRC_FOLDER} && \
-    wget -O openmm-${OPENMM_VERSION}.tar.gz -nc https://github.com/pandegroup/openmm/archive/${OPENMM_VERSION}.tar.gz && \
-    mkdir ${SRC_FOLDER}/openmm-${OPENMM_VERSION} && \
-    tar xf openmm-${OPENMM_VERSION}.tar.gz -C ${SRC_FOLDER}/openmm-${OPENMM_VERSION} --strip-components=1 && \
-    mkdir -p ${SRC_FOLDER}/openmm-${OPENMM_VERSION}/build && \
-    cd ${SRC_FOLDER}/openmm-${OPENMM_VERSION}/build && \
-    cmake .. && make -j $CPUS_FOR_MAKE && make install && \
-    cd ${SRC_FOLDER}/openmm-${OPENMM_VERSION}/build/python && \
-    python3 setup.py build && python3 setup.py install && \
-    rm ${SRC_FOLDER}/openmm-${OPENMM_VERSION}.tar.gz && \
-    rm -rf ${SRC_FOLDER}/openmm-${OPENMM_VERSION}
-
+            
 # INSTALL OST
 #############
 RUN cd ${SRC_FOLDER} && \
@@ -61,20 +45,17 @@ RUN cd ${SRC_FOLDER} && \
     tar xf openstructure-${OPENSTRUCTURE_VERSION}.tar.gz -C ${SRC_FOLDER}/openstructure-${OPENSTRUCTURE_VERSION} --strip-components=1 && \
     mkdir -p ${SRC_FOLDER}/openstructure-${OPENSTRUCTURE_VERSION}/build && \
     cd ${SRC_FOLDER}/openstructure-${OPENSTRUCTURE_VERSION}/build && \
-    cmake .. -DOPTIMIZE=ON \
-             -DENABLE_MM=ON \
+    cmake .. -DOPTIMIZE=1 \
+             -DENABLE_MM=1 \
+             -DOPEN_MM_PLUGIN_DIR=/lib/x86_64-linux-gnu/openmm/plugins \
+             -DENABLE_PARASAIL=1 \
              -DCOMPILE_TMTOOLS=1 \
-             -DOPEN_MM_LIBRARY=$OPENMM_LIB_PATH/libOpenMM.so \
-             -DOPEN_MM_INCLUDE_DIR=$OPENMM_INCLUDE_PATH \
-             -DOPEN_MM_PLUGIN_DIR=$OPENMM_LIB_PATH/plugins \
-             -DENABLE_GFX=ON \
-             -DENABLE_GUI=OFF \
-             -DENABLE_INFO=OFF \
-             -DCMAKE_C_FLAGS="-isystem /usr/include/boost/ -isystem ${OPENMM_INCLUDE_PATH}/include" \
-             -DCMAKE_CXX_FLAGS="-isystem /usr/include/boost/ -isystem ${OPENMM_INCLUDE_PATH}/include" && \
+             -DENABLE_GFX=1 \
+             -DENABLE_GUI=0 \
+             -DENABLE_INFO=0 && \
     make -j ${CPUS_FOR_MAKE} && \
-    wget ftp://ftp.wwpdb.org/pub/pdb/data/monomers/components.cif.gz && \
-    stage/bin/chemdict_tool create components.cif.gz compounds.chemlib pdb && stage/bin/chemdict_tool update ../modules/conop/data/charmm.cif compounds.chemlib charmm && \
+    wget https://files.wwpdb.org/pub/pdb/data/monomers/components.cif.gz && \
+    stage/bin/chemdict_tool create components.cif.gz compounds.chemlib pdb -i && stage/bin/chemdict_tool update ../modules/conop/data/charmm.cif compounds.chemlib charmm && \
     cmake .. -DCOMPOUND_LIB=${SRC_FOLDER}/openstructure-${OPENSTRUCTURE_VERSION}/build/compounds.chemlib && \
              make -j ${CPUS_FOR_MAKE} && make check && make install && \
     rm ${SRC_FOLDER}/openstructure-${OPENSTRUCTURE_VERSION}.tar.gz && \

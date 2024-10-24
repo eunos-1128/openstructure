@@ -1,9 +1,29 @@
+from contextlib import contextmanager
 import numpy as np
 import networkx
 
 from ost import mol
-from ost import LogWarning, LogScript, LogVerbose, LogDebug
+from ost import LogWarning, LogScript, LogInfo, LogVerbose, LogDebug, GetVerbosityLevel, PushVerbosityLevel, PopVerbosityLevel
 from ost.mol.alg import chain_mapping
+
+
+@contextmanager
+def _SinkVerbosityLevel(n=1):
+    """ Context manager to temporarily reduce the verbosity level by n.
+
+    Example usage:
+        with _SinkVerbosityLevel(2):
+            LogVerbose("Test")
+    Will only write "Test" in script level (2 above)
+    """
+    PushVerbosityLevel(GetVerbosityLevel() - n)
+    try:
+        yield
+    except:
+        raise
+    finally:
+        PopVerbosityLevel()
+
 
 class LigandScorer:
     """ Scorer to compute various small molecule ligand (non polymer) scores.
@@ -23,9 +43,10 @@ class LigandScorer:
 
     * :class:`ost.mol.alg.ligand_scoring_lddtpli.LDDTPLIScorer`
       that assesses the conservation of protein-ligand
-      contacts
+      contacts (lDDT-PLI);
     * :class:`ost.mol.alg.ligand_scoring_scrmsd.SCRMSDScorer`
-      that computes a binding-site superposed, symmetry-corrected RMSD.
+      that computes a binding-site superposed, symmetry-corrected RMSD
+      (BiSyRMSD) and ligand pocket lDDT (lDDT-LP).
 
     All versus all scores are available through the lazily computed
     :attr:`score_matrix`. However, many things can go wrong... be it even
@@ -45,7 +66,7 @@ class LigandScorer:
 
     A common use case is to derive a one-to-one mapping between ligands in
     the model and the target for which :class:`LigandScorer` provides an
-    automated assignment procedure.
+    automated :attr:`assignment` procedure.
     By default, only exact matches between target and model ligands are
     considered. This is a problem when the target only contains a subset
     of the expected atoms (for instance if atoms are missing in an
@@ -65,7 +86,7 @@ class LigandScorer:
 
     :class:`LigandScorer` generally assumes that the
     :attr:`~ost.mol.ResidueHandle.is_ligand` property is properly set on all
-    the ligand atoms, and only ligand atoms. This is typically the case for
+    the ligand residues, and only ligand atoms. This is typically the case for
     entities loaded from mmCIF (tested with mmCIF files from the PDB and
     SWISS-MODEL). Legacy PDB files must contain `HET` headers (which is usually
     the case for files downloaded from the PDB but not elsewhere).
@@ -284,7 +305,7 @@ class LigandScorer:
          1: ("identity", f"Ligands could not be matched (by {iso})"),
          2: ("symmetries", "Too many symmetries between ligand atoms were "
              "found - increasing max_symmetries might help"),
-         3: ("no_iso", "No fully isomorphic match could be found - enabling "
+         3: ("no_iso", "No full isomorphic match could be found - enabling "
              "substructure_match might allow a match"),
          4: ("disconnected", "Ligand graph is disconnected"),
          5: ("stoichiometry", "Ligand was already assigned to another ligand "
@@ -301,7 +322,7 @@ class LigandScorer:
         respective location in this matrix is 0.
         Target ligands are in rows, model ligands in columns. States are encoded
         as integers <= 9. Larger numbers encode errors for child classes.
-        Use something like ``self.state_decoding[3]`` to get a decscription.       
+        Use something like ``self.state_decoding[3]`` to get a decscription.
 
         :rtype: :class:`~numpy.ndarray`
         """
@@ -426,6 +447,7 @@ class LigandScorer:
                 raise RuntimeError("LigandScorer._score_dir must return one in "
                                    "['+', '-']")
 
+            LogScript("Computing ligand assignment")
             while len(tmp) > 0:
                 # select high coverage ligand pairs in working array
                 coverage_thresh = max([x[1] for x in tmp]) - self.coverage_delta
@@ -553,7 +575,27 @@ class LigandScorer:
         """ Makes an educated guess why target ligand is not assigned
 
         This either returns actual error states or custom states that are
-        derived from them.
+        derived from them. Currently, the following reasons are reported:
+
+        * `no_ligand`: there was no ligand in the model.
+        * `disconnected`: the ligand graph was disconnected.
+        * `identity`: the ligand was not found in the model (by graph
+          isomorphism). Check your ligand connectivity.
+        * `no_iso`: no full isomorphic match could be found. Try enabling
+          `substructure_match=True` if the target ligand is incomplete.
+        * `symmetries`: too many symmetries were found (by graph isomorphisms).
+          Try to increase `max_symmetries`.
+        * `stoichiometry`: there was a possible assignment in the model, but
+          the model ligand was already assigned to a different target ligand.
+          This indicates different stoichiometries.
+        * `no_contact` (lDDT-PLI only): There were no lDDT contacts between
+          the binding site and the ligand, and lDDT-PLI is undefined.
+        * `target_binding_site` (SCRMSD only): no polymer residues were in
+          proximity of the target ligand.
+        * `model_binding_site` (SCRMSD only): the binding site was not found
+          in the model. Either the binding site was not modeled or the model
+          ligand was positioned too far in combination with
+          `full_bs_search=False`.
 
         :param trg_lig_idx: Index of target ligand
         :type trg_lig_idx: :class:`int`
@@ -585,7 +627,7 @@ class LigandScorer:
                     "Ligand was already assigned to an other "
                     "model ligand (different stoichiometry)")
 
-        # maybe its a symmetry issue?
+        # maybe it's a symmetry issue?
         if 2 in tmp:
             return self.state_decoding[2]
 
@@ -593,12 +635,12 @@ class LigandScorer:
         # target counterpart.
         if 6 in tmp:
             mdl_idx = np.where(self.state_matrix[trg_lig_idx,:]==6)[0]
-            # we're reporting everything except disconnected error...
-            # don't ask...
             for i in mdl_idx:
                 if self.model_ligand_states[i] == 0:
                     raise RuntimeError("This should never happen")
-                if self.model_ligand_states[i] != 4:
+                if self.model_ligand_states[i] != 4 or len(tmp) == 1:
+                    # Don't report disconnected if only 1 model ligand is
+                    # disconnected, unless that's the only reason
                     return self.state_decoding[self.model_ligand_states[i]]
 
         # get rid of remaining single ligand issues (only disconnected error)
@@ -617,7 +659,28 @@ class LigandScorer:
         """ Makes an educated guess why model ligand is not assigned
 
         This either returns actual error states or custom states that are
-        derived from them.
+        derived from them. Currently, the following reasons are reported:
+
+        * `no_ligand`: there was no ligand in the target.
+        * `disconnected`: the ligand graph is disconnected.
+        * `identity`: the ligand was not found in the target (by graph or
+          subgraph isomorphism). Check your ligand connectivity.
+        * `no_iso`: no full isomorphic match could be found. Try enabling
+          `substructure_match=True` if the target ligand is incomplete.
+        * `symmetries`: too many symmetries were found (by graph isomorphisms).
+          Try to increase `max_symmetries`.
+        * `stoichiometry`: there was a possible assignment in the target, but
+          the model target was already assigned to a different model ligand.
+          This indicates different stoichiometries.
+        * `no_contact` (lDDT-PLI only): There were no lDDT contacts between
+          the binding site and the ligand, and lDDT-PLI is undefined.
+        * `target_binding_site` (SCRMSD only): a potential assignment was found
+          in the target, but there were no polymer residues in proximity of the
+          ligand in the target.
+        * `model_binding_site` (SCRMSD only): a potential assignment was
+          found in the target, but no binding site was found in the model.
+          Either the binding site was not modeled or the model ligand was
+          positioned too far in combination with `full_bs_search=False`.
 
         :param mdl_lig_idx: Index of model ligand
         :type mdl_lig_idx: :class:`int`
@@ -657,12 +720,12 @@ class LigandScorer:
         # target counterpart.
         if 6 in tmp:
             trg_idx = np.where(self.state_matrix[:,mdl_lig_idx]==6)[0]
-            # we're reporting everything except disconnected error...
-            # don't ask...
             for i in trg_idx:
                 if self.target_ligand_states[i] == 0:
                     raise RuntimeError("This should never happen")
-                if self.target_ligand_states[i] != 4:
+                if self.target_ligand_states[i] != 4 or len(tmp) == 1:
+                    # Don't report disconnected if only 1 target ligand is
+                    # disconnected, unless that's the only reason
                     return self.state_decoding[self.target_ligand_states[i]]
 
         # get rid of remaining single ligand issues (only disconnected error)
@@ -712,10 +775,11 @@ class LigandScorer:
         :type: :class:`ost.mol.alg.chain_mapping.ChainMapper`
         """
         if self.__chain_mapper is None:
-            self.__chain_mapper = \
-            chain_mapping.ChainMapper(self.target,
-                                      n_max_naive=1e9,
-                                      resnum_alignments=self.resnum_alignments)
+            with _SinkVerbosityLevel():
+                self.__chain_mapper = \
+                chain_mapping.ChainMapper(self.target,
+                                          n_max_naive=1e9,
+                                          resnum_alignments=self.resnum_alignments)
         return self.__chain_mapper
 
     @staticmethod
@@ -772,7 +836,7 @@ class LigandScorer:
 
             # Instantiate the editor
             if new_editor is None:
-                new_editor = new_entity.EditXCS()
+                new_editor = new_entity.EditXCS(mol.BUFFERED_EDIT)
 
             new_chain = new_entity.FindChain(residue.chain.name)
             if not new_chain.IsValid():
@@ -796,7 +860,7 @@ class LigandScorer:
                                 new_chain = \
                                 new_editor.InsertChain(new_chain_name)
                                 break
-                        LogScript("Moved ligand residue %s to new chain %s" % (
+                        LogInfo("Moved ligand residue %s to new chain %s" % (
                             residue.qualified_name, new_chain.name))
                     else:
                         msg = \
@@ -887,7 +951,7 @@ class LigandScorer:
                 self._state_matrix[g_idx,:] = 6
                 msg = "Disconnected graph observed for target ligand "
                 msg += str(self.target_ligands[g_idx])
-                LogVerbose(msg)
+                LogWarning(msg)
 
         for g_idx, g in enumerate(model_graphs):
             if not networkx.is_connected(g):
@@ -895,11 +959,12 @@ class LigandScorer:
                 self._state_matrix[:,g_idx] = 6
                 msg = "Disconnected graph observed for model ligand "
                 msg += str(self.model_ligands[g_idx])
-                LogVerbose(msg)
+                LogWarning(msg)
 
 
+        LogScript("Computing pairwise scores for all %s x %s ligands" % shape)
         for target_id, target_ligand in enumerate(self.target_ligands):
-            LogVerbose("Analyzing target ligand %s" % target_ligand)
+            LogInfo("Analyzing target ligand %s" % target_ligand)
 
             if self._target_ligand_states[target_id] == 4:
                 # Disconnected graph - already updated states and reported
@@ -907,7 +972,7 @@ class LigandScorer:
                 continue 
 
             for model_id, model_ligand in enumerate(self.model_ligands):
-                LogVerbose("Compare to model ligand %s" % model_ligand)
+                LogInfo("Comparing to model ligand %s" % model_ligand)
 
                 #########################################################
                 # Compute symmetries for given target/model ligand pair #
@@ -926,30 +991,30 @@ class LigandScorer:
                         max_symmetries=self.max_symmetries,
                         model_graph = model_graphs[model_id],
                         target_graph = target_graphs[target_id])
-                    LogVerbose("Ligands %s and %s symmetry match" % (
+                    LogInfo("Ligands %s and %s symmetry match" % (
                         str(model_ligand), str(target_ligand)))
                 except NoSymmetryError:
                     # Ligands are different - skip
-                    LogVerbose("No symmetry between %s and %s" % (
+                    LogInfo("No symmetry between %s and %s" % (
                         str(model_ligand), str(target_ligand)))
                     self._state_matrix[target_id, model_id] = 1
                     continue
                 except TooManySymmetriesError:
                     # Ligands are too symmetrical - skip
-                    LogVerbose("Too many symmetries between %s and %s" % (
+                    LogWarning("Too many symmetries between %s and %s" % (
                         str(model_ligand), str(target_ligand)))
                     self._state_matrix[target_id, model_id] = 2
                     continue
                 except NoIsomorphicSymmetryError:
                     # Ligands are different - skip
-                    LogVerbose("No isomorphic symmetry between %s and %s" % (
+                    LogInfo("No isomorphic symmetry between %s and %s" % (
                         str(model_ligand), str(target_ligand)))
                     self._state_matrix[target_id, model_id] = 3
                     continue
                 except DisconnectedGraphError:
                     # this should never happen as we guard against
                     # DisconnectedGraphError when precomputing the graph
-                    LogVerbose("Disconnected graph observed for %s and %s" % (
+                    LogError("Disconnected graph observed for %s and %s" % (
                         str(model_ligand), str(target_ligand)))
                     # just set both ligand states to 4
                     self._model_ligand_states[model_id] = 4
@@ -1161,7 +1226,7 @@ def ComputeSymmetries(model_ligand, target_ligand, substructure_match=False,
             symmetries.append((list(isomorphism.values()),
                                list(isomorphism.keys())))
         assert len(symmetries) > 0
-        LogDebug("Found %s isomorphic mappings (symmetries)" % len(symmetries))
+        LogVerbose("Found %s isomorphic mappings (symmetries)" % len(symmetries))
     elif gm.subgraph_is_isomorphic() and substructure_match:
         if not return_symmetries:
             return True
@@ -1177,14 +1242,14 @@ def ComputeSymmetries(model_ligand, target_ligand, substructure_match=False,
         # Assert that all the atoms in the target are part of the substructure
         assert len(symmetries[0][0]) == len(target_ligand.atoms)
         n_sym = len(symmetries)
-        LogDebug("Found %s subgraph isomorphisms (symmetries)" % n_sym)
+        LogVerbose("Found %s subgraph isomorphisms (symmetries)" % n_sym)
     elif gm.subgraph_is_isomorphic():
-        LogDebug("Found subgraph isomorphisms (symmetries), but"
+        LogVerbose("Found subgraph isomorphisms (symmetries), but"
                  " ignoring because substructure_match=False")
         raise NoIsomorphicSymmetryError("No symmetry between %s and %s" % (
             str(model_ligand), str(target_ligand)))
     else:
-        LogDebug("Found no isomorphic mappings (symmetries)")
+        LogVerbose("Found no isomorphic mappings (symmetries)")
         raise NoSymmetryError("No symmetry between %s and %s" % (
             str(model_ligand), str(target_ligand)))
 

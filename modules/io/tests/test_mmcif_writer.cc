@@ -25,28 +25,31 @@
 #include <ost/io/mol/mmcif_writer.hh>
 #include <ost/mol/mol.hh>
 #include <ost/platform.hh>
+#include <ost/log.hh>
 
 using namespace ost;
+using namespace ost::conop;
 using namespace ost::io;
 
 BOOST_AUTO_TEST_SUITE( io );
 
-conop::CompoundLibPtr SetDefaultCompoundLib() {
-  // return NULL if not successful, else return newly set default lib
-  // REQ: OST_ROOT to be set
-  char * ost_root=getenv("OST_ROOT");
-  if (!ost_root) return conop::CompoundLibPtr();
-  SetPrefixPath(ost_root);
-  String lib_path=GetSharedDataPath() + "/compounds.chemlib";
-  conop::CompoundLibPtr compound_lib=conop::CompoundLib::Load(lib_path);
-  if (compound_lib) {
-    conop::Conopology::Instance().SetDefaultLib(compound_lib);
+CompoundLibPtr load_lib()
+{
+  if (!getenv("OST_ROOT")) {
+    LOG_ERROR("OST_ROOT environment variable not set. Can't load "
+              "compound library without a proper OST_ROOT");
+    return CompoundLibPtr();
   }
+  SetPrefixPath(getenv("OST_ROOT"));
+  String lib_path=GetSharedDataPath()+"/compounds.chemlib";
+  CompoundLibPtr compound_lib=CompoundLib::Load(lib_path);
   return compound_lib;
 }
 
 BOOST_AUTO_TEST_CASE(mmcif_writer_force_hetatm)
 {
+  CompoundLibPtr lib = load_lib();
+   if (!lib) { return; }
   BOOST_TEST_MESSAGE("  Running mmcif_force_hetatm tests...");
   /*
     Make sure that atoms set to HETATM are written as HETATM. There is some
@@ -75,7 +78,7 @@ BOOST_AUTO_TEST_CASE(mmcif_writer_force_hetatm)
 
   // Create mmCIF stream
   MMCifWriter writer;
-  writer.SetStructure(ent, SetDefaultCompoundLib(), false);
+  writer.SetStructure(ent, lib, false);
   std::stringstream out;
   writer.Write("test", out);
 
@@ -113,7 +116,7 @@ BOOST_AUTO_TEST_CASE(mmcif_writer_force_hetatm)
 
   // Create mmCIF stream
   writer=MMCifWriter();
-  writer.SetStructure(ent, SetDefaultCompoundLib(), false);
+  writer.SetStructure(ent, lib, false);
   out=std::stringstream();
   writer.Write("test", out);
 
@@ -134,6 +137,8 @@ BOOST_AUTO_TEST_CASE(mmcif_writer_force_hetatm)
 
 BOOST_AUTO_TEST_CASE(mmcif_writer_entity1)
 {
+  CompoundLibPtr lib = load_lib();
+   if (!lib) { return; }
   BOOST_TEST_MESSAGE("  Running mmcif_writer_entity1 tests...");
   /*
     Make sure molecular entities in mmCIF files written by OST start counting
@@ -151,7 +156,7 @@ BOOST_AUTO_TEST_CASE(mmcif_writer_entity1)
 
   // Create mmCIF stream
   MMCifWriter writer;
-  writer.SetStructure(ent, SetDefaultCompoundLib(), false);
+  writer.SetStructure(ent, lib, false);
   std::stringstream out;
   writer.Write("test", out);
 
@@ -165,6 +170,8 @@ BOOST_AUTO_TEST_CASE(mmcif_writer_entity1)
 
 BOOST_AUTO_TEST_CASE(mmcif_writer_poly_vs_non_poly)
 {
+  CompoundLibPtr lib = load_lib();
+   if (!lib) { return; }
   BOOST_TEST_MESSAGE("  Running mmcif_writer_poly_vs_non_poly tests...");
   /*
     Go for small polymers that are not polymer... the story of 2 amino acids (to
@@ -202,7 +209,7 @@ BOOST_AUTO_TEST_CASE(mmcif_writer_poly_vs_non_poly)
 
   // Create mmCIF stream
   MMCifWriter writer;
-  writer.SetStructure(ent, SetDefaultCompoundLib(), false);
+  writer.SetStructure(ent, lib, false);
   std::stringstream out;
   writer.Write("test", out);
 
@@ -296,7 +303,7 @@ BOOST_AUTO_TEST_CASE(mmcif_writer_poly_vs_non_poly)
 
   // Create mmCIF stream
   writer=MMCifWriter();
-  writer.SetStructure(ent, SetDefaultCompoundLib(), false);
+  writer.SetStructure(ent, lib, false);
   out=std::stringstream();
   writer.Write("test", out);
 
@@ -322,6 +329,8 @@ BOOST_AUTO_TEST_CASE(mmcif_writer_poly_vs_non_poly)
 
 BOOST_AUTO_TEST_CASE(mmcif_writer_small_sugars)
 {
+  CompoundLibPtr lib = load_lib();
+   if (!lib) { return; }
   BOOST_TEST_MESSAGE("  Running mmcif_writer_small_sugars tests...");
   /*
     While RCSB marks dipeptides and dinucleotides as non-ploymers, sugars are
@@ -367,7 +376,7 @@ BOOST_AUTO_TEST_CASE(mmcif_writer_small_sugars)
 
   // Create mmCIF stream
   MMCifWriter writer;
-  writer.SetStructure(ent, SetDefaultCompoundLib(), false);
+  writer.SetStructure(ent, lib, false);
   std::stringstream out;
   writer.Write("test", out);
 
@@ -407,7 +416,7 @@ BOOST_AUTO_TEST_CASE(mmcif_writer_small_sugars)
 
   // Create mmCIF stream
   writer=MMCifWriter();
-  writer.SetStructure(ent, SetDefaultCompoundLib(), false);
+  writer.SetStructure(ent, lib, false);
   out = std::stringstream();
   writer.Write("test", out);
 

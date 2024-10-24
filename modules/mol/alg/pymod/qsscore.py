@@ -621,7 +621,7 @@ class QSScorer:
         mapped_idx_grid_1 = np.ix_(mapped_indices_1_1, mapped_indices_2_1)
         mapped_idx_grid_2 = np.ix_(mapped_indices_1_2, mapped_indices_2_2)
 
-        if mapped_idx_grid_1[0].shape[0] == 0 or mapped_idx_grid_2[0].shape[0] == 0:
+        if mapped_indices_1_1.shape[0] == 0 or mapped_indices_2_1.shape[0] == 0:
             # dealing with special cases where we have no mapped residues
             # we only avoid errors here when using maped_idx_grid_x for indexing
             # but run the rest of the algorithm anyways which produces some
@@ -630,7 +630,8 @@ class QSScorer:
             shared_mask_d2 = np.full(d2.shape, False, dtype=bool)
             mapped_nonshared_mask_d1 = np.full(d1.shape, False, dtype=bool)
             mapped_nonshared_mask_d2 = np.full(d2.shape, False, dtype=bool)
-            if mapped_idx_grid_1[0].shape[0] == 0:
+            if mapped_indices_1_1.shape[0] == 0 or \
+               mapped_indices_2_1.shape[0] == 0:
                 # mapped_idx_grid_1 has not a single mapped residue which raises
                 # an error when calling something like d1[mapped_idx_grid_1]
                 mapped_d1_contacts = np.full(d1.shape, False, dtype=bool)
@@ -638,7 +639,8 @@ class QSScorer:
                 mapped_d1_contacts = d1[mapped_idx_grid_1] < contact_d
                 mapped_nonshared_mask_d1[mapped_idx_grid_1] = mapped_d1_contacts
 
-            if mapped_idx_grid_2[0].shape[0] == 0:
+            if mapped_indices_1_2.shape[0] == 0 or \
+               mapped_indices_2_2.shape[0] == 0:
                 # mapped_idx_grid_2 has not a single mapped residue which raises
                 # an error when calling something like d2[mapped_idx_grid_2]
                 mapped_d2_contacts = np.full(d2.shape, False, dtype=bool)

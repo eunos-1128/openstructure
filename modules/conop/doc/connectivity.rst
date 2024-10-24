@@ -40,14 +40,19 @@ Processors
 The exact behaviour for a processor is implementation-specific. So far, two
 classes implement the processor interface: A heuristic and a rule-based
 processor. The processors mainly differ in the source of their connectivity
-information. The `HeuristicProcessor` uses a hard-coded heuristic connectivity
+information. 
+
+The `HeuristicProcessor` uses a hard-coded heuristic connectivity
 table for the 20  standard amino acids as well as nucleotides. For other
 compounds such as ligands the `HeuristicProcessor` runs a distance-based
-connectivity algorithm that connects two atoms if they are closer than a certain
-threshold. The `RuleBasedProcessor` uses the
-:doc:`compound library <compoundlib>`, a connectivity library containing all
-molecular components present in the PDB files on PDB.org. The library can easily
-be extended with custom  connectivity information, if required.
+connectivity algorithm that connects two atoms if they belong to the same or
+two consecutive residues, and are within a 
+:func:`reasonable distance <ost.conop.IsBondFeasible>` of each other.
+
+The `RuleBasedProcessor` uses the :doc:`compound library <compoundlib>`,
+a connectivity library containing all molecular components present in the
+PDB files on PDB.org. The library can easily be extended with custom
+connectivity information, if required.
 
 
 .. class:: Processor

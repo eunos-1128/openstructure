@@ -1,6 +1,6 @@
 import numpy as np
 
-from ost import LogWarning
+from ost import LogWarning, LogInfo
 from ost import geom
 from ost import mol
 from ost import seq
@@ -26,20 +26,16 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
     and an lDDT-PLI score is computed. The best possible lDDT-PLI score is
     returned.
 
-    By default, classic lDDT is computed. That means, contacts within
-    *lddt_pli_radius* are identified in the target and checked if they're
-    conserved in the model. Added contacts are not penalized. That means if
-    the ligand is nicely placed in the correct pocket, but that pocket now
-    suddenly interacts with MORE residues in the model, you still get a high
-    score. You can penalize for these added contacts with the
-    *add_mdl_contacts* flag. This additionally considers contacts within
-    *lddt_pli_radius* in the model but only if the involved atoms can
-    be mapped to the target. This is a requirement to 1) extract the respective
-    reference distance from the target 2) avoid usage of contacts for which
-    we have no experimental evidence. One special case are
-    contacts from chains that are NOT mapped to the target binding site. It is
-    very well possible that we have experimental evidence for this chain though
-    its just too far away from the target binding site.
+    The lDDT-PLI score is a variant of lDDT with a custom inclusion radius
+    (`lddt_pli_radius`), no stereochemistry checks, and which penalizes
+    contacts added in the model within `lddt_pli_radius` by default
+    (can be changed with the `add_mdl_contacts` flag) but only if the involved
+    atoms can be mapped to the target. This is a requirement to
+    1) extract the respective reference distance from the target
+    2) avoid usage of contacts for which we have no experimental evidence.
+    One special case are contacts from chains that are not mapped to the target
+    binding site. It is very well possible that we have experimental evidence
+    for this chain though its just too far away from the target binding site.
     We therefore try to map these contacts to the chain in the target with
     equivalent sequence that is closest to the target binding site. If the
     respective atoms can be mapped there, the contact is considered not
@@ -47,7 +43,7 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
 
     Populates :attr:`LigandScorer.aux_data` with following :class:`dict` keys:
 
-    * lddt_pli: The score
+    * lddt_pli: The LDDT-PLI score
     * lddt_pli_n_contacts: Number of contacts considered in lDDT computation
     * target_ligand: The actual target ligand for which the score was computed
     * model_ligand: The actual model ligand for which the score was computed
@@ -84,7 +80,7 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
     :type max_symmetries: :class:`int`
     :param lddt_pli_radius: lDDT inclusion radius for lDDT-PLI.
     :type lddt_pli_radius: :class:`float`
-    :param add_mdl_contacts: Whether to add mdl contacts.
+    :param add_mdl_contacts: Whether to penalize added model contacts.
     :type add_mdl_contacts: :class:`bool`
     :param lddt_pli_thresholds: Distance difference thresholds for lDDT.
     :type lddt_pli_thresholds: :class:`list` of :class:`float`
@@ -102,8 +98,8 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
     def __init__(self, model, target, model_ligands=None, target_ligands=None,
                  resnum_alignments=False, rename_ligand_chain=False,
                  substructure_match=False, coverage_delta=0.2,
-                 max_symmetries=1e5, lddt_pli_radius=6.0,
-                 add_mdl_contacts=False,
+                 max_symmetries=1e4, lddt_pli_radius=6.0,
+                 add_mdl_contacts=True,
                  lddt_pli_thresholds = [0.5, 1.0, 2.0, 4.0],
                  lddt_pli_binding_site_radius=None):
 
@@ -141,10 +137,12 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
         """ Implements interface from parent
         """
         if self.add_mdl_contacts:
+            LogInfo("Computing lDDT-PLI with added model contacts")
             result = self._compute_lddt_pli_add_mdl_contacts(symmetries,
                                                              target_ligand,
                                                              model_ligand)
         else:
+            LogInfo("Computing lDDT-PLI without added model contacts")
             result = self._compute_lddt_pli_classic(symmetries,
                                                     target_ligand,
                                                     model_ligand)
@@ -935,10 +933,11 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
   
     @property
     def _chain_mapping_mdl(self):
-        if self.__chain_mapping_mdl is None:   
-            self.__chem_mapping, self.__chem_group_alns, \
-            self.__chain_mapping_mdl = \
-            self._chain_mapper.GetChemMapping(self.model)
+        if self.__chain_mapping_mdl is None:
+            with ligand_scoring_base._SinkVerbosityLevel():
+                self.__chem_mapping, self.__chem_group_alns, \
+                self.__chain_mapping_mdl = \
+                self._chain_mapper.GetChemMapping(self.model)
         return self.__chain_mapping_mdl
 
 # specify public interface

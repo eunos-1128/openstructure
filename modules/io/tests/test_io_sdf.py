@@ -47,7 +47,41 @@ class TestSDF(unittest.TestCase):
     # Charge from atom line is ignored
     o_at = ent.FindAtom("00001_Simple Ligand", 1, "3")
     self.assertEqual(o_at.charge, 0)
-    
+
+  def test_fault_tolerant(self):
+    """This file has a "dative" bond (type = 9).
+    This is a non-standard extension from RDKit which should go through only
+    in fault tolerant mode"""
+
+    with self.assertRaises(Exception):
+      ent = io.LoadSDF('testfiles/sdf/dative_bond.sdf')
+
+    # Directly with fault_tolerant
+    PushVerbosityLevel(-1)  # Expect message at Error level
+    ent = io.LoadSDF('testfiles/sdf/dative_bond.sdf', fault_tolerant=True)
+    PopVerbosityLevel()
+    self.assertEqual(ent.FindAtom("00001_Simple Ligand", 1, "5").bonds[0].bond_order, 9)
+
+    # Sloppy profile
+    PushVerbosityLevel(-1)  # Expect message at Error level
+    ent = io.LoadSDF('testfiles/sdf/dative_bond.sdf', profile="SLOPPY")
+    PopVerbosityLevel()
+    self.assertEqual(ent.FindAtom("00001_Simple Ligand", 1, "5").bonds[0].bond_order, 9)
+
+    # Sloppy profile set as default
+    old_profile = io.profiles['DEFAULT'].Copy()
+    io.profiles['DEFAULT'] = "SLOPPY"
+    PushVerbosityLevel(-1)  # Expect message at Error level
+    ent = io.LoadSDF('testfiles/sdf/dative_bond.sdf')
+    PopVerbosityLevel()
+    self.assertEqual(ent.FindAtom("00001_Simple Ligand", 1, "5").bonds[0].bond_order, 9)
+
+    # Test that a restored default profile has fault_tolerant again
+    io.profiles['DEFAULT'] = old_profile
+    with self.assertRaises(Exception):
+      ent = io.LoadSDF('testfiles/sdf/dative_bond.sdf')
+
+
 if __name__== '__main__':
   from ost import testutils
   testutils.RunTests()

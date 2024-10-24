@@ -31,11 +31,6 @@
 namespace ost { namespace io {
 
 
-bool is_undef(StringRef value)
-{
-  return value.size()==1 && (value[0]=='?' || value[0]=='.');
-}
-
 MMCifReader::MMCifReader(std::istream& stream, mol::EntityHandle& ent_handle,
                          const IOProfile& profile):
   StarParser(stream, true), profile_(profile), ent_handle_(ent_handle)
@@ -97,8 +92,20 @@ void MMCifReader::SetRestrictChains(const String& restrict_chains)
 
 bool MMCifReader::OnBeginData(const StringRef& data_name) 
 {
-  LOG_DEBUG("MCIFFReader: " << profile_);
+  LOG_DEBUG("MMCifReader: " << profile_);
   Profile profile_import("MMCifReader::OnBeginData");
+  if (chain_count_ > 0) {
+      std::stringstream ss;
+      ss << "Can only read one data block. Found second one 'data_" << data_name << "'.";
+      if (profile_.fault_tolerant) {
+        LOG_WARNING(ss.str());
+      } else {
+        throw IOException(this->FormatDiagnostic(STAR_DIAG_ERROR,
+                                                 ss.str(),
+                                                 this->GetCurrentLinenum()));
+      }
+
+  }
 
   // IDs in mmCIF files can be any string, so no restrictions here
 
@@ -478,15 +485,21 @@ void MMCifReader::ParseAndAddAtom(const std::vector<StringRef>& columns)
   mol::ResNum res_num(0);
   bool valid_res_num = false;
   if (indices_[PDBX_PDB_MODEL_NUM] != -1) {
+    int model_id = TryGetInt(columns[indices_[PDBX_PDB_MODEL_NUM]],
+                             "atom_site.pdbx_PDB_model_num");
     if (has_model_) {
-      if (curr_model_ != TryGetInt(columns[indices_[PDBX_PDB_MODEL_NUM]],
-                                   "atom_site.pdbx_PDB_model_num")) {
+      if (curr_model_ != model_id) {
+        if (warned_ignored_model_.find(model_id) == warned_ignored_model_.end()) {
+          LOG_WARNING("Ignorning new model " << model_id <<
+                      ". Only model " << curr_model_ << " was read.");
+          warned_ignored_model_.insert(model_id);
+        }
         return;
       }
     } else {
+      LOG_INFO("Reading model " << model_id << ".");
       has_model_ = true;
-      curr_model_ = TryGetInt(columns[indices_[PDBX_PDB_MODEL_NUM]],
-      "atom_site.pdbx_PDB_model_num");
+      curr_model_ = model_id;
     }
   }
 
@@ -520,10 +533,10 @@ void MMCifReader::ParseAndAddAtom(const std::vector<StringRef>& columns)
     occ = this->GetRealOrDefault(columns[indices_[OCCUPANCY]],
                                  "atom_site.occupancy",
                                  1.0,
-                                 is_undef);
+                                 IsUndefined);
   }
   if (indices_[B_ISO_OR_EQUIV] != -1) {
-    if (!is_undef(columns[indices_[B_ISO_OR_EQUIV]])) {
+    if (!IsUndefined(columns[indices_[B_ISO_OR_EQUIV]])) {
       temp = this->TryGetReal(columns[indices_[B_ISO_OR_EQUIV]],
                               "atom_site.B_iso_or_equiv");
     }
@@ -677,6 +690,7 @@ void MMCifReader::ParseAndAddAtom(const std::vector<StringRef>& columns)
                     "name. Ignoring atoms for everything but the first");
       } else {
         LOG_WARNING("Residue with number " << res_num 
+                    << " in chain " << curr_chain_.GetName()
                     << " contains a microheterogeneity. Everything but atoms "
                     "for the residue '" << curr_residue_.GetName() 
                     << "' will be ignored");
@@ -871,13 +885,13 @@ void MMCifReader::ParseCitation(const std::vector<StringRef>& columns)
     }
   }
   if (indices_[PDBX_DATABASE_ID_PUBMED] != -1) {
-    if (!is_undef(columns[indices_[PDBX_DATABASE_ID_PUBMED]])) {
+    if (!IsUndefined(columns[indices_[PDBX_DATABASE_ID_PUBMED]])) {
       cit.SetPubMed(this->TryGetInt(columns[indices_[PDBX_DATABASE_ID_PUBMED]],
                                     "citation.pdbx_database_id_PubMed"));
     }
   }
   if (indices_[YEAR] != -1) {
-    if (!is_undef(columns[indices_[YEAR]])) {
+    if (!IsUndefined(columns[indices_[YEAR]])) {
       cit.SetYear(this->TryGetInt(columns[indices_[YEAR]], "citation.year"));
     }
   }
@@ -1176,7 +1190,7 @@ void MMCifReader::ParseStruct(const std::vector<StringRef>& columns)
   }
 
   if (indices_[PDBX_FORMULA_WEIGHT] != -1) {
-    if (!is_undef(columns[indices_[PDBX_FORMULA_WEIGHT]])) {
+    if (!IsUndefined(columns[indices_[PDBX_FORMULA_WEIGHT]])) {
       details.SetMass(this->TryGetReal(columns[indices_[PDBX_FORMULA_WEIGHT]],
                                        "struct.pdbx_formula_weight"));
     }
@@ -1680,7 +1694,7 @@ void MMCifReader::ParseStructRefSeq(const std::vector<StringRef>& columns)
        e=struct_refs_.end(); i!=e; ++i) { 
     if ((*i)->GetID()==sr_id) {
      (*i)->AddAlignedSeq(aln_id, chain_name, entbeg.second, entend.second, 
-                          dbbeg.second, dbend.second);
+                          dbbeg.second, dbend.second, profile_.fault_tolerant);
      found=true;
        break;
     }
@@ -1711,7 +1725,7 @@ void MMCifReader::ParseStructRefSeqDif(const std::vector<StringRef>& columns)
 
   std::pair<bool,int> seq_rnum;
   if (indices_[SRSD_SEQ_RNUM] != -1) {
-    if (!is_undef(columns[indices_[SRSD_SEQ_RNUM]])) {
+    if (!IsUndefined(columns[indices_[SRSD_SEQ_RNUM]])) {
       seq_rnum=this->TryGetInt(columns[indices_[SRSD_SEQ_RNUM]],
                                "_struct_ref_seq_dif.seq_num",
                                profile_.fault_tolerant);

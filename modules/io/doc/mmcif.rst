@@ -105,6 +105,9 @@ Notes:
   It is a known limitation of the mmCIF format to allow ambiguous identifiers
   for waters (and ligands to some extent) and so we have to require these
   additional identifiers.
+* An mmCIF file can contain several models (``atom_site.pdbx_PDB_model_num``).
+  Only the first model occurring in the mmCIF file is read (regardless of the
+  actual model number). If extra models are ignored, a warning is logged.
 
 
 Info Classes

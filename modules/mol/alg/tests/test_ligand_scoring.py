@@ -646,7 +646,7 @@ class TestLigandScoringFancy(unittest.TestCase):
         trg_report, trg_pair_report = sc.get_target_ligand_state_report(0)
 
         exp_lig_report = {'state': 10.0,
-                          'short desc': 'binding_site',
+                          'short desc': 'target_binding_site',
                           'desc': 'No residues were in proximity of the target ligand.'}
 
         exp_pair_report = [{'state': 1, 'short desc': 'identity',
@@ -856,18 +856,18 @@ class TestLigandScoringFancy(unittest.TestCase):
 
 
         self.assertDictEqual(sc.unassigned_model_ligands_reasons, {
-            'L_ZN': {1: 'model_representation'},
-            'L_NA': {1: 'binding_site'},
+            'L_ZN': {1: 'model_binding_site'},
+            'L_NA': {1: 'target_binding_site'},
             'L_OXY': {1: 'identity'},
             'L_MG_2': {1: 'stoichiometry'},
             "L_CMO": {1: 'disconnected'}
         })
         self.assertDictEqual(sc.unassigned_target_ligands_reasons, {
             'G': {1: 'identity'},
-            'H': {1: 'model_representation'},
+            'H': {1: 'model_binding_site'},
             'J': {1: 'stoichiometry'},
             'K': {1: 'identity'},
-            'L_NA': {1: 'binding_site'},
+            'L_NA': {1: 'target_binding_site'},
             "L_CMO": {1: 'disconnected'}
         })
         self.assertTrue("L_OXY" not in sc.score)
@@ -891,23 +891,23 @@ class TestLigandScoringFancy(unittest.TestCase):
 
         # Test with partial bs search (full_bs_search=True)
         # Here we expect L_MG_2 to be unassigned because of stoichiometry
-        # rather than model_representation, as it no longer matters so far from
+        # rather than model_binding_site, as it no longer matters so far from
         # the binding site.
         sc = ligand_scoring_scrmsd.SCRMSDScorer(mdl, trg, None, None,
                                                full_bs_search=True)
         self.assertEqual(sc.unassigned_model_ligands_reasons, {
-            'L_ZN': {1: 'model_representation'},
-            'L_NA': {1: 'binding_site'},
+            'L_ZN': {1: 'model_binding_site'},
+            'L_NA': {1: 'target_binding_site'},
             'L_OXY': {1: 'identity'},
             'L_MG_2': {1: 'stoichiometry'},
             "L_CMO": {1: 'disconnected'}
         })
         self.assertEqual(sc.unassigned_target_ligands_reasons, {
             'G': {1: 'identity'},
-            'H': {1: 'model_representation'},
+            'H': {1: 'model_binding_site'},
             'J': {1: 'stoichiometry'},
             'K': {1: 'identity'},
-            'L_NA': {1: 'binding_site'},
+            'L_NA': {1: 'target_binding_site'},
             "L_CMO": {1: 'disconnected'}
         })
 

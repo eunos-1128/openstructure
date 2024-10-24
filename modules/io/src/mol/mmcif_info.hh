@@ -858,7 +858,8 @@ public:
   const String& GetDBAccess() const { return db_access_; }
   MMCifInfoStructRefSeqPtr AddAlignedSeq(const String& align_id,
                                          const String& chain_name, int seq_begin,
-                                         int seq_end, int db_begin, int db_end);
+                                         int seq_end, int db_begin, int db_end,
+                                         bool fault_tolerant);
   MMCifInfoStructRefSeqPtr GetAlignedSeq(const String& align_id) const;
   MMCifInfoStructRefSeqs GetAlignedSeqs() const
   {

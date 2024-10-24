@@ -37,20 +37,20 @@ namespace ost { namespace io {
 
 using boost::format;
 
-SDFReader::SDFReader(const String& filename)
-  : infile_(filename), instream_(infile_)
+SDFReader::SDFReader(const String& filename, const IOProfile& profile)
+  : infile_(filename), instream_(infile_), profile_(profile)
 {
   this->ClearState(boost::filesystem::path(filename));
 }
 
-SDFReader::SDFReader(const boost::filesystem::path& loc)
-  : infile_(loc), instream_(infile_)
+SDFReader::SDFReader(const boost::filesystem::path& loc, const IOProfile& profile)
+  : infile_(loc), instream_(infile_), profile_(profile)
 {
   this->ClearState(loc);
 }
 
-SDFReader::SDFReader(std::istream& instream)
-  : infile_(), instream_(instream)
+SDFReader::SDFReader(std::istream& instream, const IOProfile& profile)
+  : infile_(), instream_(instream), profile_(profile)
 {
   this->ClearState(boost::filesystem::path(""));
 }
@@ -113,9 +113,11 @@ void SDFReader::Import(mol::EntityHandle& ent)
       ProcessV3000Line(line, ent, editor);
     }
   }
-
-  LOG_INFO("imported " << chain_count_ << " chains, " << residue_count_
-               << " residues, " << atom_count_ << " atoms");
+  LOG_INFO("imported "
+               << ent.GetChainCount() << " chains, "
+               << ent.GetResidueCount() << " residues, "
+               << ent.GetAtomCount() << " atoms and "
+               << ent.GetBondCount() << " bonds");
 }
 
 void SDFReader::ClearState(const boost::filesystem::path& loc)
@@ -204,7 +206,7 @@ void SDFReader::ParseHeader(const String& line, int line_num,
         version_=version_str;
       }
       else {
-        String msg="Unsupported SDF version: %s.";
+        String msg="Invalid SDF file or unsupported SDF version: %s.";
         throw IOException(str(format(msg) % version_str));
       }
       // Counts will be overridden in V3000
@@ -353,15 +355,40 @@ void SDFReader::AddBond(const bond_data& bond_tuple, int line_num, mol::EntityHa
 
   try {
     type=boost::lexical_cast<int>(boost::trim_copy(s_type));
-    if (type<1 || type>8) {
-      String msg="Bad bond line %d: Bond type number"
-                      " '%s' not within accepted range (1-8).";
-      throw IOException(str(format(msg) % line_num % s_type));
+    // From SDF spec:
+    // bond type      1 = Single, 2 = Double,       [Q] Values 4 through 8 are
+    //                3 = Triple, 4 = Aromatic,     for SSS queries oniy.
+    //                5 = Single or Double,
+    //                6 = Single or Aromatic,
+    //                7 = Double or Aromatic,
+    //                8 = Any
+    if (type < 1 || type > 8) {
+      std::stringstream ss;
+      ss << "Bad bond line " << line_num << ": Bond type number "
+         << std::to_string(type) << " not within accepted range (1-8).";
+      if (profile_.fault_tolerant) {
+        LOG_ERROR(ss.str());
+      } else {
+        throw IOException(ss.str());
+      }
+    } else if (type > 3) {
+      std::stringstream ss;
+      ss << "Bad bond line " << line_num << ": Bond type number "
+         << std::to_string(type) << ": values 4-8 are reserved for queries, "
+         << "should not appear in an SDF file.";
+        LOG_WARNING(ss.str());
     }
   } catch(boost::bad_lexical_cast&) {
-    String msg="Bad bond line %d: Can't convert bond type number"
-                " '%s' to integral constant.";
-    throw IOException(str(format(msg) % line_num % s_type));
+    std::stringstream ss;
+    ss << "Bad bond line " << line_num << ": Can't convert bond type number '"
+       << s_type << "' to integral constant.";
+    if (profile_.fault_tolerant) {
+      ss << " Assuming single bond in fault tolerant mode.";
+      LOG_ERROR(ss.str());
+      type = 1;
+    } else {
+      throw IOException(ss.str());
+    }
   }
 
   mol::AtomHandle first,second;

@@ -28,6 +28,7 @@
 #include <ost/mol/chain_handle.hh>
 #include <ost/mol/residue_handle.hh>
 #include <ost/io/module_config.hh>
+#include <ost/io/mol/io_profile.hh>
 
 namespace ost { namespace io {
 
@@ -36,11 +37,9 @@ namespace ost { namespace io {
 
 class DLLEXPORT_OST_IO SDFReader {
 public:
-  SDFReader(const String& filename);
-  SDFReader(const boost::filesystem::path& loc);
-  SDFReader(std::istream& instream);
-
-  bool HasNext();
+  SDFReader(const String& filename, const IOProfile& profile);
+  SDFReader(const boost::filesystem::path& loc, const IOProfile& profile);
+  SDFReader(std::istream& instream, const IOProfile& profile);
 
   void Import(mol::EntityHandle& ent);
 
@@ -97,6 +96,7 @@ private:
   boost::filesystem::ifstream infile_;
   std::istream& instream_;
   boost::iostreams::filtering_stream<boost::iostreams::input>  in_;
+  IOProfile profile_;
   String version_;
   bool v3000_atom_block_;
   bool v3000_bond_block_;

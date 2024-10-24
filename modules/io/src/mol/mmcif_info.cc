@@ -196,11 +196,20 @@ void MMCifInfoBioUnit::Merge(MMCifInfoBioUnit& from)
 MMCifInfoStructRefSeqPtr 
 MMCifInfoStructRef::AddAlignedSeq(const String& aid, const String& chain_name, 
                                   int seq_begin, int seq_end, int db_begin, 
-                                  int db_end)
+                                  int db_end, bool fault_tolerant)
 {
   std::map<String, MMCifInfoStructRefSeqPtr>::const_iterator i=seqs_.find(aid);
   if (i!=seqs_.end()) {
-    throw IOException("duplicate align_id for struct_ref '"+id_+"'");
+    std::stringstream msg;
+    msg << "Duplicate align_id for struct_ref '" << id_ << "'";
+    if (fault_tolerant) {
+      msg << ". Record will be overwritten.";
+      LOG_WARNING(msg.str());
+    }
+    else {
+      throw IOException(msg.str());
+    }
+
   }
   MMCifInfoStructRefSeqPtr p(new MMCifInfoStructRefSeq(aid, chain_name,
                                                        seq_begin, seq_end, 

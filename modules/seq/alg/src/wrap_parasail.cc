@@ -17,6 +17,7 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 //------------------------------------------------------------------------------
 
+#include <ost/message.hh>
 #include <ost/seq/alg/wrap_parasail.hh>
 
 #if OST_PARASAIL_ENABLED
@@ -131,6 +132,45 @@ ost::seq::AlignmentList Align(const ost::seq::ConstSequenceHandle& s1,
     return aln_list;
 }
 
+ost::seq::AlignmentList AlignEmptySeq(const ost::seq::ConstSequenceHandle& s1,
+                                      const ost::seq::ConstSequenceHandle& s2) {
+  ost::seq::AlignmentHandle aln = ost::seq::CreateAlignment();
+  if(s1.GetLength() == 0 && s2.GetLength() == 0) {
+    ost::seq::SequenceHandle new_s1 = ost::seq::CreateSequence(s1.GetName(), s1.GetString());
+    new_s1.SetOffset(s1.GetOffset());
+    aln.AddSequence(new_s1);
+    ost::seq::SequenceHandle new_s2 = ost::seq::CreateSequence(s2.GetName(), s2.GetString());
+    new_s2.SetOffset(s2.GetOffset());
+    aln.AddSequence(new_s2);
+  } else if(s1.GetLength() == 0) {
+    String x(s2.GetLength(), '-');
+    ost::seq::SequenceHandle new_s1 = ost::seq::CreateSequence(s1.GetName(), x);
+    new_s1.SetOffset(s1.GetOffset());
+    aln.AddSequence(new_s1);
+    ost::seq::SequenceHandle new_s2 = ost::seq::CreateSequence(s2.GetName(), s2.GetString());
+    new_s2.SetOffset(s2.GetOffset());
+    aln.AddSequence(new_s2);
+  } else if(s2.GetLength() == 0) {
+    ost::seq::SequenceHandle new_s1 = ost::seq::CreateSequence(s1.GetName(), s1.GetString());
+    new_s1.SetOffset(s1.GetOffset());
+    aln.AddSequence(new_s1);
+    String x(s1.GetLength(), '-');
+    ost::seq::SequenceHandle new_s2 = ost::seq::CreateSequence(s2.GetName(), x);
+    new_s2.SetOffset(s2.GetOffset());
+    aln.AddSequence(new_s2);
+  } else {
+    throw ost::Error("One seq must be empty in AlignEmptySeq");
+  }
+  if(s1.HasAttachedView()) {
+    aln.AttachView(0, s1.GetAttachedView());
+  }
+  if(s2.HasAttachedView()) {
+    aln.AttachView(1, s2.GetAttachedView());
+  }
+  ost::seq::AlignmentList aln_list = {aln};
+  return aln_list;
+}
+
 }
 
 namespace ost{ namespace seq{ namespace alg{
@@ -139,6 +179,9 @@ ost::seq::AlignmentList ParaLocalAlign(const ost::seq::ConstSequenceHandle& s1,
                                        const ost::seq::ConstSequenceHandle& s2,
                                        ost::seq::alg::SubstWeightMatrixPtr& subst,
                                        int gap_open, int gap_ext) {
+  if(s1.GetLength() == 0 || s2.GetLength() == 0) {
+    return ost::seq::AlignmentList();
+  }
   return Align(s1, s2, gap_open, gap_ext, subst,
                parasail_sw_trace_scan_sat, true); 
 }
@@ -147,6 +190,9 @@ ost::seq::AlignmentList ParaGlobalAlign(const ost::seq::ConstSequenceHandle& s1,
                                         const ost::seq::ConstSequenceHandle& s2,
                                         ost::seq::alg::SubstWeightMatrixPtr& subst,
                                         int gap_open, int gap_ext) {
+  if(s1.GetLength() == 0 || s2.GetLength() == 0) {
+    return AlignEmptySeq(s1, s2);
+  }
   return Align(s1, s2, gap_open, gap_ext, subst,
                parasail_nw_trace_scan_sat, false);  
 }
@@ -155,6 +201,9 @@ ost::seq::AlignmentList ParaSemiGlobalAlign(const ost::seq::ConstSequenceHandle&
                                             const ost::seq::ConstSequenceHandle& s2,
                                             ost::seq::alg::SubstWeightMatrixPtr& subst,
                                             int gap_open, int gap_ext) {
+  if(s1.GetLength() == 0 || s2.GetLength() == 0) {
+    return AlignEmptySeq(s1, s2);
+  }
   return Align(s1, s2, gap_open, gap_ext, subst,
                parasail_sg_trace_scan_sat, false);   
 }

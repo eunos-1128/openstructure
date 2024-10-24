@@ -190,13 +190,8 @@ class ReprResult:
         self._mdl_bb_pos = None
         self._ref_full_bb_pos = None
         self._mdl_full_bb_pos = None
-        self._transform = None
+        self._superposition = None
         self._superposed_mdl_bb_pos = None
-        self._bb_rmsd = None
-        self._gdt_8 = None
-        self._gdt_4 = None
-        self._gdt_2 = None
-        self._gdt_1 = None
         self._ost_query = None
         self._flat_mapping = None
         self._inconsistent_residues = None
@@ -318,24 +313,33 @@ class ReprResult:
             self._mdl_full_bb_pos = self._GetFullBBPos(self.mdl_residues)
         return self._mdl_full_bb_pos
 
+
     @property
-    def transform(self):
-        """ Transformation to superpose mdl residues onto ref residues
+    def superposition(self):
+        """ Superposition of mdl residues onto ref residues
 
         Superposition computed as minimal RMSD superposition on
         :attr:`ref_bb_pos` and :attr:`mdl_bb_pos`. If number of positions is
         smaller 3, the full_bb_pos equivalents are used instead.
 
-        :type: :class:`ost.geom.Mat4`
+        :type: :class:`ost.mol.alg.SuperpositionResult`
         """
-        if self._transform is None:
+        if self._superposition is None:
             if len(self.mdl_bb_pos) < 3:
-                self._transform = _GetTransform(self.mdl_full_bb_pos,
+                self._superposition = _GetSuperposition(self.mdl_full_bb_pos,
                                                 self.ref_full_bb_pos, False)
             else:
-                self._transform = _GetTransform(self.mdl_bb_pos,
+                self._superposition = _GetSuperposition(self.mdl_bb_pos,
                                                 self.ref_bb_pos, False)
-        return self._transform
+        return self._superposition
+
+    @property
+    def transform(self):
+        """ Transformation to superpose mdl residues onto ref residues
+
+        :type: :class:`ost.geom.Mat4`
+        """
+        return self.superposition.transformation
 
     @property
     def superposed_mdl_bb_pos(self):
@@ -350,53 +354,12 @@ class ReprResult:
 
     @property
     def bb_rmsd(self):
-        """ RMSD between :attr:`ref_bb_pos` and :attr:`superposed_mdl_bb_pos`
+        """ RMSD of the binding site backbone atoms after :attr:`superposition`
 
         :type: :class:`float`
         """
-        if self._bb_rmsd is None:
-            self._bb_rmsd = self.ref_bb_pos.GetRMSD(self.superposed_mdl_bb_pos)
-        return self._bb_rmsd
+        return self.superposition.rmsd
 
-    @property
-    def gdt_8(self):
-        """ GDT with one single threshold: 8.0
-
-        :type: :class:`float`
-        """
-        if self._gdt_8 is None:
-            self._gdt_8 = self.ref_bb_pos.GetGDT(self.superposed_mdl_bb_pos, 8.0)
-        return self._gdt_8
-
-    @property
-    def gdt_4(self):
-        """ GDT with one single threshold: 4.0
-
-        :type: :class:`float`
-        """
-        if self._gdt_4 is None:
-            self._gdt_4 = self.ref_bb_pos.GetGDT(self.superposed_mdl_bb_pos, 4.0)
-        return self._gdt_4
-
-    @property
-    def gdt_2(self):
-        """ GDT with one single threshold: 2.0
-
-        :type: :class:`float`
-        """
-        if self._gdt_2 is None:
-            self._gdt_2 = self.ref_bb_pos.GetGDT(self.superposed_mdl_bb_pos, 2.0)
-        return self._gdt_2
-
-    @property
-    def gdt_1(self):
-        """ GDT with one single threshold: 1.0
-
-        :type: :class:`float`
-        """
-        if self._gdt_1 is None:
-            self._gdt_1 = self.ref_bb_pos.GetGDT(self.superposed_mdl_bb_pos, 1.0)
-        return self._gdt_1
 
     @property
     def ost_query(self):
@@ -435,10 +398,6 @@ class ReprResult:
                                      self.mdl_residues]
         json_dict["transform"] = list(self.transform.data)
         json_dict["bb_rmsd"] = self.bb_rmsd
-        json_dict["gdt_8"] = self.gdt_8
-        json_dict["gdt_4"] = self.gdt_4
-        json_dict["gdt_2"] = self.gdt_2
-        json_dict["gdt_1"] = self.gdt_1
         json_dict["ost_query"] = self.ost_query
         json_dict["flat_mapping"] = self.GetFlatChainMapping()
         return json_dict
@@ -522,10 +481,9 @@ class ChainMapper:
       simply derived from residue numbers (*resnum_alignments* flag).
       In case of NW, *pep_subst_mat*, *pep_gap_open* and *pep_gap_ext*
       and their nucleotide equivalents are relevant. Two chains are
-      considered identical if they fulfill the thresholds given by
-      *pep_seqid_thr*, *pep_gap_thr*, their nucleotide equivalents
-      respectively. The grouping information is available as
-      attributes of this class.
+      considered identical if they fulfill the *pep_seqid_thr* and
+      have at least *min_pep_length* aligned residues. Same logic
+      is applied for nucleotides with respective thresholds.
 
     * Map chains in an input model to these groups. Generating alignments
       and the similarity criteria are the same as above. You can either
@@ -551,19 +509,8 @@ class ChainMapper:
                           identical. 95 percent tolerates the few mutations
                           crystallographers like to do.
     :type pep_seqid_thr:  :class:`float`
-    :param pep_gap_thr: Additional threshold to avoid gappy alignments with
-                        high seqid. By default this is disabled (set to 1.0).
-                        This threshold checks for a maximum allowed fraction
-                        of gaps in any of the two sequences after stripping
-                        terminal gaps. The reason for not just normalizing
-                        seqid by the longer sequence is that one sequence
-                        might be a perfect subsequence of the other but only
-                        cover half of it. 
-    :type pep_gap_thr:  :class:`float`
     :param nuc_seqid_thr: Nucleotide equivalent for *pep_seqid_thr*
     :type nuc_seqid_thr:  :class:`float`
-    :param nuc_gap_thr: Nucleotide equivalent for *nuc_gap_thr*
-    :type nuc_gap_thr:  :class:`float`
     :param pep_subst_mat: Substitution matrix to align peptide sequences,
                           irrelevant if *resnum_alignments* is True,
                           defaults to seq.alg.BLOSUM62
@@ -595,8 +542,7 @@ class ChainMapper:
     :type n_max_naive: :class:`int`
     """
     def __init__(self, target, resnum_alignments=False,
-                 pep_seqid_thr = 95., pep_gap_thr = 1.0,
-                 nuc_seqid_thr = 95., nuc_gap_thr = 1.0,
+                 pep_seqid_thr = 95., nuc_seqid_thr = 95., 
                  pep_subst_mat = seq.alg.BLOSUM62, pep_gap_open = -11,
                  pep_gap_ext = -1, nuc_subst_mat = seq.alg.NUC44,
                  nuc_gap_open = -4, nuc_gap_ext = -4,
@@ -606,9 +552,7 @@ class ChainMapper:
         # attributes
         self.resnum_alignments = resnum_alignments
         self.pep_seqid_thr = pep_seqid_thr
-        self.pep_gap_thr = pep_gap_thr
         self.nuc_seqid_thr = nuc_seqid_thr
-        self.nuc_gap_thr = nuc_gap_thr
         self.min_pep_length = min_pep_length
         self.min_nuc_length = min_nuc_length
         self.n_max_naive = n_max_naive
@@ -697,9 +641,9 @@ class ChainMapper:
             _GetChemGroupAlignments(self.polypep_seqs, self.polynuc_seqs,
                                     self.aligner,
                                     pep_seqid_thr=self.pep_seqid_thr,
-                                    pep_gap_thr=self.pep_gap_thr,
+                                    min_pep_length=self.min_pep_length,
                                     nuc_seqid_thr=self.nuc_seqid_thr,
-                                    nuc_gap_thr=self.nuc_gap_thr)
+                                    min_nuc_length=self.min_nuc_length)
 
         return self._chem_group_alignments
 
@@ -738,9 +682,9 @@ class ChainMapper:
             _GetChemGroupAlignments(self.polypep_seqs, self.polynuc_seqs,
                                     self.aligner,
                                     pep_seqid_thr=self.pep_seqid_thr,
-                                    pep_gap_thr=self.pep_gap_thr,
+                                    min_pep_length=self.min_pep_length,
                                     nuc_seqid_thr=self.nuc_seqid_thr,
-                                    nuc_gap_thr=self.nuc_gap_thr)
+                                    min_nuc_length=self.min_nuc_length)
 
         return self._chem_group_types
         
@@ -1176,7 +1120,8 @@ class ChainMapper:
               for t_pos, t in zip(trg_pos, trg_chains):
                   for m_pos, m in zip(mdl_pos, mdl_chains):
                       if len(t_pos) >= 3 and len(m_pos) >= 3:
-                          transform = _GetTransform(m_pos, t_pos, False)
+                          transform = _GetSuperposition(m_pos, t_pos,
+                                                        False).transformation
                           initial_transforms.append(transform)
                           initial_mappings.append((t,m))
 
@@ -1437,6 +1382,10 @@ class ChainMapper:
             mappings = list(_ChainMappings(substructure_chem_groups,
                                            substructure_chem_mapping,
                                            self.n_max_naive))
+
+        # This step can be slow so give some hints in logs
+        msg = "Computing initial ranking of %d chain mappings" % len(mappings)
+        (ost.LogWarning if len(mappings) > 10000 else ost.LogInfo)(msg)
 
         for mapping in mappings:
             # chain_mapping and alns as input for lDDT computation
@@ -1756,20 +1705,17 @@ def _GetAlnPropsOne(aln):
 
     :param aln: Alignment to compute properties
     :type aln: :class:`seq.AlignmentHandle`
-    :returns: Tuple with 3 elements. 1) sequence identify in range [0, 100] 
-              considering aligned columns 2) Fraction of gaps between
-              first and last aligned column in s1 3) same for s2.
+    :returns: Tuple with 2 elements. 1) sequence identify in range [0, 100] 
+              considering aligned columns 2) Number of aligned columns.
     """
     assert(aln.GetCount() == 2)
-    n_gaps_1 = str(aln.GetSequence(0)).strip('-').count('-')
-    n_gaps_2 = str(aln.GetSequence(1)).strip('-').count('-')
-    gap_frac_1 = float(n_gaps_1)/len(aln.GetSequence(0).GetGaplessString())
-    gap_frac_2 = float(n_gaps_2)/len(aln.GetSequence(1).GetGaplessString())
-    return (seq.alg.SequenceIdentity(aln), gap_frac_1, gap_frac_2) 
+    seqid = seq.alg.SequenceIdentity(aln)
+    n_aligned = sum([1 for col in aln if (col[0] != '-' and col[1] != '-')])
+    return (seqid, n_aligned) 
 
 def _GetChemGroupAlignments(pep_seqs, nuc_seqs, aligner, pep_seqid_thr=95.,
-                            pep_gap_thr=0.1, nuc_seqid_thr=95.,
-                            nuc_gap_thr=0.1):
+                            min_pep_length=6, nuc_seqid_thr=95.,
+                            min_nuc_length=4):
     """Returns alignments with groups of chemically equivalent chains
 
     :param pep_seqs: List of polypeptide sequences
@@ -1782,17 +1728,14 @@ def _GetChemGroupAlignments(pep_seqs, nuc_seqs, aligner, pep_seqid_thr=95.,
                           identical. 95 percent tolerates the few mutations
                           crystallographers like to do.
     :type pep_seqid_thr:  :class:`float`
-    :param pep_gap_thr: Additional threshold to avoid gappy alignments with high
-                        seqid. The reason for not just normalizing seqid by the
-                        longer sequence is that one sequence might be a perfect
-                        subsequence of the other but only cover half of it. This
-                        threshold checks for a maximum allowed fraction of gaps
-                        in any of the two sequences after stripping terminal gaps.
-    :type pep_gap_thr: :class:`float`
+    :param min_pep_length: Additional threshold to avoid gappy alignments with high
+                           seqid. Number of aligned columns must be at least this
+                           number.
+    :type min_pep_length: :class:`int`
     :param nuc_seqid_thr: Nucleotide equivalent of *pep_seqid_thr*
     :type nuc_seqid_thr:  :class:`float`
-    :param nuc_gap_thr: Nucleotide equivalent of *nuc_gap_thr*
-    :type nuc_gap_thr: :class:`float`
+    :param min_nuc_length: Nucleotide equivalent of *min_pep_length*
+    :type min_nuc_length: :class:`int`
     :returns: Tuple with first element being an AlignmentList. Each alignment
               represents a group of chemically equivalent chains and the first
               sequence is the longest. Second element is a list of equivalent
@@ -1800,9 +1743,9 @@ def _GetChemGroupAlignments(pep_seqs, nuc_seqs, aligner, pep_seqid_thr=95.,
               [:class:`ost.ChemType.AMINOACIDS`,
               :class:`ost.ChemType.NUCLEOTIDES`] 
     """
-    pep_groups = _GroupSequences(pep_seqs, pep_seqid_thr, pep_gap_thr, aligner,
+    pep_groups = _GroupSequences(pep_seqs, pep_seqid_thr, min_pep_length, aligner,
                                  mol.ChemType.AMINOACIDS)
-    nuc_groups = _GroupSequences(nuc_seqs, nuc_seqid_thr, nuc_gap_thr, aligner,
+    nuc_groups = _GroupSequences(nuc_seqs, nuc_seqid_thr, min_nuc_length, aligner,
                                  mol.ChemType.NUCLEOTIDES)
     group_types = [mol.ChemType.AMINOACIDS] * len(pep_groups)
     group_types += [mol.ChemType.NUCLEOTIDES] * len(nuc_groups)
@@ -1810,18 +1753,15 @@ def _GetChemGroupAlignments(pep_seqs, nuc_seqs, aligner, pep_seqid_thr=95.,
     groups.extend(nuc_groups)
     return (groups, group_types)
 
-def _GroupSequences(seqs, seqid_thr, gap_thr, aligner, chem_type):
+def _GroupSequences(seqs, seqid_thr, min_length, aligner, chem_type):
     """Get list of alignments representing groups of equivalent sequences
 
     :param seqid_thr: Threshold used to decide when two chains are identical.
     :type seqid_thr:  :class:`float`
     :param gap_thr: Additional threshold to avoid gappy alignments with high
-                    seqid. The reason for not just normalizing seqid by the
-                    longer sequence is that one sequence might be a perfect
-                    subsequence of the other but only cover half of it. This
-                    threshold checks for a maximum allowed fraction of gaps
-                    in any of the two sequences after stripping terminal gaps.
-    :type gap_thr: :class:`float`
+                    seqid. Number of aligned columns must be at least this
+                    number.
+    :type gap_thr: :class:`int`
     :param aligner: Helper class to generate pairwise alignments
     :type aligner: :class:`_Aligner`
     :param chem_type: ChemType of seqs which is passed to *aligner*, must be in
@@ -1839,8 +1779,8 @@ def _GroupSequences(seqs, seqid_thr, gap_thr, aligner, chem_type):
             for g_s_idx in range(len(groups[g_idx])):
                 aln  = aligner.Align(seqs[s_idx], seqs[groups[g_idx][g_s_idx]],
                                      chem_type)
-                sid, frac_i, frac_j = _GetAlnPropsOne(aln)
-                if sid >= seqid_thr and frac_i < gap_thr and frac_j < gap_thr:
+                sid, n_aligned = _GetAlnPropsOne(aln)
+                if sid >= seqid_thr and n_aligned >= min_length:
                     matching_group = g_idx
                     break
             if matching_group is not None:
@@ -2970,8 +2910,8 @@ def _IterativeRigidRMSD(initial_transforms, initial_mappings, chem_groups,
                 trg_chain_groups[best_sc_group_idx].remove(best_sc_mapping[0])
                 mdl_chain_groups[best_sc_group_idx].remove(best_sc_mapping[1])
 
-                transform = _GetTransform(mapped_mdl_pos, mapped_trg_pos,
-                                          False)
+                transform = _GetSuperposition(mapped_mdl_pos, mapped_trg_pos,
+                                              False).transformation
 
         # compute overall RMSD for current transform
         mapped_mdl_pos.ApplyTransform(transform)
@@ -3286,7 +3226,7 @@ def _ChainMappings(ref_chains, mdl_chains, n_max=None):
     return _ConcatIterators(iterators)
 
 
-def _GetTransform(pos_one, pos_two, iterative):
+def _GetSuperposition(pos_one, pos_two, iterative):
     """ Computes minimal RMSD superposition for pos_one onto pos_two
 
     :param pos_one: Positions that should be superposed onto *pos_two*
@@ -3297,7 +3237,7 @@ def _GetTransform(pos_one, pos_two, iterative):
                 potentially raises, uses standard superposition as fallback.
     :type iterative: :class:`bool`
     :returns: Transformation matrix to superpose *pos_one* onto *pos_two*
-    :rtype: :class:`geom.Mat4`
+    :rtype: :class:`ost.mol.alg.SuperpositionResult`
     """
     res = None
     if iterative:
@@ -3307,7 +3247,7 @@ def _GetTransform(pos_one, pos_two, iterative):
             pass # triggers fallback below
     if res is None:
         res = mol.alg.SuperposeSVD(pos_one, pos_two)
-    return res.transformation
+    return res
 
 # specify public interface
 __all__ = ('ChainMapper', 'ReprResult', 'MappingResult')

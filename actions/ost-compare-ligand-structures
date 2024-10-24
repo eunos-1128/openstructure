@@ -32,8 +32,10 @@ definition, and have properly named residues and atoms, in order for
 ligand connectivity to be loaded correctly. Ligands loaded from SDF files
 are exempt from this restriction, meaning any arbitrary ligand can be assessed.
 
-Output is written in JSON format (default: out.json). In case of no additional
-options, this is a dictionary with three keys:
+Output can be written in two format: JSON (default) or CSV, controlled by the
+--output-format/-of argument.
+
+Without additional options, the JSON ouput is a dictionary with four keys:
 
  * "model_ligands": A list of ligands in the model. If ligands were provided
    explicitly with --model-ligands, elements of the list will be the paths to
@@ -46,6 +48,7 @@ options, this is a dictionary with three keys:
  * "status": SUCCESS if everything ran through. In case of failure, the only
    content of the JSON output will be \"status\" set to FAILURE and an
    additional key: "traceback".
+ * "ost_version": The OpenStructure version used for computation.
 
 Each score is opt-in and the respective results are available in three keys:
 
@@ -70,9 +73,44 @@ This is a list of data items for each pair of model/reference ligands. The data
 items follow the same structure as in "assigned_scores". If no score for a
 specific pair of ligands could be computed, "score" and "coverage" are set to
 null and a key "reason" is added giving an educated guess why this happened.
+
+CSV output is a table of comma-separated values, with one line for each
+reference ligand (or one model ligand if the --by-model-ligand-output flag was
+set).
+
+The following column is always available:
+
+ * reference_ligand/model_ligand: If reference ligands were provided explicitly
+   with --reference-ligands, elements of the list will be the paths to the
+   ligand SDF file(s). Otherwise, they will be the chain name, residue number
+   and insertion code of the ligand, separated by a dot. If the
+   --by-model-ligand-output flag was set, this will be model ligand instead,
+   following the same rules.
+
+If lDDT-PLI was enabled with --lddt-pli, the following columns are added:
+
+ * "lddt_pli", "lddt_pli_coverage" and "lddt_pli_(model|reference)_ligand"
+   are the lDDT-PLI score result, the corresponding coverage and assigned model
+   ligand (or reference ligand if the --by-model-ligand-output flag was set)
+   if an assignment was found, respectively, empty otherwise.
+ * "lddt_pli_unassigned" is empty if an assignment was found, otherwise it
+   lists the short reason this reference ligand was unassigned.
+
+If BiSyRMSD was enabled with --rmsd, the following columns are added:
+
+ * "rmsd", "rmsd_coverage". "lddt_lp" "bb_rmsd" and
+   "rmsd_(model|reference)_ligand" are the BiSyRMSD, the corresponding
+   coverage, lDDT-LP, backbone RMSD and assigned model ligand (or reference
+   ligand if the --by-model-ligand-output flag was set) if an assignment
+   was found, respectively, empty otherwise.
+ * "rmsd_unassigned" is empty if an assignment was found, otherwise it
+   lists the short reason this reference ligand was unassigned.
+
 """
 
 import argparse
+import csv
+from io import StringIO
 import json
 import os
 import sys
@@ -128,9 +166,9 @@ def _ParseArgs():
         "--out",
         "--output",
         dest="output",
-        default="out.json",
-        help=("Output file name. The output will be saved as a JSON file. "
-              "default: out.json"))
+        default=None,
+        help=("Output file name. "
+              "Default depends on format: out.json or out.csv"))
 
     parser.add_argument(
         "-mf",
@@ -153,6 +191,43 @@ def _ParseArgs():
         choices=["pdb", "cif", "mmcif"],
         help=("Format of reference file. pdb reads pdb but also pdb.gz, same "
               "applies to cif/mmcif. Inferred from filepath if not given."))
+
+    parser.add_argument(
+        "-of",
+        "--out-format",
+        "--output-format",
+        dest="output_format",
+        choices=["json", "csv"],
+        default="json",
+        help=("Output format, JSON or CSV, in lowercase. "
+              "default: json"))
+
+    parser.add_argument(
+        "-csvm",
+        "--by-model-ligand",
+        "--by-model-ligand-output",
+        dest="output_by_model_ligand",
+        default=False,
+        action="store_true",
+        help=("For CSV output, this flag changes the output so that each line "
+              "reports one model ligand, instead of a reference ligand. "
+              "Has no effect with JSON output."))
+
+    parser.add_argument(
+        "--csv-extra-header",
+        dest="csv_extra_header",
+        default=None,
+        type=str,
+        help=("Extra header prefix for CSV output. This allows adding "
+              "additional annotations (such as target ID, group, etc) to the "
+              "output"))
+
+    parser.add_argument(
+        "--csv-extra-data",
+        dest="csv_extra_data",
+        default=None,
+        type=str,
+        help=("Additional data (columns) for CSV output."))
 
     parser.add_argument(
         "-mb",
@@ -208,6 +283,7 @@ def _ParseArgs():
         "--coverage-delta",
         dest="coverage_delta",
         default=0.2,
+        type=float,
         help=("Coverage delta for partial ligand assignment."))
 
     parser.add_argument(
@@ -215,8 +291,8 @@ def _ParseArgs():
         '--verbosity',
         dest="verbosity",
         type=int,
-        default=3,
-        help="Set verbosity level. Defaults to 3 (INFO).")
+        default=2,
+        help="Set verbosity level. Defaults to 2 (Script).")
 
     parser.add_argument(
         "--full-results",
@@ -239,14 +315,22 @@ def _ParseArgs():
         "--lddt-pli-radius",
         dest="lddt_pli_radius",
         default=6.0,
+        type=float,
         help=("lDDT inclusion radius for lDDT-PLI."))
 
     parser.add_argument(
-        "--lddt-pli-amc",
-        dest="lddt_pli_amc",
-        default=False,
+        "--lddt-pli-add-mdl-contacts",
+        dest="lddt_pli_add_mdl_contacts",
+        default=True,
         action="store_true",
-        help=("Add model contacts (amc) when computing lDDT-PLI."))
+        help=("Add model contacts when computing lDDT-PLI."))
+
+    parser.add_argument(
+        "--no-lddt-pli-add-mdl-contacts",
+        dest="lddt_pli_add_mdl_contacts",
+        default=True,
+        action="store_false",
+        help=("DO NOT add model contacts when computing lDDT-PLI."))
 
     # arguments relevant for rmsd
 
@@ -261,6 +345,7 @@ def _ParseArgs():
         "--radius",
         dest="radius",
         default=4.0,
+        type=float,
         help=("Inclusion radius to extract reference binding site that is used "
               "for RMSD computation. Any residue with atoms within this "
               "distance of the ligand will be included in the binding site."))
@@ -269,6 +354,7 @@ def _ParseArgs():
         "--lddt-lp-radius",
         dest="lddt_lp_radius",
         default=15.0,
+        type=float,
         help=("lDDT inclusion radius for lDDT-LP."))
 
     parser.add_argument(
@@ -280,7 +366,20 @@ def _ParseArgs():
         help=("Enumerate all potential binding sites in the model when "
               "searching rigid superposition for RMSD computation"))
 
-    return parser.parse_args()
+    parser.add_argument(
+        "-ms",
+        "--max--symmetries",
+        dest="max_symmetries",
+        default=1e4,
+        type=int,
+        help=("If more than that many isomorphisms exist for a target-ligand "
+              "pair, it will be ignored and reported as unassigned."))
+
+    args = parser.parse_args()
+    if args.output is None:
+        args.output = "out.%s" % args.output_format
+
+    return args
 
 
 def _CheckCompoundLib():
@@ -320,8 +419,6 @@ def _LoadStructure(structure_path, sformat, fault_tolerant, bu_id):
     The returned structure has structure_path attached as structure name
     """
 
-    # increase loglevel, as we would pollute the info log with weird stuff
-    ost.PushVerbosityLevel(ost.LogLevel.Error)
     # Load the structure
     if sformat == "mmcif":
         if bu_id is not None:
@@ -346,7 +443,6 @@ def _LoadStructure(structure_path, sformat, fault_tolerant, bu_id):
             raise Exception(f"No residues found in file: {structure_path}")
 
     # restore old loglevel and return
-    ost.PopVerbosityLevel()
     entity.SetName(structure_path)
     return entity
 
@@ -366,7 +462,11 @@ def _LoadLigand(file):
     """
     Load a single ligand from file names. Return an entity.
     """
-    return ost.io.LoadEntity(file, format="sdf")
+    ent = ost.io.LoadEntity(file, format="sdf")
+    ed = ent.EditXCS()
+    ed.RenameChain(ent.chains[0], file)
+    ed.UpdateICS()
+    return ent
 
 
 def _CleanupStructure(entity):
@@ -425,7 +525,8 @@ def _SetupLDDTPLIScorer(model, model_ligands, reference, reference_ligands, args
                                                 substructure_match = args.substructure_match,
                                                 coverage_delta = args.coverage_delta,
                                                 lddt_pli_radius = args.lddt_pli_radius,
-                                                add_mdl_contacts = args.lddt_pli_amc)
+                                                add_mdl_contacts = args.lddt_pli_add_mdl_contacts,
+                                                max_symmetries = args.max_symmetries)
 
 def _SetupSCRMSDScorer(model, model_ligands, reference, reference_ligands, args):
     return ligand_scoring_scrmsd.SCRMSDScorer(model, reference,
@@ -436,7 +537,9 @@ def _SetupSCRMSDScorer(model, model_ligands, reference, reference_ligands, args)
                                               substructure_match = args.substructure_match,
                                               coverage_delta = args.coverage_delta,
                                               bs_radius = args.radius,
-                                              lddt_lp_radius = args.lddt_lp_radius)
+                                              lddt_lp_radius = args.lddt_lp_radius,
+                                              full_bs_search = args.full_bs_search,
+                                              max_symmetries = args.max_symmetries)
 
 def _Process(model, model_ligands, reference, reference_ligands, args):
 
@@ -527,6 +630,7 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
     ##################
 
     if args.lddt_pli:
+        LogScript("Computing lDDT-PLI scores")
         out["lddt_pli"] = dict()
         out["lddt_pli"]["assigned_scores"] = list()
         for lig_pair in lddtpli_scorer.assignment:
@@ -563,8 +667,8 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
             for ref_lig_idx in range(shape[0]):
                 for mdl_lig_idx in range(shape[1]):
                     state = int(lddtpli_scorer.state_matrix[(ref_lig_idx, mdl_lig_idx)])
-                    target_key = out["reference_ligands"][lig_pair[0]]
-                    model_key = out["model_ligands"][lig_pair[1]]
+                    target_key = out["reference_ligands"][ref_lig_idx]
+                    model_key = out["model_ligands"][mdl_lig_idx]
                     if state == 0:                    
                         score = float(lddtpli_scorer.score_matrix[(ref_lig_idx, mdl_lig_idx)])
                         coverage = float(lddtpli_scorer.coverage_matrix[(ref_lig_idx, mdl_lig_idx)])
@@ -589,6 +693,7 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
 
 
     if args.rmsd:
+        LogScript("Computing BiSyRMSD scores")
         out["rmsd"] = dict()
         out["rmsd"]["assigned_scores"] = list()
         for lig_pair in scrmsd_scorer.assignment:
@@ -611,7 +716,8 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
                                                                          aux_data["bs_ref_res_mapped"]],
                                                    "bs_mdl_res_mapped": [_QualifiedResidueNotation(r) for r in
                                                                          aux_data["bs_mdl_res_mapped"]],
-                                                   "inconsistent_residues": [_QualifiedResidueNotation(r) for r in
+                                                   "inconsistent_residues": [_QualifiedResidueNotation(r[0]) + \
+                                                                             "-" +_QualifiedResidueNotation(r[1]) for r in
                                                                              aux_data["inconsistent_residues"]],
                                                    "transform": [transform_data[i:i + 4]
                                                                  for i in range(0, len(transform_data), 4)]})
@@ -634,8 +740,8 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
             for ref_lig_idx in range(shape[0]):
                 for mdl_lig_idx in range(shape[1]):
                     state = int(scrmsd_scorer.state_matrix[(ref_lig_idx, mdl_lig_idx)])
-                    target_key = out["reference_ligands"][lig_pair[0]]
-                    model_key = out["model_ligands"][lig_pair[1]]
+                    target_key = out["reference_ligands"][ref_lig_idx]
+                    model_key = out["model_ligands"][mdl_lig_idx]
                     if state == 0:                    
                         score = float(scrmsd_scorer.score_matrix[(ref_lig_idx, mdl_lig_idx)])
                         coverage = float(scrmsd_scorer.coverage_matrix[(ref_lig_idx, mdl_lig_idx)])
@@ -654,7 +760,8 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
                                                                                   aux_data["bs_ref_res_mapped"]],
                                                             "bs_mdl_res_mapped": [_QualifiedResidueNotation(r) for r in
                                                                                   aux_data["bs_mdl_res_mapped"]],
-                                                            "inconsistent_residues": [_QualifiedResidueNotation(r) for r in
+                                                            "inconsistent_residues": [_QualifiedResidueNotation(r[0]) + \
+                                                                             "-" +_QualifiedResidueNotation(r[1]) for r in
                                                                                       aux_data["inconsistent_residues"]],
                                                             "transform": [transform_data[i:i + 4]
                                                                           for i in range(0, len(transform_data), 4)]})
@@ -669,22 +776,97 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
 
     return out
 
+def _WriteCSV(out, args):
+    csv_dict = {}
+
+    if args.output_by_model_ligand:
+        ligand_by = "model_ligand"
+        ligand_other = "reference_ligand"
+    else:
+        ligand_by = "reference_ligand"
+        ligand_other = "model_ligand"
+
+    # Always fill-in basic reference ligand info
+    fieldnames = [ligand_by]
+    for ligand in out["%ss" % ligand_by]:
+        csv_dict[ligand] = {
+            ligand_by: ligand,
+        }
+
+    if args.lddt_pli:
+        fieldnames.extend(["lddt_pli",  "lddt_pli_coverage",
+                           "lddt_pli_%s" % ligand_other, "lddt_pli_unassigned"])
+        for score in out["lddt_pli"]["assigned_scores"]:
+            csv_dict[score[ligand_by]].update({
+                ligand_by: score[ligand_by],
+                "lddt_pli": score["score"],
+                "lddt_pli_coverage": score["coverage"],
+                "lddt_pli_%s" % ligand_other: score[ligand_other],
+            })
+        for ligand, reason in out["lddt_pli"][
+                "%s_unassigned_reason" % ligand_by].items():
+            csv_dict[ligand].update({
+                ligand_by: ligand,
+                "lddt_pli_unassigned": reason[0],
+            })
+
+    if args.rmsd:
+        fieldnames.extend(["rmsd", "lddt_lp", "bb_rmsd", "rmsd_coverage",
+                           "rmsd_%s" % ligand_other, "rmsd_unassigned"])
+        for score in out["rmsd"]["assigned_scores"]:
+            csv_dict[score[ligand_by]].update({
+                ligand_by: score[ligand_by],
+                "rmsd": score["score"],
+                "lddt_lp": score["lddt_lp"],
+                "bb_rmsd": score["bb_rmsd"],
+                "rmsd_coverage": score["coverage"],
+                "rmsd_%s" % ligand_other: score[ligand_other],
+            })
+        for ligand, reason in out["rmsd"][
+                "%s_unassigned_reason" % ligand_by].items():
+            csv_dict[ligand].update({
+                ligand_by: ligand,
+                "rmsd_unassigned": reason[0],
+            })
+
+    if args.csv_extra_header or args.csv_extra_data:
+
+        extra_csv = StringIO(
+            args.csv_extra_header + os.linesep + args.csv_extra_data)
+        reader = csv.DictReader(extra_csv)
+        extra_data = next(iter(reader))
+        if None in extra_data:
+            raise ValueError("Not enough columns in --csv-extra-header")
+        fieldnames = reader.fieldnames + fieldnames
+        for ligand, row in csv_dict.items():
+            row.update(extra_data)
+
+    with open(args.output, 'w', newline='') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in csv_dict.values():
+            writer.writerow(row)
 
 def _Main():
 
     args = _ParseArgs()
     ost.PushVerbosityLevel(args.verbosity)
     if args.verbosity < 4:
-        sys.tracebacklimit = 100
+        # Hide tracebacks by default
+        # Run script with -v 4 (Verbose) or higher to display them
+        sys.tracebacklimit = 0
     _CheckCompoundLib()
     try:
         # Load structures
+        LogScript("Loading data")
+        LogInfo("Loading reference structure")
         reference_format = _GetStructureFormat(args.reference,
                                                sformat=args.reference_format)
         reference = _LoadStructure(args.reference,
                                    sformat=reference_format,
                                    bu_id=args.reference_biounit,
                                    fault_tolerant = args.fault_tolerant)
+        LogInfo("Loading model structure")
         model_format = _GetStructureFormat(args.model,
                                            sformat=args.model_format)
         model = _LoadStructure(args.model,
@@ -693,13 +875,19 @@ def _Main():
                                fault_tolerant = args.fault_tolerant)
 
         # Load ligands
-        model_ligands = _LoadLigands(args.model_ligands)
+        LogInfo("Loading reference ligands")
         reference_ligands = _LoadLigands(args.reference_ligands)
+        LogInfo("Loading model ligands")
+        model_ligands = _LoadLigands(args.model_ligands)
 
         # Cleanup
+        LogVerbose("Cleaning up reference structure")
         cleaned_reference = _CleanupStructure(reference)
+        LogVerbose("Cleaning up model structure")
         cleaned_model = _CleanupStructure(model)
+        LogVerbose("Cleaning up reference ligands")
         cleaned_reference_ligands = _CleanupLigands(reference_ligands)
+        LogVerbose("Cleaning up model ligands")
         cleaned_model_ligands = _CleanupLigands(model_ligands)
 
         # Validate
@@ -712,18 +900,27 @@ def _Main():
                        cleaned_reference, cleaned_reference_ligands,
                        args)
 
+        out["ost_version"] = ost.__version__
         out["status"] = "SUCCESS"
-        with open(args.output, 'w') as fh:
-            json.dump(out, fh, indent=4, sort_keys=False)
+        if args.output_format == "json":
+            with open(args.output, 'w') as fh:
+                json.dump(out, fh, indent=4, sort_keys=False)
+        else:
+            _WriteCSV(out, args)
+        LogScript("Saved results in %s" % args.output)
 
     except Exception as exc:
-        out = dict()
-        out["status"] = "FAILURE"
-        out["traceback"] = traceback.format_exc(limit=1000)
-        etype, evalue, tb = sys.exc_info()
-        out["exception"] = " ".join(traceback.format_exception_only(etype, evalue))
-        with open(args.output, 'w') as fh:
-            json.dump(out, fh, indent=4, sort_keys=False)
+        if args.output_format == "json":
+            out = dict()
+            out["status"] = "FAILURE"
+            out["traceback"] = traceback.format_exc(limit=1000)
+            etype, evalue, tb = sys.exc_info()
+            out["exception"] = " ".join(traceback.format_exception_only(etype, evalue))
+            with open(args.output, 'w') as fh:
+                json.dump(out, fh, indent=4, sort_keys=False)
+            LogWarning("Error information saved in %s" % args.output)
+        else:
+            LogScript("Error encountered, no output saved")
         raise
 
 

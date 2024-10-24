@@ -60,7 +60,9 @@ results:
  * "min_pep_length"
  * "min_nuc_length"
  * "lddt_add_mdl_contacts"
+ * "lddt_inclusion_radius"
  * "dockq_capri_peptide"
+ * "ost_version"
 
 The pairwise sequence alignments are computed with Needleman-Wunsch using
 BLOSUM62 (NUC44 for nucleotides). Many benchmarking scenarios preprocess the
@@ -247,6 +249,25 @@ def _ParseArgs():
               "format: <chain_name>.<resnum>.<resnum_inscode>.<atom_name>"))
 
     parser.add_argument(
+        "--aa-local-lddt",
+        dest="aa_local_lddt",
+        default=False,
+        action="store_true",
+        help=("Compute per-atom lDDT scores with default parameterization "
+              "and store as key \"aa_local_lddt\". Score for each atom is "
+              "accessible by key "
+              "<chain_name>.<resnum>.<resnum_inscode>.<aname>. "
+              "Alpha carbon from residue with number 42 in chain X can be "
+              "extracted with: data[\"aa_local_lddt\"][\"X.42..CA\"]. "
+              "If there is a residue insertion code, lets say A, the atom key "
+              "becomes \"X.42.A.CA\". "
+              "Stereochemical irregularities affecting lDDT are reported as "
+              "keys \"model_clashes\", \"model_bad_bonds\", "
+              "\"model_bad_angles\" and the respective reference "
+              "counterparts. Atoms specified in there follow the following "
+              "format: <chain_name>.<resnum>.<resnum_inscode>.<atom_name>"))
+
+    parser.add_argument(
         "--bb-lddt",
         dest="bb_lddt",
         default=False,
@@ -344,7 +365,8 @@ def _ParseArgs():
         help=("Compute DockQ scores and its components. Relevant interfaces "
               "with at least one contact (any atom within 5A) of the reference "
               "structure are available as key \"dockq_reference_interfaces\". "
-              "Only interfaces between peptide chains are considered here! "
+              "Protein-protein, protein-nucleotide and nucleotide-nucleotide "
+              "interfaces are considered. "
               "Key \"dockq_interfaces\" is a subset of "
               "\"dockq_reference_interfaces\" that contains interfaces that "
               "can be mapped to the model. They are stored as lists in format "
@@ -382,7 +404,8 @@ def _ParseArgs():
               "8A in combination with only considering CB atoms for "
               "protein-peptide interactions. "
               "Note that the resulting DockQ is not evaluated for these "
-              "slightly updated fnat and irmsd (lrmsd stays the same)."
+              "slightly updated fnat and irmsd (lrmsd stays the same). "
+              "Raises an error if reference contains nucleotide chains. "
               "This flag has no influence on patch_dockq scores."))
 
     parser.add_argument(
@@ -412,6 +435,32 @@ def _ParseArgs():
               "\"per_interface_ics_recall\" and \"per_interface_ics\"."))
 
     parser.add_argument(
+        "--ics-trimmed",
+        dest="ics_trimmed",
+        default=False,
+        action="store_true",
+        help=("Computes interface contact similarity (ICS) related scores but "
+              "on a trimmed model. That means that a mapping between model and "
+              "reference is performed and all model residues without reference "
+              "counterpart are removed. As a consequence, model contacts for "
+              "which we have no experimental evidence do not affect the score. "
+              "The effect of these added model contacts without mapping to "
+              "target would be decreased precision and thus lower ics. Recall is "
+              "not affected. Enabling this flag adds the following keys: "
+              "\"ics_trimmed\", \"ics_precision_trimmed\", "
+              "\"ics_recall_trimmed\", \"model_contacts_trimmed\". "
+              "The reference contacts and reference interfaces are the same "
+              "as for ics and available as keys: \"reference_contacts\", "
+              "\"contact_reference_interfaces\". "
+              "All these measures are also available on a per-interface basis "
+              "for each interface in the reference structure that are defined "
+              "as chain pairs with at least one contact (available as key "
+              " \"contact_reference_interfaces\"). The respective metrics are "
+              "available as keys \"per_interface_ics_precision_trimmed\", "
+              "\"per_interface_ics_recall_trimmed\" and "
+              "\"per_interface_ics_trimmed\"."))
+
+    parser.add_argument(
         "--ips",
         dest="ips",
         default=False,
@@ -438,6 +487,12 @@ def _ParseArgs():
               "available as keys \"per_interface_ips_precision\", "
               "\"per_interface_ips_recall\" and \"per_interface_ips\"."))
 
+    parser.add_argument(
+        "--ips-trimmed",
+        dest="ips_trimmed",
+        default=False,
+        action="store_true",
+        help=("The IPS equivalent of ICS on trimmed models."))
 
     parser.add_argument(
         "--rigid-scores",
@@ -451,7 +506,10 @@ def _ParseArgs():
               "8.0] given these positions and transformation, \"oligo_gdtha\": "
               "same with thresholds [0.5, 1.0, 2.0, 4.0], \"rmsd\": RMSD given "
               "these positions and transformation, \"transform\": the used 4x4 "
-              "transformation matrix that superposes model onto reference."))
+              "transformation matrix that superposes model onto reference, "
+              "\"rigid_chain_mapping\": equivalent of \"chain_mapping\" which "
+              "is used for rigid scores (optimized for RMSD instead of "
+              "QS-score/lDDT)."))
 
     parser.add_argument(
         "--patch-scores",
@@ -565,7 +623,7 @@ def _ParseArgs():
         dest="verbosity",
         type=int,
         default=2,
-        help="Set verbosity level. Defaults to 3 (Script).")
+        help="Set verbosity level. Defaults to 2 (Script).")
 
     parser.add_argument(
         "--lddt-add-mdl-contacts",
@@ -581,6 +639,14 @@ def _ParseArgs():
               "not necessarily in the reference. No contact will "
               "be added if the respective atom pair is not "
               "resolved in the reference."))
+
+    parser.add_argument(
+        "--lddt-inclusion-radius",
+        dest="lddt_inclusion_radius",
+        type = float,
+        default=15.0,
+        help=("Passed to lDDT scorer. Affects all lDDT scores but not "
+              "chain mapping."))
  
     return parser.parse_args()
 
@@ -706,6 +772,17 @@ def _LocalScoresToJSONDict(score_dict):
             json_dict[f"{ch}.{num.num}.{ins_code}"] = _RoundOrNone(s)
     return json_dict
 
+def _LocalAAScoresToJSONDict(score_dict):
+    """ Convert ResNums and atom names to str for JSON serialization
+    """
+    json_dict = dict()
+    for ch, ch_scores in score_dict.items():
+        for num, res_scores in ch_scores.items():
+            ins_code = num.ins_code.strip("\u0000")
+            for a, s in res_scores.items():
+                json_dict[f"{ch}.{num.num}.{ins_code}.{a}"] = _RoundOrNone(s)
+    return json_dict
+
 def _InterfaceResiduesToJSONList(interface_dict):
     """ Convert ResNums to str for JSON serialization.
 
@@ -780,7 +857,8 @@ def _Process(model, reference, args, model_format, reference_format):
                             min_pep_length = args.min_pep_length,
                             min_nuc_length = args.min_nuc_length,
                             lddt_add_mdl_contacts = args.lddt_add_mdl_contacts,
-                            dockq_capri_peptide = args.dockq_capri_peptide)
+                            dockq_capri_peptide = args.dockq_capri_peptide,
+                            lddt_inclusion_radius = args.lddt_inclusion_radius)
 
     ir = _GetInconsistentResidues(scorer.aln)
     if len(ir) > 0 and args.enforce_consistency:
@@ -810,7 +888,10 @@ def _Process(model, reference, args, model_format, reference_format):
     if args.local_lddt:
         out["local_lddt"] = _LocalScoresToJSONDict(scorer.local_lddt)
 
-    if args.lddt or args.local_lddt:
+    if args.aa_local_lddt:
+        out["aa_local_lddt"] = _LocalAAScoresToJSONDict(scorer.aa_local_lddt)
+
+    if args.lddt or args.local_lddt or args.aa_local_lddt:
         out["model_clashes"] = [x.ToJSON() for x in scorer.model_clashes]
         out["model_bad_bonds"] = [x.ToJSON() for x in scorer.model_bad_bonds]
         out["model_bad_angles"] = [x.ToJSON() for x in scorer.model_bad_angles]
@@ -845,8 +926,13 @@ def _Process(model, reference, args, model_format, reference_format):
         [_RoundOrNone(x) for x in scorer.per_interface_qs_best]
 
     if args.ics or args.ips:
-        out["reference_contacts"] = scorer.native_contacts
         out["model_contacts"] = scorer.model_contacts
+
+    if args.ics_trimmed or args.ips_trimmed:
+        out["model_contacts_trimmed"] = scorer.trimmed_model_contacts
+
+    if args.ics or args.ips or args.ics_trimmed or args.ips_trimmed:
+        out["reference_contacts"] = scorer.native_contacts
         out["contact_reference_interfaces"] = scorer.contact_target_interfaces
 
     if args.ics:
@@ -871,6 +957,28 @@ def _Process(model, reference, args, model_format, reference_format):
         out["per_interface_ips"] = \
         [_RoundOrNone(x) for x in scorer.per_interface_ips]
 
+    if args.ics_trimmed:
+        out["ics_trimmed"] = _RoundOrNone(scorer.ics_trimmed)
+        out["ics_precision_trimmed"] = _RoundOrNone(scorer.ics_precision_trimmed)
+        out["ics_recall_trimmed"] = _RoundOrNone(scorer.ics_recall_trimmed)
+        out["per_interface_ics_precision_trimmed"] = \
+        [_RoundOrNone(x) for x in scorer.per_interface_ics_precision_trimmed]
+        out["per_interface_ics_recall_trimmed"] = \
+        [_RoundOrNone(x) for x in scorer.per_interface_ics_recall_trimmed]
+        out["per_interface_ics_trimmed"] = \
+        [_RoundOrNone(x) for x in scorer.per_interface_ics_trimmed]
+
+    if args.ips_trimmed:
+        out["ips_trimmed"] = _RoundOrNone(scorer.ips_trimmed)
+        out["ips_precision_trimmed"] = _RoundOrNone(scorer.ips_precision_trimmed)
+        out["ips_recall_trimmed"] = _RoundOrNone(scorer.ips_recall_trimmed)
+        out["per_interface_ips_precision_trimmed"] = \
+        [_RoundOrNone(x) for x in scorer.per_interface_ips_precision_trimmed]
+        out["per_interface_ips_recall_trimmed"] = \
+        [_RoundOrNone(x) for x in scorer.per_interface_ips_recall_trimmed]
+        out["per_interface_ips_trimmed"] = \
+        [_RoundOrNone(x) for x in scorer.per_interface_ips_trimmed]
+
     if args.dockq:
         out["dockq_reference_interfaces"] = scorer.dockq_target_interfaces
         out["dockq_interfaces"] = scorer.dockq_interfaces 
@@ -890,8 +998,9 @@ def _Process(model, reference, args, model_format, reference_format):
         out["oligo_gdtts"] = _RoundOrNone(scorer.gdtts)
         out["oligo_gdtha"] = _RoundOrNone(scorer.gdtha)
         out["rmsd"] = _RoundOrNone(scorer.rmsd)
-        data = scorer.transform.data
+        data = scorer.rigid_transform.data
         out["transform"] = [data[i:i + 4] for i in range(0, len(data), 4)]
+        out["rigid_chain_mapping"] = scorer.rigid_mapping.GetFlatMapping()
 
     if args.patch_scores:
         out["model_interface_residues"] = \
@@ -924,6 +1033,8 @@ def _Main():
     args = _ParseArgs()
     ost.PushVerbosityLevel(args.verbosity)
     if args.verbosity < 4:
+        # Hide tracebacks by default
+        # Run script with -v 4 (Verbose) or higher to display them
         sys.tracebacklimit = 0
     _CheckCompoundLib()
     try:
@@ -960,14 +1071,16 @@ def _Main():
         out["min_pep_length"] = args.min_pep_length
         out["min_nuc_length"] = args.min_nuc_length
         out["lddt_add_mdl_contacts"] = args.lddt_add_mdl_contacts
+        out["lddt_inclusion_radius"] = args.lddt_inclusion_radius
         out["dockq_capri_peptide"] = args.dockq_capri_peptide
+        out["ost_version"] = ost.__version__
         out["status"] = "SUCCESS"
         with open(args.output, 'w') as fh:
             json.dump(out, fh, indent=4, sort_keys=False)
     except Exception as exc:
         out = dict()
         out["status"] = "FAILURE"
-        out["traceback"] = traceback.format_exc()
+        out["traceback"] = traceback.format_exc(limit=1000)
         etype, evalue, tb = sys.exc_info()
         out["exception"] = " ".join(traceback.format_exception_only(etype, evalue))
         with open(args.output, 'w') as fh:

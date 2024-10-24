@@ -1,3 +1,4 @@
+import itertools
 import numpy as np
 
 from ost import mol
@@ -438,7 +439,7 @@ class lDDTScorer:
              no_intrachain=False, penalize_extra_chains=False,
              residue_mapping=None, return_dist_test=False,
              check_resnames=True, add_mdl_contacts=False,
-             interaction_data=None):
+             interaction_data=None, set_atom_props=False):
         """Computes lDDT of *model* - globally and per-residue
 
         :param model: Model to be scored - models are preferably scored upon
@@ -530,6 +531,12 @@ class lDDTScorer:
         :type add_mdl_contacts: :class:`bool`
         :param interaction_data: Pro param - don't use
         :type interaction_data: :class:`tuple`
+        :param set_atom_props: If True, sets generic properties on a per atom
+                               level if *local_lddt_prop*/*local_contact_prop*
+                               are set as well.
+                               In other words: this is the only way you can
+                               get per-atom lDDT values.
+        :type set_atom_props: :class:`bool`
 
         :returns: global and per-residue lDDT scores as a tuple -
                   first element is global lDDT score (None if *target* has no
@@ -610,16 +617,28 @@ class lDDTScorer:
         self._ResolveSymmetries(pos, thresholds, symmetries, sym_ref_indices,
                                 sym_ref_distances)
 
+        atom_indices = list(itertools.chain.from_iterable(res_atom_indices))
+
+        per_atom_exp = np.asarray([self._GetNExp(i, ref_indices)
+            for i in atom_indices], dtype=np.int32)
         per_res_exp = np.asarray([self._GetNExp(res_ref_atom_indices[idx],
             ref_indices) for idx in range(len(res_indices))], dtype=np.int32)
-        per_res_conserved = self._EvalResidues(pos, thresholds,
-                                               res_atom_indices,
-                                               ref_indices, ref_distances)
+
+        per_atom_conserved = self._EvalAtoms(pos, atom_indices, thresholds,
+                                             ref_indices, ref_distances)
+        per_res_conserved = np.zeros((len(res_atom_indices), len(thresholds)),
+                                     dtype=np.int32)
+        start_idx = 0
+        for r_idx in range(len(res_atom_indices)):
+            end_idx = start_idx + len(res_atom_indices[r_idx])
+            per_res_conserved[r_idx] = np.sum(per_atom_conserved[start_idx:end_idx,:],
+                                              axis=0)
+            start_idx = end_idx
 
         n_thresh = len(thresholds)
 
         # do per-residue scores
-        per_res_lDDT = [None] * len(model.residues)
+        per_res_lDDT = [None] * model.GetResidueCount()
         for idx in range(len(res_indices)):
             n_exp = n_thresh * per_res_exp[idx]
             if n_exp > 0:
@@ -655,6 +674,40 @@ class lDDTScorer:
                                            n_thresh * int(per_res_exp[i]))
                 residues[r_idx].SetIntProp(conserved_prop,
                                            int(np.sum(per_res_conserved[i,:])))
+
+        if set_atom_props and (local_lddt_prop or local_contact_prop):
+            atom_list = list()
+            residues = model.residues
+            for i, indices in enumerate(res_atom_indices):
+                r = residues[res_indices[i]]
+                r_idx = ref_res_indices[i]
+                res_start_idx = self.res_start_indices[r_idx]
+                anames = self.compound_anames[self.compound_names[r_idx]]
+                for a_i in indices:
+                    a = r.FindAtom(anames[a_i - res_start_idx])
+                    assert(a.IsValid())
+                    atom_list.append(a)
+
+            summed_per_atom_conserved = per_atom_conserved.sum(axis=1)
+            if local_lddt_prop:
+                # the only place where actually need to compute per-atom lDDT
+                # scores
+                for a_idx in range(len(atom_list)):
+                    if per_atom_exp[a_idx] != 0:
+                        tmp = summed_per_atom_conserved[a_idx] / per_atom_exp[a_idx]
+                        tmp = tmp / n_thresh
+                        atom_list[a_idx].SetFloatProp(local_lddt_prop, tmp)
+
+            if local_contact_prop:
+                conserved_prop = local_contact_prop + "_cons"
+                exp_prop = local_contact_prop + "_exp"
+                for a_idx in range(len(atom_list)):
+                    # do number of conserved contacts
+                    tmp = summed_per_atom_conserved[a_idx]
+                    atom_list[a_idx].SetIntProp(conserved_prop, tmp)
+                    # do number of expected contacts
+                    tmp = per_atom_exp[a_idx] * n_thresh
+                    atom_list[a_idx].SetIntProp(exp_prop, tmp)
 
         if return_dist_test:
             return lDDT, per_res_lDDT, lDDT_tot, lDDT_cons, res_indices, \

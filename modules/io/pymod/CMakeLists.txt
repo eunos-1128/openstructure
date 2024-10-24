@@ -4,6 +4,7 @@ set(OST_IO_PYMOD_SOURCES
   export_mmcif_io.cc
   export_omf_io.cc
   export_map_io.cc
+  export_sdf_io.cc
 )
 
 set(OST_IO_PYMOD_MODULES

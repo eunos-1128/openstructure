@@ -22,11 +22,13 @@
 
 #include <ost/base.hh>
 #include <ost/module_config.hh>
+#include <unordered_set>
 
 namespace ost {
 
-bool DLLEXPORT_OST_BASE compare_files(const String& test, 
-                                      const String& gold_standard);  
+bool DLLEXPORT_OST_BASE compare_files(const String& test,
+                                      const String& gold_standard,
+                                      const std::unordered_set<int>& ignore_line = {});
 }
 
 
