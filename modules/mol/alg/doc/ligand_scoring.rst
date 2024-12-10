@@ -1,6 +1,12 @@
 :mod:`~ost.mol.alg.ligand_scoring` -- Ligand scoring functions
 ------------------------------------------------------------------------------------------
 
+.. note ::
+  Extra requirements:
+
+  - Python modules `numpy` and `networkx` must be available
+    (e.g. use ``pip install numpy networkx``)
+
 .. module:: ost.mol.alg.ligand_scoring
    :synopsis: Ligand scoring functions
 

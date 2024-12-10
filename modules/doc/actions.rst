@@ -475,7 +475,7 @@ Comparing two structures with ligands
 You can compare two structures with non-polymer/small molecule ligands and
 compute lDDT-PLI and ligand RMSD scores from the command line with the
 ``ost compare-ligand-structures`` action. This can be considered a command
-line interface to :class:`ost.mol.alg.ligand_scoring.LigandScorer` and more
+line interface to :class:`ost.mol.alg.ligand_scoring_base.LigandScorer` and more
 information about arguments and outputs can be found there.
 
 Details on the usage (output of ``ost compare-ligand-structures --help``):
@@ -500,106 +500,117 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
                                        [--radius RADIUS]
                                        [--lddt-lp-radius LDDT_LP_RADIUS] [-fbs]
                                        [-ms MAX_SYMMETRIES]
-  
+
   Evaluate model with non-polymer/small molecule ligands against reference.
-  
+
   Example: ost compare-ligand-structures \
       -m model.pdb \
       -ml ligand.sdf \
       -r reference.cif \
       --lddt-pli --rmsd
-  
+
   Structures of polymer entities (proteins and nucleotides) can be given in PDB
-  or mmCIF format.
-  
+  or mmCIF format. In case of PDB format, the full loaded structure undergoes
+  processing described below. In case of mmCIF format, chains representing
+  "polymer" entities according to _entity.type are selected and further processed
+  as described below.
+
+  Structure cleanup is heavily based on the PDB component dictionary and performs
+  1) removal of hydrogens, 2) removal of residues for which there is no entry in
+  component dictionary, 3) removal of residues that are not peptide linking or
+  nucleotide linking according to the component dictionary 4) removal of atoms
+  that are not defined for respective residues in the component dictionary. Except
+  step 1), every cleanup is logged and a report is available in the json outfile.
+
   Ligands can be given as path to SDF files containing the ligand for both model
   (--model-ligands/-ml) and reference (--reference-ligands/-rl). If omitted,
-  ligands will be detected in the model and reference structures. For structures
-  given in mmCIF format, this is based on the annotation as "non polymer entity"
-  (i.e. ligands in the _pdbx_entity_nonpoly mmCIF category) and works reliably.
-  For structures given in legacy PDB format, this is based on the HET records
-  which is usually only set properly on files downloaded from the PDB (and even
-  then, this is not always the case). This is normally not what you want. You
-  should always give ligands as SDF for structures in legacy PDB format.
-  
-  Polymer/oligomeric ligands (saccharides, peptides, nucleotides) are not
-  supported.
-  
-  Only minimal cleanup steps are performed (remove hydrogens and deuteriums,
-  and for structures of polymers only, remove unknown atoms and cleanup element
-  column).
-  
-  Ligands in mmCIF and PDB files must comply with the PDB component dictionary
-  definition, and have properly named residues and atoms, in order for
-  ligand connectivity to be loaded correctly. Ligands loaded from SDF files
-  are exempt from this restriction, meaning any arbitrary ligand can be assessed.
-  
+  ligands are optionally detected from a structure file if it is given in mmCIF
+  format. This is based on "non-polymer" _entity.type annotation and the
+  respective entries must exist in the PDB component dictionary in order to get
+  connectivity information. For example, receptor structure and ligand(s) are
+  loaded from the same mmCIF file given as '-m'/'-r'. This does not work for
+  structures provided in PDB format and an error is raised if ligands are not
+  explitely given in SDF format.
+
+  Ligands undergo gentle processing where hydrogens are removed. Connectivity
+  is relevant for scoring. It is read directly from SDF input. If ligands are
+  extracted from mmCIF, connectivity is derived from the PDB component
+  dictionary. Polymer/oligomeric ligands (saccharides, peptides, nucleotides)
+  are not supported.
+
   Output can be written in two format: JSON (default) or CSV, controlled by the
   --output-format/-of argument.
-  
-  Without additional options, the JSON ouput is a dictionary with four keys:
-  
+
+  Without additional options, the JSON ouput is a dictionary with the following
+  keys:
+
    * "model_ligands": A list of ligands in the model. If ligands were provided
      explicitly with --model-ligands, elements of the list will be the paths to
      the ligand SDF file(s). Otherwise, they will be the chain name, residue
      number and insertion code of the ligand, separated by a dot.
-   * "reference_ligands": A list of ligands in the reference. If ligands were
-     provided explicitly with --reference-ligands, elements of the list will be
-     the paths to the ligand SDF file(s). Otherwise, they will be the chain name,
-     residue number and insertion code of the ligand, separated by a dot.
+   * "reference_ligands": Same for reference ligands.
    * "status": SUCCESS if everything ran through. In case of failure, the only
      content of the JSON output will be "status" set to FAILURE and an
      additional key: "traceback".
    * "ost_version": The OpenStructure version used for computation.
-  
+   * "model_cleanup_log": Lists residues/atoms that have been removed in model
+     cleanup process.
+   * "reference_cleanup_log": Same for reference.
+   * "reference": Parameter provided for --reference/-r
+   * "model": Parameter provided for --model/-m
+   * "resnum_alignments": Parameter provided for --residue-number-alignment/-rna
+   * "substructure_match": Parameter provided for --substructure-match/-sm
+   * "coverage_delta": Parameter provided for --coverage-delta/-cd
+   * "max_symmetries": Parameter provided for --max-symmetries/-ms 
+
   Each score is opt-in and the respective results are available in three keys:
-  
+
    * "assigned_scores": A list with data for each pair of assigned ligands.
      Data is yet another dict containing score specific information for that
      ligand pair. The following keys are there in any case:
-  
+
       * "model_ligand": The model ligand
       * "reference_ligand": The target ligand to which model ligand is assigned to
       * "score": The score
       * "coverage": Fraction of model ligand atoms which are covered by target
         ligand. Will only deviate from 1.0 if --substructure-match is enabled.
-  
+
    * "model_ligand_unassigned_reason": Dictionary with unassigned model ligands
      as key and an educated guess why this happened.
-  
+
    * "reference_ligand_unassigned_reason": Dictionary with unassigned target ligands
      as key and an educated guess why this happened.
-  
+
   If --full-results is enabled, another element with key "full_results" is added.
   This is a list of data items for each pair of model/reference ligands. The data
   items follow the same structure as in "assigned_scores". If no score for a
   specific pair of ligands could be computed, "score" and "coverage" are set to
   null and a key "reason" is added giving an educated guess why this happened.
-  
+
   CSV output is a table of comma-separated values, with one line for each
   reference ligand (or one model ligand if the --by-model-ligand-output flag was
   set).
-  
+
   The following column is always available:
-  
+
    * reference_ligand/model_ligand: If reference ligands were provided explicitly
      with --reference-ligands, elements of the list will be the paths to the
      ligand SDF file(s). Otherwise, they will be the chain name, residue number
      and insertion code of the ligand, separated by a dot. If the
      --by-model-ligand-output flag was set, this will be model ligand instead,
      following the same rules.
-  
+
   If lDDT-PLI was enabled with --lddt-pli, the following columns are added:
-  
+
    * "lddt_pli", "lddt_pli_coverage" and "lddt_pli_(model|reference)_ligand"
      are the lDDT-PLI score result, the corresponding coverage and assigned model
      ligand (or reference ligand if the --by-model-ligand-output flag was set)
      if an assignment was found, respectively, empty otherwise.
    * "lddt_pli_unassigned" is empty if an assignment was found, otherwise it
      lists the short reason this reference ligand was unassigned.
-  
+
   If BiSyRMSD was enabled with --rmsd, the following columns are added:
-  
+
    * "rmsd", "rmsd_coverage". "lddt_lp" "bb_rmsd" and
      "rmsd_(model|reference)_ligand" are the BiSyRMSD, the corresponding
      coverage, lDDT-LP, backbone RMSD and assigned model ligand (or reference
@@ -607,7 +618,7 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
      was found, respectively, empty otherwise.
    * "rmsd_unassigned" is empty if an assignment was found, otherwise it
      lists the short reason this reference ligand was unassigned.
-  
+
   options:
     -h, --help            show this help message and exit
     -m MODEL, --mdl MODEL, --model MODEL
@@ -687,8 +698,7 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
                           Enumerate all potential binding sites in the model
                           when searching rigid superposition for RMSD
                           computation
-    -ms MAX_SYMMETRIES, --max--symmetries MAX_SYMMETRIES
+    -ms MAX_SYMMETRIES, --max-symmetries MAX_SYMMETRIES
                           If more than that many isomorphisms exist for a
                           target-ligand pair, it will be ignored and reported as
                           unassigned.
-
