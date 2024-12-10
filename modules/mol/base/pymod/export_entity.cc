@@ -163,6 +163,7 @@ void export_Entity()
     .def("GetHashCode", &EntityHandle::GetHashCode) 
     .def(self==self)
     .def(self!=self)
+    .add_property("hash_code", &EntityHandle::GetHashCode)
   ;
 
   def("CreateEntity",create1);
