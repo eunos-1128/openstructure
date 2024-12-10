@@ -128,6 +128,7 @@ void export_Compound() {
     .def("AddAtom", &Compound::AddAtom)
     .def("AddBond", &Compound::AddBond)
     .def("IsPeptideLinking", &Compound::IsPeptideLinking)
+    .def("IsNucleotideLinking", &Compound::IsNucleotideLinking)
     .add_property("chem_class", &get_chemclass,
                   &set_chemclass)
     .add_property("chem_type", &get_chemtype)
