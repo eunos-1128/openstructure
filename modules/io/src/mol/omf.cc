@@ -2575,6 +2575,8 @@ void ChainData::FromStream(std::istream& stream,
           } else {
             res_idx += 1;
           }
+        } else {
+          res_idx += 1;
         }
       }
     }
@@ -2648,6 +2650,8 @@ void ChainData::FromStream(std::istream& stream,
             res_idx += 1;
             res_start_idx += res_def_one.anames.size();
           }
+        } else {
+          res_idx += 1;
         }
       }
     }
