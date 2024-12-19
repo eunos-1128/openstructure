@@ -512,7 +512,8 @@ def _LoadStructureData(receptor_path,
         if bu_id is not None:
             raise RuntimeError(f"Cannot specify biounit ({bu_id}) for receptor "
                                f"in PDB format ({receptor_path})")
-        receptor = ligand_scoring_base.PDBPrep(receptor_path)
+        receptor = ligand_scoring_base.PDBPrep(receptor_path,
+                                               fault_tolerant=fault_tolerant)
         ligands = _LoadLigands(ligand_path)
 
     elif receptor_format == "mmcif":
