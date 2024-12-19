@@ -1,3 +1,15 @@
+Changes in Release 2.9.1
+--------------------------------------------------------------------------------
+
+ * Enhanced structure cleanup in ligand scoring to avoid issues when non-
+   standard atoms are present in reference/ model structures. Cleanup is logged
+   and available as output in the compare-ligand-structures action.
+ * Disabled automatic ligand extraction from PDB files. For mmCIF this is still
+   possible and strictly uses the _entity.type item "polymer" to identify
+   receptor chains and "non-polymer" to identify ligands.
+ * OMF bugfix: avoid potentially endless loop in OMF parsing
+
+
 Changes in Release 2.9.0
 --------------------------------------------------------------------------------
 
