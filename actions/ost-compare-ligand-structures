@@ -530,6 +530,9 @@ def _LoadStructureData(receptor_path,
     else:
         raise RuntimeError("This should never happen")
 
+    # assign filename as name to receptor
+    receptor.SetName(receptor_path)
+
     return (receptor, ligands)
 
 
