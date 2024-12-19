@@ -630,7 +630,7 @@ def _ParseArgs():
         dest="lddt_add_mdl_contacts",
         default=False,
         action="store_true",
-        help=("Only using contacts in lDDT that"
+        help=("Only using contacts in lDDT that "
               "are within a certain distance threshold in the "
               "reference does not penalize for added model "
               "contacts. If set to True, this flag will also "

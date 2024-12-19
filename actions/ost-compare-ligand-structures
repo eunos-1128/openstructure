@@ -8,47 +8,58 @@ Example: ost compare-ligand-structures \\
     --lddt-pli --rmsd
 
 Structures of polymer entities (proteins and nucleotides) can be given in PDB
-or mmCIF format.
+or mmCIF format. In case of PDB format, the full loaded structure undergoes
+processing described below. In case of mmCIF format, chains representing
+"polymer" entities according to _entity.type are selected and further processed
+as described below.
+
+Structure cleanup is heavily based on the PDB component dictionary and performs
+1) removal of hydrogens, 2) removal of residues for which there is no entry in
+component dictionary, 3) removal of residues that are not peptide linking or
+nucleotide linking according to the component dictionary 4) removal of atoms
+that are not defined for respective residues in the component dictionary. Except
+step 1), every cleanup is logged and a report is available in the json outfile.
 
 Ligands can be given as path to SDF files containing the ligand for both model
 (--model-ligands/-ml) and reference (--reference-ligands/-rl). If omitted,
-ligands will be detected in the model and reference structures. For structures
-given in mmCIF format, this is based on the annotation as "non polymer entity"
-(i.e. ligands in the _pdbx_entity_nonpoly mmCIF category) and works reliably.
-For structures given in legacy PDB format, this is based on the HET records
-which is usually only set properly on files downloaded from the PDB (and even
-then, this is not always the case). This is normally not what you want. You
-should always give ligands as SDF for structures in legacy PDB format.
+ligands are optionally detected from a structure file if it is given in mmCIF
+format. This is based on "non-polymer" _entity.type annotation and the
+respective entries must exist in the PDB component dictionary in order to get
+connectivity information. For example, receptor structure and ligand(s) are
+loaded from the same mmCIF file given as '-m'/'-r'. This does not work for
+structures provided in PDB format and an error is raised if ligands are not
+explitely given in SDF format.
 
-Polymer/oligomeric ligands (saccharides, peptides, nucleotides) are not
-supported.
-
-Only minimal cleanup steps are performed (remove hydrogens and deuteriums,
-and for structures of polymers only, remove unknown atoms and cleanup element
-column).
-
-Ligands in mmCIF and PDB files must comply with the PDB component dictionary
-definition, and have properly named residues and atoms, in order for
-ligand connectivity to be loaded correctly. Ligands loaded from SDF files
-are exempt from this restriction, meaning any arbitrary ligand can be assessed.
+Ligands undergo gentle processing where hydrogens are removed. Connectivity
+is relevant for scoring. It is read directly from SDF input. If ligands are
+extracted from mmCIF, connectivity is derived from the PDB component
+dictionary. Polymer/oligomeric ligands (saccharides, peptides, nucleotides)
+are not supported.
 
 Output can be written in two format: JSON (default) or CSV, controlled by the
 --output-format/-of argument.
 
-Without additional options, the JSON ouput is a dictionary with four keys:
+Without additional options, the JSON ouput is a dictionary with the following
+keys:
 
  * "model_ligands": A list of ligands in the model. If ligands were provided
    explicitly with --model-ligands, elements of the list will be the paths to
    the ligand SDF file(s). Otherwise, they will be the chain name, residue
    number and insertion code of the ligand, separated by a dot.
- * "reference_ligands": A list of ligands in the reference. If ligands were
-   provided explicitly with --reference-ligands, elements of the list will be
-   the paths to the ligand SDF file(s). Otherwise, they will be the chain name,
-   residue number and insertion code of the ligand, separated by a dot.
+ * "reference_ligands": Same for reference ligands.
  * "status": SUCCESS if everything ran through. In case of failure, the only
    content of the JSON output will be \"status\" set to FAILURE and an
    additional key: "traceback".
  * "ost_version": The OpenStructure version used for computation.
+ * "model_cleanup_log": Lists residues/atoms that have been removed in model
+   cleanup process.
+ * "reference_cleanup_log": Same for reference. 
+ * "reference": Parameter provided for --reference/-r
+ * "model": Parameter provided for --model/-m
+ * "resnum_alignments": Parameter provided for --residue-number-alignment/-rna
+ * "substructure_match": Parameter provided for --substructure-match/-sm
+ * "coverage_delta": Parameter provided for --coverage-delta/-cd
+ * "max_symmetries": Parameter provided for --max-symmetries/-ms 
 
 Each score is opt-in and the respective results are available in three keys:
 
@@ -368,7 +379,7 @@ def _ParseArgs():
 
     parser.add_argument(
         "-ms",
-        "--max--symmetries",
+        "--max-symmetries",
         dest="max_symmetries",
         default=1e4,
         type=int,
@@ -413,40 +424,6 @@ def _GetStructureFormat(structure_path, sformat=None):
                         f"file {structure_path}.")
 
 
-def _LoadStructure(structure_path, sformat, fault_tolerant, bu_id):
-    """Read OST entity either from mmCIF or PDB.
-
-    The returned structure has structure_path attached as structure name
-    """
-
-    # Load the structure
-    if sformat == "mmcif":
-        if bu_id is not None:
-            cif_entity, cif_seqres, cif_info = \
-            io.LoadMMCIF(structure_path, info=True, seqres=True,
-                         fault_tolerant=fault_tolerant)
-            for biounit in cif_info.biounits:
-                if biounit.id == bu_id:
-                    entity = ost.mol.alg.CreateBU(cif_entity, biounit)
-                    break
-            else:
-                raise RuntimeError(f"No biounit found with ID '{bu_id}'.")
-
-        else:
-            entity = io.LoadMMCIF(structure_path,
-                                  fault_tolerant = fault_tolerant)
-        if len(entity.residues) == 0:
-            raise Exception(f"No residues found in file: {structure_path}")
-    else:
-        entity = io.LoadPDB(structure_path, fault_tolerant = fault_tolerant)
-        if len(entity.residues) == 0:
-            raise Exception(f"No residues found in file: {structure_path}")
-
-    # restore old loglevel and return
-    entity.SetName(structure_path)
-    return entity
-
-
 def _LoadLigands(ligands):
     """
     Load a list of ligands from file names. Return a list of entities oif the
@@ -461,49 +438,15 @@ def _LoadLigands(ligands):
 def _LoadLigand(file):
     """
     Load a single ligand from file names. Return an entity.
+    Removes hydrogens.
     """
     ent = ost.io.LoadEntity(file, format="sdf")
+    ent = ost.mol.CreateEntityFromView(ent.Select(
+        "ele != H and ele != D"), include_exlusive_atoms=False)
     ed = ent.EditXCS()
     ed.RenameChain(ent.chains[0], file)
     ed.UpdateICS()
     return ent
-
-
-def _CleanupStructure(entity):
-    """Cleans up the structure.
-    Currently only removes hydrogens (and deuterium atoms).
-    """
-    return ost.mol.CreateEntityFromView(entity.Select(
-        "ele != H and ele != D"), include_exlusive_atoms=False)
-
-
-def _CleanupLigands(ligands):
-    """Clean up a list of structures.
-    """
-    if ligands is None:
-        return None
-    else:
-        return [_CleanupStructure(lig) for lig in ligands]
-
-
-def _Validate(structure, ligands, legend, fault_tolerant=False):
-    """Validate the structure.
-
-    If fault_tolerant is True, only warns in case of problems. If False,
-    raise them as ValueErrors.
-
-    At the moment this chiefly checks if ligands are in the structure and are
-    given explicitly at the same time.
-    """
-    if ligands is not None:
-        for residue in structure.residues:
-            if residue.is_ligand:
-                msg = "Ligand residue %s found in %s polymer structure" %(
-                    residue.qualified_name, legend)
-                if fault_tolerant:
-                    ost.LogWarning(msg)
-                else:
-                    raise ValueError(msg)
 
 
 def _QualifiedResidueNotation(r):
@@ -515,6 +458,50 @@ def _QualifiedResidueNotation(r):
         rnum=resnum.num,
         ins_code=resnum.ins_code.strip("\u0000"),
     )
+
+
+def _LoadStructureData(receptor_path,
+                       ligand_path,
+                       sformat = None,
+                       bu_id = None,
+                       fault_tolerant = False):
+
+    receptor = None
+    ligands = None
+    receptor_format = _GetStructureFormat(receptor_path, sformat = sformat)
+
+    if receptor_format == "pdb":
+        if ligand_path is None:
+            raise RuntimeError(f"Must provide ligand as SDF file(s) when "
+                               f"receptor ({receptor_path}) is given in PDB "
+                               f"format.")
+        if bu_id is not None:
+            raise RuntimeError(f"Cannot specify biounit ({bu_id}) for receptor "
+                               f"in PDB format ({receptor_path})")
+        receptor = ligand_scoring_base.PDBPrep(receptor_path,
+                                               fault_tolerant=fault_tolerant)
+        ligands = _LoadLigands(ligand_path)
+
+    elif receptor_format == "mmcif":
+        if ligand_path is None:
+            receptor, ligands = ligand_scoring_base.MMCIFPrep(receptor_path,
+                                                              biounit = bu_id,
+                                                              extract_nonpoly = True,
+                                                              fault_tolerant = fault_tolerant)
+        else:
+            receptor = ligand_scoring_base.MMCIFPrep(receptor_path,
+                                                     biounit = bu_id,
+                                                     extract_nonpoly = False,
+                                                     fault_tolerant = fault_tolerant)
+            ligands = _LoadLigands(ligand_path)
+    else:
+        raise RuntimeError("This should never happen")
+
+    # assign filename as name to receptor
+    receptor.SetName(receptor_path)
+
+    return (receptor, ligands)
+
 
 def _SetupLDDTPLIScorer(model, model_ligands, reference, reference_ligands, args):
     return ligand_scoring_lddtpli.LDDTPLIScorer(model, reference,
@@ -580,7 +567,7 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
     # Extract / Map ligand information #
     ####################################
 
-    if model_ligands is not None:
+    if args.model_ligands is not None:
         # Replace model ligand by path
         if len(model_ligands) == len(scorer.model_ligands):
             # Map ligand => path
@@ -602,7 +589,7 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
         # Map ligand => qualified residue
         out["model_ligands"] = [_QualifiedResidueNotation(l) for l in scorer.model_ligands]
 
-    if reference_ligands is not None:
+    if args.reference_ligands is not None:
         # Replace reference ligand by path
         if len(reference_ligands) == len(scorer.target_ligands):
             # Map ligand => path
@@ -774,6 +761,16 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
                                                             "reference_ligand": target_key,
                                                             "reason": reason})
 
+    # add cleanup logs and parameters relevant for reproducibility
+    out["model"] = args.model
+    out["reference"] = args.reference
+    out["model_cleanup_log"] = scorer.model_cleanup_log
+    out["reference_cleanup_log"] = scorer.target_cleanup_log
+    out["resnum_alignments"] = scorer.resnum_alignments
+    out["substructure_match"] = scorer.substructure_match
+    out["coverage_delta"] = scorer.coverage_delta
+    out["max_symmetries"] = scorer.max_symmetries
+
     return out
 
 def _WriteCSV(out, args):
@@ -859,46 +856,21 @@ def _Main():
     try:
         # Load structures
         LogScript("Loading data")
-        LogInfo("Loading reference structure")
-        reference_format = _GetStructureFormat(args.reference,
-                                               sformat=args.reference_format)
-        reference = _LoadStructure(args.reference,
-                                   sformat=reference_format,
-                                   bu_id=args.reference_biounit,
-                                   fault_tolerant = args.fault_tolerant)
-        LogInfo("Loading model structure")
-        model_format = _GetStructureFormat(args.model,
-                                           sformat=args.model_format)
-        model = _LoadStructure(args.model,
-                               sformat=model_format,
-                               bu_id=args.model_biounit,
-                               fault_tolerant = args.fault_tolerant)
+        LogInfo("Loading reference data")
+        reference, reference_ligands = _LoadStructureData(args.reference,
+                                                          args.reference_ligands,
+                                                          sformat = args.reference_format,
+                                                          bu_id = args.reference_biounit,
+                                                          fault_tolerant = args.fault_tolerant)
 
-        # Load ligands
-        LogInfo("Loading reference ligands")
-        reference_ligands = _LoadLigands(args.reference_ligands)
-        LogInfo("Loading model ligands")
-        model_ligands = _LoadLigands(args.model_ligands)
+        LogInfo("Loading model data")
+        model, model_ligands = _LoadStructureData(args.model,
+                                                  args.model_ligands,
+                                                  sformat = args.model_format,
+                                                  bu_id = args.model_biounit,
+                                                  fault_tolerant = args.fault_tolerant)
 
-        # Cleanup
-        LogVerbose("Cleaning up reference structure")
-        cleaned_reference = _CleanupStructure(reference)
-        LogVerbose("Cleaning up model structure")
-        cleaned_model = _CleanupStructure(model)
-        LogVerbose("Cleaning up reference ligands")
-        cleaned_reference_ligands = _CleanupLigands(reference_ligands)
-        LogVerbose("Cleaning up model ligands")
-        cleaned_model_ligands = _CleanupLigands(model_ligands)
-
-        # Validate
-        _Validate(cleaned_model, cleaned_model_ligands, "model",
-                  fault_tolerant = args.fault_tolerant)
-        _Validate(cleaned_reference, cleaned_reference_ligands, "reference",
-                  fault_tolerant = args.fault_tolerant)
-
-        out = _Process(cleaned_model, cleaned_model_ligands,
-                       cleaned_reference, cleaned_reference_ligands,
-                       args)
+        out = _Process(model, model_ligands, reference, reference_ligands, args)
 
         out["ost_version"] = ost.__version__
         out["status"] = "SUCCESS"

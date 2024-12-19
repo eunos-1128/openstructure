@@ -95,7 +95,7 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
     :type lddt_pli_binding_site_radius: :class:`float`
     """
 
-    def __init__(self, model, target, model_ligands=None, target_ligands=None,
+    def __init__(self, model, target, model_ligands, target_ligands,
                  resnum_alignments=False, rename_ligand_chain=False,
                  substructure_match=False, coverage_delta=0.2,
                  max_symmetries=1e4, lddt_pli_radius=6.0,
@@ -103,8 +103,7 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
                  lddt_pli_thresholds = [0.5, 1.0, 2.0, 4.0],
                  lddt_pli_binding_site_radius=None):
 
-        super().__init__(model, target, model_ligands = model_ligands,
-                         target_ligands = target_ligands,
+        super().__init__(model, target, model_ligands, target_ligands,
                          resnum_alignments = resnum_alignments,
                          rename_ligand_chain = rename_ligand_chain,
                          substructure_match = substructure_match,

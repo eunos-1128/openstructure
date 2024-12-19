@@ -108,15 +108,14 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
                            pose is too far from the actual binding site.
     :type full_bs_search: :class:`bool`
     """
-    def __init__(self, model, target, model_ligands=None, target_ligands=None,
+    def __init__(self, model, target, model_ligands, target_ligands,
                  resnum_alignments=False, rename_ligand_chain=False,
                  substructure_match=False, coverage_delta=0.2,
                  max_symmetries=1e5, bs_radius=4.0, lddt_lp_radius=15.0,
                  model_bs_radius=25, binding_sites_topn=100000,
                  full_bs_search=False):
 
-        super().__init__(model, target, model_ligands = model_ligands,
-                         target_ligands = target_ligands,
+        super().__init__(model, target, model_ligands, target_ligands,
                          resnum_alignments = resnum_alignments,
                          rename_ligand_chain = rename_ligand_chain,
                          substructure_match = substructure_match,

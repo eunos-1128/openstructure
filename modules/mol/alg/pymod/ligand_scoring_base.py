@@ -2,7 +2,10 @@ from contextlib import contextmanager
 import numpy as np
 import networkx
 
+import ost
+from ost import io
 from ost import mol
+from ost import conop
 from ost import LogWarning, LogScript, LogInfo, LogVerbose, LogDebug, GetVerbosityLevel, PushVerbosityLevel, PopVerbosityLevel
 from ost.mol.alg import chain_mapping
 
@@ -25,14 +28,193 @@ def _SinkVerbosityLevel(n=1):
         PopVerbosityLevel()
 
 
+def _QualifiedAtomNotation(a):
+    """Return a parsable string of the atom in the format:
+    ChainName.ResidueNumber.InsertionCode.AtomName."""
+    resnum = a.residue.number
+    return "{cname}.{rnum}.{ins_code}.{aname}".format(
+        cname=a.chain.name,
+        rnum=resnum.num,
+        ins_code=resnum.ins_code.strip("\u0000"),
+        aname=a.name,
+    )
+
+
+def _QualifiedResidueNotation(r):
+    """Return a parsable string of the residue in the format:
+    ChainName.ResidueNumber.InsertionCode."""
+    resnum = r.number
+    return "{cname}.{rnum}.{ins_code}".format(
+        cname=r.chain.name,
+        rnum=resnum.num,
+        ins_code=resnum.ins_code.strip("\u0000"),
+    )
+
+
+def CleanHydrogens(ent, clib):
+    """ Ligand scoring helper - Returns copy of *ent* without hydrogens
+
+    Non-standard hydrogen naming can cause trouble in residue property
+    assignment which is done by the :class:`ost.conop.RuleBasedProcessor` when
+    loading. In fact, residue property assignment is not done for every residue
+    that has unknown atoms according to the chemical component dictionary. This
+    function therefore re-processes the entity after removing hydrogens.
+
+    :param ent: Entity to clean
+    :type ent: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
+    :param clib: Compound library to perform re-processing after hydrogen
+                 removal.
+    :type clib: :class:`ost.conop.CompoundLib`
+    :returns: Cleaned and re-processed ent
+    """
+    cleaned_ent = mol.CreateEntityFromView(ent.Select(
+        "ele != H and ele != D"), include_exlusive_atoms=False)
+    # process again to set missing residue properties due to non standard
+    # hydrogens
+    processor = conop.RuleBasedProcessor(clib)
+    processor.Process(cleaned_ent)
+    return cleaned_ent
+
+
+def MMCIFPrep(mmcif_path, biounit=None, extract_nonpoly=False,
+              fault_tolerant=False):
+    """ Ligand scoring helper - Prepares :class:`LigandScorer` input from mmCIF
+
+    Only performs gentle cleanup of hydrogen atoms. Further cleanup is delegated
+    to :class:`LigandScorer`.
+
+    :param mmcif_path: Path to mmCIF file that contains polymer and optionally
+                       non-polymer entities
+    :type mmcif_path: :class:`str`
+    :param biounit: If given, construct specified biounit from mmCIF AU
+    :type biounit: :class:`str`
+    :param extract_nonpoly: Additionally returns a list of
+                            :class:`ost.mol.EntityHandle`
+                            objects representing all non-polymer (ligand)
+                            entities.
+    :type extract_nonpoly: :class:`bool`
+    :param fault_tolerant: Passed as parameter to :func:`ost.io.LoadMMCIF`
+    :type fault_tolerant: :class:`bool`
+    :returns: :class:`ost.mol.EntityHandle` which only contains polymer
+              entities representing the receptor structure. If *extract_nonpoly*
+              is True, a tuple is returned which additionally contains a
+              :class:`list` of :class:`ost.mol.EntityHandle`, where each
+              :class:`ost.mol.EntityHandle` represents a non-polymer (ligand).
+    """
+    clib = conop.GetDefaultLib()
+    if not clib:
+        ost.LogError("A compound library is required. "
+                     "Please refer to the OpenStructure website: "
+                     "https://openstructure.org/docs/conop/compoundlib/.")
+        raise RuntimeError("No compound library found")
+
+    mmcif_entity, mmcif_info = io.LoadMMCIF(mmcif_path, info=True,
+                                            fault_tolerant=fault_tolerant)
+    mmcif_entity = CleanHydrogens(mmcif_entity, clib)
+
+    # get AU chain names representing polymer entities
+    polymer_entity_ids = mmcif_info.GetEntityIdsOfType("polymer")
+    polymer_chain_names = list()
+    for ch in mmcif_entity.chains:
+        if mmcif_info.GetMMCifEntityIdTr(ch.name) in polymer_entity_ids:
+            polymer_chain_names.append(ch.name)
+
+    # get AU chain names representing non-polymer entities
+    non_polymer_entity_ids = mmcif_info.GetEntityIdsOfType("non-polymer")
+    non_polymer_chain_names = list()
+    for ch in mmcif_entity.chains:
+        if mmcif_info.GetMMCifEntityIdTr(ch.name) in non_polymer_entity_ids:
+            non_polymer_chain_names.append(ch.name)
+
+    # construct biounit if necessary
+    if biounit is not None:
+        biounit_found = False
+        for bu in mmcif_info.biounits:
+            if bu.id == biounit:
+                mmcif_entity = mol.alg.CreateBU(mmcif_entity, bu)
+                biounit_found = True
+                break
+        if not biounit_found:
+            raise RuntimeError(f"Specified biounit '{biounit}' not in "
+                               f"{mmcif_path}")
+
+    # assign generic properties for selection later on
+    non_poly_id = 0
+    for ch in mmcif_entity.chains:
+        cname = None
+        if biounit is not None:
+            # if a biounit is constructed, you get chain names like: 1.YOLO
+            # we cannot simply split by '.' since '.' is an allowed character
+            # in chain names. => split by first occurence
+            dot_index = ch.name.find('.')
+            if dot_index == -1:
+                cname = ch.name
+            else:
+                cname = ch.name[dot_index+1:]
+        else:
+            cname = ch.name
+        
+        if cname in polymer_chain_names:
+            ch.SetIntProp("poly", 1)
+        if cname in non_polymer_chain_names:
+            ch.SetIntProp("nonpolyid", non_poly_id)
+            non_poly_id += 1
+
+    poly_sel = mmcif_entity.Select("gcpoly:0=1")
+    poly_ent = mol.CreateEntityFromView(poly_sel, True)
+
+    if extract_nonpoly == False:
+        return poly_ent
+
+    non_poly_sel = mmcif_entity.Select("gcnonpoly:0=1")
+    non_poly_entities = list()
+    for i in range(non_poly_id):
+        view = mmcif_entity.Select(f"gcnonpolyid:{non_poly_id}={i}")
+        if view.GetResidueCount() != 1:
+            raise RuntimeError(f"Expect non-polymer entities in "
+                               f"{mmcif_path} to contain exactly 1 "
+                               f"residue. Got {ch.GetResidueCount()} "
+                               f"in chain {ch.name}")
+        compound = clib.FindCompound(view.residues[0].name)
+        if compound is None:
+            raise RuntimeError(f"Can only extract non-polymer entities if "
+                               f"respective residues are available in PDB "
+                               f"component dictionary. Can't find "
+                               f"\"{view.residues[0].name}\"")
+
+        non_poly_entities.append(mol.CreateEntityFromView(view, True))
+
+    return (poly_ent, non_poly_entities)
+
+
+def PDBPrep(pdb_path, fault_tolerant=False):
+    """ Ligand scoring helper - Prepares :class:`LigandScorer` input from PDB
+
+    Only performs gentle cleanup of hydrogen atoms. Further cleanup is delegated
+    to :class:`LigandScorer`. There is no logic to extract ligands from PDB
+    files. Ligands must be provided separately as SDF files in these cases.
+
+    :param pdb_path: Path to PDB file that contains polymer entities
+    :type pdb_path: :class:`str`
+    :param fault_tolerant: Passed as parameter to :func:`ost.io.LoadPDB`
+    :type fault_tolerant: :class:`bool`
+    :returns: :class:`EntityHandle` from loaded file.
+    """
+    clib = conop.GetDefaultLib()
+    if not clib:
+        ost.LogError("A compound library is required. "
+                     "Please refer to the OpenStructure website: "
+                     "https://openstructure.org/docs/conop/compoundlib/.")
+        raise RuntimeError("No compound library found")
+
+    pdb_entity = io.LoadPDB(pdb_path, fault_tolerant=fault_tolerant)
+    pdb_entity = CleanHydrogens(pdb_entity, clib)
+
+    return pdb_entity
+
+
 class LigandScorer:
     """ Scorer to compute various small molecule ligand (non polymer) scores.
-
-    .. note ::
-      Extra requirements:
-
-      - Python modules `numpy` and `networkx` must be available
-        (e.g. use ``pip install numpy networkx``)
 
     :class:`LigandScorer` is an abstract base class dealing with all the setup,
     data storage, enumerating ligand symmetries and target/model ligand
@@ -84,26 +266,8 @@ class LigandScorer:
 
     Assumptions:
 
-    :class:`LigandScorer` generally assumes that the
-    :attr:`~ost.mol.ResidueHandle.is_ligand` property is properly set on all
-    the ligand residues, and only ligand atoms. This is typically the case for
-    entities loaded from mmCIF (tested with mmCIF files from the PDB and
-    SWISS-MODEL). Legacy PDB files must contain `HET` headers (which is usually
-    the case for files downloaded from the PDB but not elsewhere).
-
-    The class doesn't perform any cleanup of the provided structures.
-    It is up to the caller to ensure that the data is clean and suitable for
-    scoring. :ref:`Molck <molck>` should be used with extra
-    care, as many of the options (such as `rm_non_std` or `map_nonstd_res`) can
-    cause ligands to be removed from the structure. If cleanup with Molck is
-    needed, ligands should be kept aside and passed separately. Non-ligand
-    residues should be valid compounds with atom names following the naming
-    conventions of the component dictionary. Non-standard residues are
-    acceptable, and if the model contains a standard residue at that position,
-    only atoms with matching names will be considered.
-
     Unlike most of OpenStructure, this class does not assume that the ligands
-    (either in the model or the target) are part of the PDB component
+    (either for the model or the target) are part of the PDB component
     dictionary. They may have arbitrary residue names. Residue names do not
     have to match between the model and the target. Matching is based on
     the calculation of isomorphisms which depend on the atom element name and
@@ -112,49 +276,31 @@ class LigandScorer:
     set before passing any ligands to this class. Ligands with improper
     connectivity will lead to bogus results.
 
-    Note, however, that atom names should be unique within a residue (ie two
-    distinct atoms cannot have the same atom name).
-
     This only applies to the ligand. The rest of the model and target
     structures (protein, nucleic acids) must still follow the usual rules and
-    contain only residues from the compound library.
+    contain only residues from the compound library. Structures are cleaned up
+    according to constructor documentation. We advise to
+    use the :func:`MMCIFPrep` and :func:`PDBPrep` for loading which already
+    clean hydrogens and, in the case of MMCIF, optionally extract ligands ready
+    to be used by the :class:`LigandScorer` based on "non-polymer" entity types.
+    In case of PDB file format, ligands must be loaded separately as SDF files.
 
-    Although it isn't a requirement, hydrogen atoms should be removed from the
-    structures. Here is an example code snippet that will perform a reasonable
-    cleanup. Keep in mind that this is most likely not going to work as
-    expected with entities loaded from PDB files, as the `is_ligand` flag is
-    probably not set properly.
-
-    Here is an example of how to use setup a scorer code::
+    Here is an example of how to setup a scorer::
 
         from ost.mol.alg.ligand_scoring_scrmsd import SCRMSDScorer
-        from ost.mol.alg import Molck, MolckSettings
 
         # Load data
         # Structure model in PDB format, containing the receptor only
-        model = io.LoadPDB("path_to_model.pdb")
+        model = PDBPrep("path_to_model.pdb")
         # Ligand model as SDF file
         model_ligand = io.LoadEntity("path_to_ligand.sdf", format="sdf")
         # Target loaded from mmCIF, containing the ligand
-        target = io.LoadMMCIF("path_to_target.cif")
+        target, target_ligands = MMCIFPrep("path_to_target.cif",
+                                           extract_nonpoly=True)
 
-        # Cleanup a copy of the structures
-        cleaned_model = model.Copy()
-        cleaned_target = target.Copy()
-        molck_settings = MolckSettings(rm_unk_atoms=True,
-                                       rm_non_std=False,
-                                       rm_hyd_atoms=True,
-                                       rm_oxt_atoms=False,
-                                       rm_zero_occ_atoms=False,
-                                       colored=False,
-                                       map_nonstd_res=False,
-                                       assign_elem=True)
-        Molck(cleaned_model, conop.GetDefaultLib(), molck_settings)
-        Molck(cleaned_target, conop.GetDefaultLib(), molck_settings)
-
-        # Setup scorer object and compute lDDT-PLI
+        # Setup scorer object and compute SCRMSD
         model_ligands = [model_ligand.Select("ele != H")]
-        sc = SCRMSDScorer(cleaned_model, cleaned_target, model_ligands)
+        sc = SCRMSDScorer(model, target, model_ligands, target_ligands)
 
         # Perform assignment and read respective scores
         for lig_pair in sc.assignment:
@@ -163,54 +309,45 @@ class LigandScorer:
             score = sc.score_matrix[lig_pair[0], lig_pair[1]]
             print(f"Score for {trg_lig} and {mdl_lig}: {score}")
 
+        # check cleanup in model and target structure:
+        print("model cleanup:", sc.model_cleanup_log)
+        print("target cleanup:", sc.target_cleanup_log)
+
     :param model: Model structure - a deep copy is available as :attr:`model`.
-                  No additional processing (ie. Molck), checks,
-                  stereochemistry checks or sanitization is performed on the
-                  input. Hydrogen atoms are kept.
+                  The model undergoes the following cleanup steps which are
+                  dependent on :class:`ost.conop.CompoundLib` returned by
+                  :func:`ost.conop.GetDefaultLib`: 1) removal
+                  of hydrogens, 2) removal of residues for which there is no
+                  entry in :class:`ost.conop.CompoundLib`, 3) removal of
+                  residues that are not peptide linking or nucleotide linking
+                  according to :class:`ost.conop.CompoundLib` 4) removal of
+                  atoms that are not defined for respective residues in
+                  :class:`ost.conop.CompoundLib`. Except step 1), every cleanup
+                  is logged with :class:`ost.LogLevel` Warning and a report is
+                  available as :attr:`model_cleanup_log`.
     :type model: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
-    :param target: Target structure - a deep copy is available as
-                   :attr:`target`. No additional processing (ie. Molck), checks
-                   or sanitization is performed on the input. Hydrogen atoms are
-                   kept.
+    :param target: Target structure - same processing as *model*. 
     :type target: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
     :param model_ligands: Model ligands, as a list of
-                          :class:`~ost.mol.ResidueHandle` belonging to the model
-                          entity. Can be instantiated with either a :class:list
-                          of :class:`~ost.mol.ResidueHandle`/
-                          :class:`ost.mol.ResidueView` or of
+                          :class:`ost.mol.ResidueHandle`/
+                          :class:`ost.mol.ResidueView`/
                           :class:`ost.mol.EntityHandle`/
-                          :class:`ost.mol.EntityView`.
-                          If `None`, ligands will be extracted based on the
-                          :attr:`~ost.mol.ResidueHandle.is_ligand` flag (this is
-                          normally set properly in entities loaded from mmCIF).
+                          :class:`ost.mol.EntityView`. For
+                          :class:`ost.mol.EntityHandle`/
+                          :class:`ost.mol.EntityView`, each residue is
+                          considered to be an individual ligand.
+                          All ligands are copied into a separate
+                          :class:`ost.mol.EntityHandle` available as
+                          :attr:`model_ligand_ent` and the respective
+                          list of ligands is available as :attr:`model_ligands`.
     :type model_ligands: :class:`list`
-    :param target_ligands: Target ligands, as a list of
-                           :class:`~ost.mol.ResidueHandle` belonging to the
-                           target entity. Can be instantiated either a
-                           :class:list of :class:`~ost.mol.ResidueHandle`/
-                           :class:`ost.mol.ResidueView` or of
-                           :class:`ost.mol.EntityHandle`/
-                           :class:`ost.mol.EntityView` containing a single
-                           residue each. If `None`, ligands will be extracted
-                           based on the :attr:`~ost.mol.ResidueHandle.is_ligand`
-                           flag (this is normally set properly in entities
-                           loaded from mmCIF).
+    :param target_ligands: Target ligands, same processing as model ligands. 
     :type target_ligands: :class:`list`
     :param resnum_alignments: Whether alignments between chemically equivalent
                               chains in *model* and *target* can be computed
                               based on residue numbers. This can be assumed in
                               benchmarking setups such as CAMEO/CASP.
     :type resnum_alignments: :class:`bool`
-    :param rename_ligand_chain: If a residue with the same chain name and
-                                residue number than an explicitly passed model
-                                or target ligand exits in the structure,
-                                and `rename_ligand_chain` is False, a
-                                RuntimeError will be raised. If
-                                `rename_ligand_chain` is True, the ligand will
-                                be moved to a new chain instead, and the move
-                                will be logged to the console with SCRIPT
-                                level.
-    :type rename_ligand_chain: :class:`bool`
     :param substructure_match: Set this to True to allow incomplete (i.e.
                                partially resolved) target ligands.
     :type substructure_match: :class:`bool`
@@ -222,52 +359,82 @@ class LigandScorer:
     :type max_symmetries: :class:`int`
     """
 
-    def __init__(self, model, target, model_ligands=None, target_ligands=None,
-                 resnum_alignments=False, rename_ligand_chain=False,
-                 substructure_match=False, coverage_delta=0.2,
-                 max_symmetries=1e5):
+    def __init__(self, model, target, model_ligands, target_ligands,
+                 resnum_alignments=False, substructure_match=False,
+                 coverage_delta=0.2, max_symmetries=1e5,
+                 rename_ligand_chain=False):
 
         if isinstance(model, mol.EntityView):
-            self.model = mol.CreateEntityFromView(model, False)
+            self._model = mol.CreateEntityFromView(model, False)
         elif isinstance(model, mol.EntityHandle):
-            self.model = model.Copy()
+            self._model = model.Copy()
         else:
             raise RuntimeError("model must be of type EntityView/EntityHandle")
 
         if isinstance(target, mol.EntityView):
-            self.target = mol.CreateEntityFromView(target, False)
+            self._target = mol.CreateEntityFromView(target, False)
         elif isinstance(target, mol.EntityHandle):
-            self.target = target.Copy()
+            self._target = target.Copy()
         else:
             raise RuntimeError("target must be of type EntityView/EntityHandle")
 
-        # Extract ligands from target
-        if target_ligands is None:
-            self.target_ligands = self._extract_ligands(self.target)
-        else:
-            self.target_ligands = self._prepare_ligands(self.target, target,
-                                                        target_ligands,
-                                                        rename_ligand_chain)
-        if len(self.target_ligands) == 0:
-            LogWarning("No ligands in the target")
+        clib = conop.GetDefaultLib()
+        if not clib:
+            ost.LogError("A compound library is required. "
+                         "Please refer to the OpenStructure website: "
+                         "https://openstructure.org/docs/conop/compoundlib/.")
+            raise RuntimeError("No compound library found")
+        self._target, self._target_cleanup_log = \
+        self._cleanup_polymer_ent(self._target, clib)
+        self._model, self._model_cleanup_log = \
+        self._cleanup_polymer_ent(self._model, clib)
 
-        # Extract ligands from model
-        if model_ligands is None:
-            self.model_ligands = self._extract_ligands(self.model)
-        else:
-            self.model_ligands = self._prepare_ligands(self.model, model,
-                                                       model_ligands,
-                                                       rename_ligand_chain)
+        # keep ligands separate from polymer entities
+        self._target_ligand_ent = mol.CreateEntity()
+        self._model_ligand_ent = mol.CreateEntity()
+        target_ligand_ent_ed = self._target_ligand_ent.EditXCS(mol.BUFFERED_EDIT)
+        model_ligand_ent_ed = self._model_ligand_ent.EditXCS(mol.BUFFERED_EDIT)
+
+        self._target_ligands = list()
+        for l in target_ligands:
+            if isinstance(l, mol.EntityView) or isinstance(l, mol.EntityHandle):
+                for r in l.residues:
+                    self._target_ligands.append(self._copy_ligand(r, self._target_ligand_ent,
+                                                                  target_ligand_ent_ed,
+                                                                  rename_ligand_chain))
+            elif isinstance(l, mol.ResidueHandle) or isinstance(l, mol.ResidueView):
+                self._target_ligands.append(self._copy_ligand(l, self._target_ligand_ent,
+                                                              target_ligand_ent_ed,
+                                                              rename_ligand_chain))  
+            else:
+                raise RuntimeError("ligands must be of type EntityView/"
+                                   "EntityHandle/ResidueView/ResidueHandle")
+            
+        self._model_ligands = list()
+        for l in model_ligands:
+            if isinstance(l, mol.EntityView) or isinstance(l, mol.EntityHandle):
+                for r in l.residues:
+                    self._model_ligands.append(self._copy_ligand(r, self._model_ligand_ent,
+                                                                 model_ligand_ent_ed,
+                                                                 rename_ligand_chain))
+            elif isinstance(l, mol.ResidueHandle) or isinstance(l, mol.ResidueView):
+                self._model_ligands.append(self._copy_ligand(l, self._model_ligand_ent,
+                                                             model_ligand_ent_ed,
+                                                             rename_ligand_chain))  
+            else:
+                raise RuntimeError("ligands must be of type EntityView/"
+                                   "EntityHandle/ResidueView/ResidueHandle")
+
+
         if len(self.model_ligands) == 0:
             LogWarning("No ligands in the model")
             if len(self.target_ligands) == 0:
                 raise ValueError("No ligand in the model and in the target")
 
-        self.resnum_alignments = resnum_alignments
-        self.rename_ligand_chain = rename_ligand_chain
-        self.substructure_match = substructure_match
-        self.coverage_delta = coverage_delta
-        self.max_symmetries = max_symmetries
+        self._resnum_alignments = resnum_alignments
+        self._substructure_match = substructure_match
+        self._coverage_delta = coverage_delta
+        self._max_symmetries = max_symmetries
 
         # lazily computed attributes
         self.__chain_mapper = None
@@ -313,6 +480,95 @@ class LigandScorer:
          6: ("single_ligand_issue", "Cannot compute valid pairwise score as "
              "either model or target ligand have non-zero state."),
          9: ("unknown", "An unknown error occured in LigandScorer")}
+
+
+    @property
+    def model(self):
+        """ Model receptor structure
+
+        Processed according to docs in :class:`LigandScorer` constructor
+        """
+        return self._model
+
+    @property
+    def target(self):
+        """ Target receptor structure
+
+        Processed according to docs in :class:`LigandScorer` constructor
+        """
+        return self._target
+
+    @property
+    def model_cleanup_log(self):
+        """ Reports residues/atoms that were removed in model during cleanup
+
+        Residues and atoms are described as :class:`str` in format
+        <chain_name>.<resnum>.<ins_code> (residue) and
+        <chain_name>.<resnum>.<ins_code>.<aname> (atom).
+
+        :class:`dict` with keys:
+        
+        * 'cleaned_residues': another :class:`dict` with keys:
+
+          * 'no_clib': residues that have been removed because no entry could be
+            found in :class:`ost.conop.CompoundLib`
+          * 'not_linking': residues that have been removed because they're not
+            peptide or nucleotide linking according to
+            :class:`ost.conop.CompoundLib`
+
+        * 'cleaned_atoms': another :class:`dict` with keys:
+
+          * 'unknown_atoms': atoms that have been removed as they're not part
+            of their respective residue according to
+            :class:`ost.conop.CompoundLib`
+        """
+        return self._model_cleanup_log
+
+    @property
+    def target_cleanup_log(self):
+        """ Same for target
+        """
+        return self._target_cleanup_log  
+
+    @property
+    def model_ligands(self):
+        """ Residues representing model ligands
+
+        :class:`list` of :class:`ost.mol.ResidueHandle`
+        """
+        return self._model_ligands    
+
+    @property
+    def target_ligands(self):
+        """ Residues representing target ligands
+
+        :class:`list` of :class:`ost.mol.ResidueHandle`
+        """
+        return self._target_ligands 
+
+    @property
+    def resnum_alignments(self):
+        """ Given at :class:`LigandScorer` construction
+        """
+        return self._resnum_alignments
+
+    @property
+    def substructure_match(self):
+        """ Given at :class:`LigandScorer` construction
+        """
+        return self._substructure_match
+
+    @property
+    def coverage_delta(self):
+        """ Given at :class:`LigandScorer` construction
+        """
+        return self._coverage_delta
+
+    @property
+    def max_symmetries(self):
+        """ Given at :class:`LigandScorer` construction
+        """
+        return self._max_symmetries
 
     @property
     def state_matrix(self):
@@ -507,6 +763,7 @@ class LigandScorer:
                 d = self.aux_matrix[trg_lig_idx, mdl_lig_idx]
                 self._aux_dict[cname][rnum] = d
         return self._aux_dict
+
 
     @property
     def unassigned_target_ligands(self):
@@ -782,147 +1039,6 @@ class LigandScorer:
                                           resnum_alignments=self.resnum_alignments)
         return self.__chain_mapper
 
-    @staticmethod
-    def _extract_ligands(entity):
-        """Extract ligands from entity. Return a list of residues.
-
-        Assumes that ligands have the :attr:`~ost.mol.ResidueHandle.is_ligand`
-        flag set. This is typically the case for entities loaded from mmCIF
-        (tested with mmCIF files from the PDB and SWISS-MODEL).
-        Legacy PDB files must contain `HET` headers (which is usually the
-        case for files downloaded from the PDB but not elsewhere).
-
-        This function performs basic checks to ensure that the residues in this
-        chain are not forming polymer bonds (ie peptide/nucleotide ligands) and
-        will raise a RuntimeError if this assumption is broken.
-
-        :param entity: the entity to extract ligands from
-        :type entity: :class:`~ost.mol.EntityHandle`
-        :rtype: :class:`list` of :class:`~ost.mol.ResidueHandle`
-
-        """
-        extracted_ligands = []
-        for residue in entity.residues:
-            if residue.is_ligand:
-                if mol.InSequence(residue, residue.next):
-                    raise RuntimeError("Residue %s connected in polymer sequen"
-                                       "ce %s" % (residue.qualified_name))
-                extracted_ligands.append(residue)
-                LogVerbose("Detected residue %s as ligand" % residue)
-        return extracted_ligands
-
-    @staticmethod
-    def _prepare_ligands(new_entity, old_entity, ligands, rename_chain):
-        """Prepare the ligands given into a list of ResidueHandles which are
-        part of the copied entity, suitable for the model_ligands and
-        target_ligands properties.
-
-        This function takes a list of ligands as (Entity|Residue)(Handle|View).
-        Entities can contain multiple ligands, which will be considered as
-        separate ligands.
-
-        Ligands which are part of the entity are simply fetched in the new
-        copied entity. Otherwise, they are copied over to the copied entity.
-        """
-        extracted_ligands = []
-
-        next_chain_num = 1
-        new_editor = None
-
-        def _copy_residue(residue, rename_chain):
-            """ Copy the residue into the new chain.
-            Return the new residue handle."""
-            nonlocal next_chain_num, new_editor
-
-            # Instantiate the editor
-            if new_editor is None:
-                new_editor = new_entity.EditXCS(mol.BUFFERED_EDIT)
-
-            new_chain = new_entity.FindChain(residue.chain.name)
-            if not new_chain.IsValid():
-                new_chain = new_editor.InsertChain(residue.chain.name)
-                new_editor.SetChainType(new_chain,
-                                        mol.ChainType.CHAINTYPE_NON_POLY)
-            else:
-                # Does a residue with the same name already exist?
-                already_exists = new_chain.FindResidue(residue.number).IsValid()
-                if already_exists:
-                    if rename_chain:
-                        chain_ext = 2  # Extend the chain name by this
-                        while True:
-                            new_chain_name = \
-                            residue.chain.name + "_" + str(chain_ext)
-                            new_chain = new_entity.FindChain(new_chain_name)
-                            if new_chain.IsValid():
-                                chain_ext += 1
-                                continue
-                            else:
-                                new_chain = \
-                                new_editor.InsertChain(new_chain_name)
-                                break
-                        LogInfo("Moved ligand residue %s to new chain %s" % (
-                            residue.qualified_name, new_chain.name))
-                    else:
-                        msg = \
-                        "A residue number %s already exists in chain %s" % (
-                            residue.number, residue.chain.name)
-                        raise RuntimeError(msg)
-
-            # Add the residue with its original residue number
-            new_res = new_editor.AppendResidue(new_chain, residue.name,
-                                               residue.number)
-            # Add atoms
-            for old_atom in residue.atoms:
-                new_editor.InsertAtom(new_res, old_atom.name, old_atom.pos, 
-                    element=old_atom.element, occupancy=old_atom.occupancy,
-                    b_factor=old_atom.b_factor, is_hetatm=old_atom.is_hetatom)
-            # Add bonds
-            for old_atom in residue.atoms:
-                for old_bond in old_atom.bonds:
-                    new_first = new_res.FindAtom(old_bond.first.name)
-                    new_second = new_res.FindAtom(old_bond.second.name)
-                    new_editor.Connect(new_first, new_second)
-            return new_res
-
-        def _process_ligand_residue(res, rename_chain):
-            """Copy or fetch the residue. Return the residue handle."""
-            new_res = None
-            if res.entity.handle == old_entity.handle:
-                # Residue is part of the old_entity handle.
-                # However, it may not be in the copied one, for instance it may
-                # have been a view We try to grab it first, otherwise we copy it
-                new_res = new_entity.FindResidue(res.chain.name, res.number)
-            if new_res and new_res.valid:
-                qname = res.handle.qualified_name
-                LogVerbose("Ligand residue %s already in entity" % qname)
-            else:
-                # Residue is not part of the entity, need to copy it first
-                new_res = _copy_residue(res, rename_chain)
-                qname = res.handle.qualified_name
-                LogVerbose("Copied ligand residue %s" % qname)
-            new_res.SetIsLigand(True)
-            return new_res
-
-        for ligand in ligands:
-            is_eh = isinstance(ligand, mol.EntityHandle)
-            is_ev = isinstance(ligand, mol.EntityView)
-            is_rh = isinstance(ligand, mol.ResidueHandle)
-            is_rv = isinstance(ligand, mol.ResidueView)
-            if is_eh or is_ev:
-                for residue in ligand.residues:
-                    new_residue = _process_ligand_residue(residue, rename_chain)
-                    extracted_ligands.append(new_residue)
-            elif is_rh or is_rv:
-                new_residue = _process_ligand_residue(ligand, rename_chain)
-                extracted_ligands.append(new_residue)
-            else:
-                raise RuntimeError("Ligands should be given as Entity or "
-                                   "Residue")
-
-        if new_editor is not None:
-            new_editor.UpdateICS()
-        return extracted_ligands
-
     def _compute_scores(self):
         """
         Compute score for every possible target-model ligand pair and store the
@@ -1113,6 +1229,157 @@ class LigandScorer:
         raise NotImplementedError("_score_dir must be implemented by child "
                                   "class")
 
+    def _copy_ligand(self, l, ent, ed, rename_ligand_chain):
+        """ Copies ligand into entity and returns residue handle
+        """
+        new_chain = ent.FindChain(l.chain.name)
+        if not new_chain.IsValid():
+            new_chain = ed.InsertChain(l.chain.name)
+            ed.SetChainType(new_chain, mol.ChainType.CHAINTYPE_NON_POLY)
+        else:
+            # Does a residue with the same name already exist?
+            already_exists = new_chain.FindResidue(l.number).IsValid()
+            if already_exists:
+                if rename_ligand_chain:
+                    chain_ext = 2  # Extend the chain name by this
+                    while True:
+                        new_chain_name = \
+                        l.chain.name + "_" + str(chain_ext)
+                        new_chain = ent.FindChain(new_chain_name)
+                        if new_chain.IsValid():
+                            chain_ext += 1
+                            continue
+                        else:
+                            new_chain = \
+                            ed.InsertChain(new_chain_name)
+                            break
+                    LogInfo("Moved ligand residue %s to new chain %s" % (
+                            l.qualified_name, new_chain.name))
+                else:
+                    msg = \
+                    "A residue number %s already exists in chain %s" % (
+                        l.number, l.chain.name)
+                    raise RuntimeError(msg)
+
+        # Add the residue with its original residue number
+        new_res = ed.AppendResidue(new_chain, l.name, l.number)
+        # Add atoms
+        for old_atom in l.atoms:
+            ed.InsertAtom(new_res, old_atom.name, old_atom.pos, 
+                element=old_atom.element, occupancy=old_atom.occupancy,
+                b_factor=old_atom.b_factor, is_hetatm=old_atom.is_hetatom)
+        # Add bonds
+        for old_atom in l.atoms:
+            for old_bond in old_atom.bonds:
+                new_first = new_res.FindAtom(old_bond.first.name)
+                new_second = new_res.FindAtom(old_bond.second.name)
+                ed.Connect(new_first, new_second, old_bond.bond_order)
+        new_res.SetIsLigand(True)
+        return new_res
+
+    def _cleanup_polymer_ent(self, ent, clib):
+        """ In principle molck light but logs LigandScorer specific warnings
+
+        Only to be applied to polymer entity
+
+        1) removes atoms with elements set to H or D (not logged as there is no
+           effect on scoring)
+        2) removes residues with no entry in component dictionary
+        3) removes all residues that are not peptide_liking or
+           nucleotide_linking according component dictionary
+        4) removes unknown atoms according to component dictionary
+        5) reruns processor
+        """
+
+        cleanup_log = {"cleaned_residues": {"no_clib": [],
+                                            "not_linking": []},
+                       "cleaned_atoms": {"unknown_atoms": []}}
+
+        # 1)
+        hydrogen_sel = ent.Select("ele == H or ele == D")
+        if hydrogen_sel.GetAtomCount() > 0:
+            # just do, no logging as it has no effect on scoring
+            ent = ost.mol.CreateEntityFromView(ent.Select(
+                      "ele != H and ele != D"), include_exlusive_atoms=False)
+
+        # extract residues/atoms for 2), 3) and 4) 
+        not_in_clib = list()
+        not_linking = list()
+        unknown_atom = list()
+
+        for r in ent.residues:
+            comp = clib.FindCompound(r.GetName())
+            if comp is None:
+                not_in_clib.append(r)
+                continue
+            if not (comp.IsPeptideLinking() or comp.IsNucleotideLinking()):
+                not_linking.append(r)
+                continue
+            comp_anames = set([a.name for a in comp.atom_specs])
+            for a in r.atoms:
+                if a.name not in comp_anames:
+                    unknown_atom.append(a)
+
+        # 2)
+        if len(not_in_clib) > 0:
+            cleanup_log["cleaned_residues"]["no_clib"] = \
+            [_QualifiedResidueNotation(r) for r in not_in_clib]
+            msg = ("Expect all residues in receptor structure to be defined in "
+                   "compound library but this is not the case. "
+                   "Please refer to the OpenStructure website if an updated "
+                   "library is sufficient to solve the problem: "
+                   "https://openstructure.org/docs/conop/compoundlib/ "
+                   "These residues will not be considered for scoring (which "
+                   "may also affect pre-processing steps such as alignments): ")
+            msg += ','.join(cleanup_log["cleaned_residues"]["no_clib"])
+            ost.LogWarning(msg)
+            for r in not_in_clib:
+                r.SetIntProp("clib", 1)
+            ent = ost.mol.CreateEntityFromView(ent.Select("grclib:0!=1"),
+                      include_exlusive_atoms=False)
+
+        # 3)
+        if len(not_linking) > 0:
+            cleanup_log["cleaned_residues"]["not_linking"] = \
+            [_QualifiedResidueNotation(r) for r in not_linking]
+            msg = ("Expect all residues in receptor structure to be peptide "
+                   "linking or nucleotide linking according to the compound "
+                   "library but this is not the case. "
+                   "Please refer to the OpenStructure website if an updated "
+                   "library is sufficient to solve the problem: "
+                   "https://openstructure.org/docs/conop/compoundlib/ "
+                   "These residues will not be considered for scoring (which "
+                   "may also affect pre-processing steps such as alignments): ")
+            msg += ','.join(cleanup_log["cleaned_residues"]["not_linking"])
+            ost.LogWarning(msg)
+            for r in not_linking:
+                r.SetIntProp("linking", 1)
+            ent = ost.mol.CreateEntityFromView(ent.Select("grlinking:0!=1"),
+                      include_exlusive_atoms=False)
+
+        # 4)
+        if len(unknown_atom) > 0:
+            cleanup_log["cleaned_atoms"]["unknown_atoms"] = \
+            [_QualifiedAtomNotation(a) for a in unknown_atom]
+            msg = ("Expect atom names according to the compound library but "
+                   "this is not the case."
+                   "Please refer to the OpenStructure website if an updated "
+                   "library is sufficient to solve the problem: "
+                   "https://openstructure.org/docs/conop/compoundlib/ "
+                   "These atoms will not be considered for scoring: ")
+            msg += ','.join(cleanup_log["cleaned_atoms"]["unknown_atoms"])
+            ost.LogWarning(msg)
+            for a in unknown_atom:
+                a.SetIntProp("unknown", 1)
+            ent = ost.mol.CreateEntityFromView(ent.Select("gaunknown:0!=1"),
+                      include_exlusive_atoms=False)
+
+        # 5)
+        processor = conop.RuleBasedProcessor(clib)
+        processor.Process(ent)
+
+        return (ent, cleanup_log)
+
 
 def _ResidueToGraph(residue, by_atom_index=False):
     """Return a NetworkX graph representation of the residue.
@@ -1279,6 +1546,7 @@ class DisconnectedGraphError(Exception):
     pass
 
 # specify public interface
-__all__ = ('LigandScorer', 'ComputeSymmetries', 'NoSymmetryError',
+__all__ = ('CleanHydrogens', 'MMCIFPrep', 'PDBPrep',
+           'LigandScorer', 'ComputeSymmetries', 'NoSymmetryError',
            'NoIsomorphicSymmetryError', 'TooManySymmetriesError',
            'DisconnectedGraphError')
