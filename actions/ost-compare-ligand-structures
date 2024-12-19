@@ -424,40 +424,6 @@ def _GetStructureFormat(structure_path, sformat=None):
                         f"file {structure_path}.")
 
 
-def _LoadStructure(structure_path, sformat, fault_tolerant, bu_id):
-    """Read OST entity either from mmCIF or PDB.
-
-    The returned structure has structure_path attached as structure name
-    """
-
-    # Load the structure
-    if sformat == "mmcif":
-        if bu_id is not None:
-            cif_entity, cif_seqres, cif_info = \
-            io.LoadMMCIF(structure_path, info=True, seqres=True,
-                         fault_tolerant=fault_tolerant)
-            for biounit in cif_info.biounits:
-                if biounit.id == bu_id:
-                    entity = ost.mol.alg.CreateBU(cif_entity, biounit)
-                    break
-            else:
-                raise RuntimeError(f"No biounit found with ID '{bu_id}'.")
-
-        else:
-            entity = io.LoadMMCIF(structure_path,
-                                  fault_tolerant = fault_tolerant)
-        if len(entity.residues) == 0:
-            raise Exception(f"No residues found in file: {structure_path}")
-    else:
-        entity = io.LoadPDB(structure_path, fault_tolerant = fault_tolerant)
-        if len(entity.residues) == 0:
-            raise Exception(f"No residues found in file: {structure_path}")
-
-    # restore old loglevel and return
-    entity.SetName(structure_path)
-    return entity
-
-
 def _LoadLigands(ligands):
     """
     Load a list of ligands from file names. Return a list of entities oif the
