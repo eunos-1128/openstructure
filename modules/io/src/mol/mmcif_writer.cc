@@ -24,6 +24,169 @@
 
 namespace {
 
+
+  // Dummy entity mimics a mol.EntityHandle/mol.EntityView and implements all
+  // functionality required for mmCIF writing. This allows mmCIF writing also
+  // for arbitrary data structures without the expensive detour of OpenStructure
+  // Entity construction.
+
+  struct DummyResidue;
+  struct DummyChain;
+
+  struct DummyAtom{
+
+    DummyAtom(const String& name, const String& element, const geom::Vec3& pos,
+              Real occupancy, Real bfactor, bool hetatom,
+              DummyResidue* parent_residue): name(name),
+                                             element(element),
+                                             pos(pos),
+                                             occupancy(occupancy),
+                                             bfactor(bfactor),
+                                             hetatom(hetatom),
+                                             parent_residue(parent_residue) { }
+
+    const String& GetName() const { return name; }
+    const String& GetElement() const { return element; }
+    const geom::Vec3& GetPos() const { return pos; }
+    Real GetOccupancy() const { return occupancy; }
+    Real GetBFactor() const { return bfactor; }
+    bool IsHetAtom() const { return hetatom; }
+    const DummyResidue& GetResidue() const { return *parent_residue; }
+
+    std::string name;
+    std::string element;
+    geom::Vec3 pos;
+    Real occupancy;
+    Real bfactor;
+    bool hetatom;
+    DummyResidue* parent_residue;
+  };
+
+  struct DummyResidue{
+
+    DummyResidue(const String& name, char olc, char chem_class, int rnum,
+                 char rnum_ins_code, DummyChain* parent_chain): name(name),
+                                                                olc(olc),
+                                                                chem_class(chem_class),
+                                                                rnum(rnum, rnum_ins_code),
+                                                                parent_chain(parent_chain) { }
+
+    const std::string& GetName() const { return name; }
+    const std::vector<DummyAtom>& GetAtomList() const { return atoms; }
+    char GetChemClass() const { return chem_class; }
+    const ost::mol::ResNum& GetNumber() const { return rnum; }
+    char GetOneLetterCode() const { return olc; }
+    const DummyChain& GetChain() const { return *parent_chain; }
+
+    // mmCIF writer honours string properties that define auth assigned resnums
+    // etc. OMF does not store such things but we still need to define the
+    // functions.
+    bool HasProp(const std::string& dummy_string) { return false; }
+    std::string GetStringProp(const std::string& dummy_string) { return ""; }
+
+    std::string name;
+    char olc;
+    char chem_class;
+    ost::mol::ResNum rnum;
+    std::vector<DummyAtom> atoms;
+    DummyChain* parent_chain;
+  };
+
+  std::ostream& operator<< (std::ostream& stream, const DummyResidue& r) {
+    stream << r.name + r.rnum.AsString();
+    return stream;
+  }
+
+
+  struct DummyChain{
+
+    DummyChain(): is_valid(false) {}
+
+    DummyChain(const std::string& name, ost::mol::ChainType chain_type): is_valid(true),
+                                                                         name(name),
+                                                                         chain_type(chain_type) { }
+
+
+    const std::string& GetName() const { return name; }
+    const std::vector<DummyResidue>& GetResidueList() const { return residues; }
+    ost::mol::ChainType const GetType() { return chain_type; }
+    bool IsValid() const { return is_valid; }
+
+    // mmCIF writer honours string properties that define auth assigned things
+    // etc. OMF does not store such things but we still need to define the
+    // functions.
+    bool HasProp(const std::string& dummy_string) const { return false; }
+    std::string GetStringProp(const std::string& dummy_string) const { return ""; }
+
+    
+    bool is_valid;
+    std::string name;
+    ost::mol::ChainType chain_type;
+    std::vector<DummyResidue> residues;
+  };
+
+
+  struct DummyEnt{
+
+    DummyEnt(const ost::io::OMF& ent) {
+
+      std::vector<std::string> chain_names = ent.GetChainNames();
+      const std::vector<ost::io::ResidueDefinition>& res_defs =
+      ent.GetResidueDefinitions();
+
+      chains.reserve(chain_names.size()); // to keep pointers valid...
+
+      for(auto cname: chain_names) {
+        ost::io::ChainDataPtr chain_data = ent.GetChainData(cname);
+        chains.push_back(DummyChain(chain_data->ch_name,
+                                    chain_data->chain_type));
+        DummyChain* current_chain = &chains.back();
+
+        // to keep pointers valid
+        current_chain->residues.reserve(chain_data->res_def_indices.size());
+
+        int a_idx = 0;
+        for(uint r_idx = 0; r_idx < chain_data->res_def_indices.size();
+            ++r_idx) {
+          const ost::io::ResidueDefinition& res_def =
+          res_defs[chain_data->res_def_indices[r_idx]];
+          current_chain->residues.push_back(DummyResidue(res_def.name,
+                                                         res_def.olc,
+                                                         res_def.chem_class,
+                                                         chain_data->rnums[r_idx],
+                                                         chain_data->insertion_codes[r_idx],
+                                                         current_chain));
+          DummyResidue* current_residue = &current_chain->residues.back();
+          current_residue->atoms.reserve(res_def.anames.size());
+          for(uint i = 0; i < res_def.anames.size(); ++i) {
+            current_residue->atoms.push_back(DummyAtom(res_def.anames[i],
+                                                       res_def.elements[i],
+                                                       chain_data->positions[a_idx],
+                                                       chain_data->occupancies[a_idx],
+                                                       chain_data->bfactors[a_idx],
+                                                       res_def.is_hetatm[i],
+                                                       current_residue));
+            ++a_idx;
+          }
+        }
+      }
+    }
+
+    const std::vector<DummyChain>& GetChainList() const { return chains; }
+    const DummyChain& FindChain(const std::string& name) const {
+      for(const DummyChain& ch: chains) {
+        if(ch.name == name) {
+          return ch;
+        }
+      }
+
+      return invalid_chain;
+    }
+
+    std::vector<DummyChain> chains;
+    DummyChain invalid_chain;
+  };
+
   void CheckValidEntityPolyType(const String& entity_poly_type) {
     std::unordered_set<std::string> s = {"cyclic-pseudo-peptide",
                                          "other",
@@ -1241,7 +1404,7 @@ namespace {
                           ost::io::StarWriterLoopPtr atom_site,
                           ost::io::StarWriterLoopPtr pdbx_poly_seq_scheme) {
     std::vector<ost::mol::ResidueHandleList> res_lists;
-    ost::mol::ChainHandleList chain_list = ent.GetChainList();
+    auto chain_list = ent.GetChainList();
     for(auto ch: chain_list) {
       res_lists.push_back(ch.GetResidueList());
     }
@@ -1255,13 +1418,28 @@ namespace {
                           ost::io::StarWriterLoopPtr atom_site,
                           ost::io::StarWriterLoopPtr pdbx_poly_seq_scheme) {
     std::vector<ost::mol::ResidueViewList> res_lists;
-    ost::mol::ChainViewList chain_list = ent.GetChainList();
+    auto chain_list = ent.GetChainList();
     for(auto ch: chain_list) {
       res_lists.push_back(ch.GetResidueList());
     }
     ProcessEntmmCIFify(res_lists, compound_lib, entity_info,
                        atom_site, pdbx_poly_seq_scheme);
   }
+
+  void ProcessEntmmCIFify(const DummyEnt& ent,
+                          ost::conop::CompoundLibPtr compound_lib,
+                          std::vector<ost::io::MMCifWriterEntity>& entity_info,
+                          ost::io::StarWriterLoopPtr atom_site,
+                          ost::io::StarWriterLoopPtr pdbx_poly_seq_scheme) {
+    std::vector<std::vector<DummyResidue> > res_lists;
+    auto chain_list = ent.GetChainList();
+    for(auto ch: chain_list) {
+      res_lists.push_back(ch.GetResidueList());
+    }
+    ProcessEntmmCIFify(res_lists, compound_lib, entity_info,
+                       atom_site, pdbx_poly_seq_scheme);
+  }
+
 
   template <class T>
   void ProcessEntmmCIF(const T& ent,
@@ -1565,6 +1743,18 @@ void MMCifWriter::SetStructure(const ost::mol::EntityView& ent,
   this->Setup();
   entity_info_ = entity_info;
   ProcessEnt(ent, compound_lib, mmcif_conform, entity_info_,
+             atom_site_, pdbx_poly_seq_scheme_);
+  this->Finalize(compound_lib);
+}
+
+void MMCifWriter::SetStructure(const ost::io::OMF& ent,
+                               conop::CompoundLibPtr compound_lib,
+                               bool mmcif_conform,
+                               const std::vector<MMCifWriterEntity>& entity_info) {
+  this->Setup();
+  entity_info_ = entity_info;
+  DummyEnt dummy_ent(ent);
+  ProcessEnt(dummy_ent, compound_lib, mmcif_conform, entity_info_,
              atom_site_, pdbx_poly_seq_scheme_);
   this->Finalize(compound_lib);
 }

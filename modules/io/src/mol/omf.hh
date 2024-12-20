@@ -233,6 +233,15 @@ public:
 
   String GetSequence(const String& cname) const;
 
+  // raw data access - pros only...
+  const std::vector<ResidueDefinition>& GetResidueDefinitions() const {
+    return residue_definitions_;
+  }
+
+  ChainDataPtr GetChainData(const std::string& cname) const {
+    return chain_data_.at(cname);
+  }
+
 private:
   // only construct with static functions
   OMF(): options_(0) { }
