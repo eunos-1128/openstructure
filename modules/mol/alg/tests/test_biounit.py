@@ -29,6 +29,13 @@ class TestBioUnit(unittest.TestCase):
     self.assertEqual(len(transformations[0]), 2)
     self.assertEqual(transformations[0][0], geom.Mat4()) # identity
 
+    # check whether we can extract the expected chain names of the
+    # resulting biounit
+    self.assertEqual(bu_info.GetBUChains(),
+                     ["1.A", "1.B", "1.C", "1.D", "1.E", "1.F",
+                      "2.A", "2.B", "2.C", "2.D", "2.E", "2.F"])
+
+
     # reconstruct biounit
     bu = mol.alg.CreateBU(ent, bu_info)
     self.assertEqual([ch.GetName() for ch in bu.chains],

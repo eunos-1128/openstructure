@@ -225,6 +225,71 @@ void BUInfo::_InitTransforms() const {
   }
 }
 
+void BUInfo::GetBUChains(std::vector<String>& bu_chains) const {
+
+  bu_chains.clear();
+
+  // For chain naming. First copy with transformation: 2.<au_cname>, second
+  // 3.<au_cname> etc.
+  std::map<String, int> chain_counter;
+
+  // The name 1.<au_cname> is reserved for that particular AU chain with
+  // identity transform, i.e. the copy of the actual AU chain. We need to keep
+  // track of this as there can only be one.
+  std::set<String> au_chain_copies;
+
+  const std::vector<std::vector<String> >& au_chains = this->GetAUChains();
+  const std::vector<std::vector<geom::Mat4> >& transforms =
+  this->GetTransformations();
+
+  for(uint chain_intvl = 0; chain_intvl < au_chains.size(); ++chain_intvl) {
+    if(au_chains[chain_intvl].empty()) continue;
+    // process all transformations
+    for(uint t_idx = 0; t_idx < transforms[chain_intvl].size(); ++t_idx) {
+      const geom::Mat4& m = transforms[chain_intvl][t_idx];
+      // check if m is identity matrix => no transformation applied
+      bool is_identity = true;
+      geom::Mat4 identity_matrix = geom::Mat4::Identity();
+      const Real* m_data = m.Data();
+      const Real* identity_data = identity_matrix.Data();
+      for(int i = 0; i < 16; ++i) {
+        if(std::abs(m_data[i] - identity_data[i]) > 1e-5) {
+          is_identity = false;
+          break;
+        }
+      }
+
+      for(uint c_idx = 0; c_idx < au_chains[chain_intvl].size(); ++c_idx) {
+        String au_cname = au_chains[chain_intvl][c_idx];
+
+        std::stringstream bu_cname_ss;
+        if(is_identity && au_chain_copies.find(au_cname) == au_chain_copies.end()) {
+          bu_cname_ss << "1." << au_cname; // 1.<au_cname> reserved for AU chain
+                                           // without transformation
+                                           // at least the first of it...
+                                           // as of January 2024, there were 3
+                                           // entries (8qn6, 8x1h, 2c0x) where
+                                           // the identity transform is applied
+                                           // more than once on the same AU
+                                           // chain, effectively leading to
+                                           // chains sitting on top of each
+                                           // other... But hey, bullshit in,
+                                           // bullshit out
+          au_chain_copies.insert(au_cname);
+        } else {
+          if(chain_counter.find(au_cname) == chain_counter.end()) {
+            chain_counter[au_cname] = 2;
+          }
+          bu_cname_ss << chain_counter[au_cname] << '.' << au_cname;
+          chain_counter[au_cname] += 1;
+        }
+
+        bu_chains.push_back(bu_cname_ss.str());
+      }
+    }
+  }
+}
+
 ost::mol::EntityHandle CreateBU(const ost::mol::EntityHandle& asu,
                                 const ost::io::MMCifInfoBioUnit& bu) {
   BUInfo bu_info(bu);

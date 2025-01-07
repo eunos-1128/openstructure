@@ -70,6 +70,15 @@ namespace{
     return ost::mol::alg::CreateBU(asu, bu);
   }
 
+  list wrap_get_bu_chains(const ost::mol::alg::BUInfo& info) {
+    list return_list;
+    std::vector<String> bu_chains;
+    info.GetBUChains(bu_chains);
+    for(auto cname: bu_chains) {
+      return_list.append(cname);
+    }
+    return return_list;
+  }
 } // anon ns
 
 void export_biounit() {
@@ -79,6 +88,7 @@ void export_biounit() {
     .def("ToBytes", &wrap_to_bytes)
     .def("GetAUChains", &wrap_get_au_chains)
     .def("GetTransformations", &wrap_get_transformations)
+    .def("GetBUChains", &wrap_get_bu_chains)
   ;
 
   def("CreateBU", &wrap_CreateBU_one);

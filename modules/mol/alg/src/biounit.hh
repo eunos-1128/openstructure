@@ -42,6 +42,8 @@ struct BUInfo {
 
   const std::vector<std::vector<geom::Mat4> >& GetTransformations() const;
 
+  void GetBUChains(std::vector<String>& bu_chains) const;
+
   void _InitTransforms() const;
 
   std::vector<String> au_chains;
