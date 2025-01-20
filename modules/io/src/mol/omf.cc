@@ -5336,7 +5336,7 @@ ost::mol::EntityHandle OMF::GetAU() const{
     ost::mol::ChainHandle chain_one = ent.FindChain(bond_chain_names_[i*2]);
     ost::mol::ChainHandle chain_two = ent.FindChain(bond_chain_names_[i*2+1]);
     ost::mol::AtomHandle at_one = chain_one.GetAtomList()[bond_atoms_[2*i]];
-    ost::mol::AtomHandle at_two = chain_two.GetAtomList()[bond_atoms_[2*i]];
+    ost::mol::AtomHandle at_two = chain_two.GetAtomList()[bond_atoms_[2*i+1]];
     ed.Connect(at_one, at_two, bond_orders_[i]);
   }
   return ent;
