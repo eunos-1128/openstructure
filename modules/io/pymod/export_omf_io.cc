@@ -58,6 +58,15 @@ namespace{
                            bu_info.GetBUChains());
   }
 
+  tuple wrap_trace(OMFPtr omf,
+                   const String& cname,
+                   const String& aname) {
+    std::vector<int> rnums;
+    geom::Vec3List pos;
+    omf->Trace(cname, aname, rnums, pos);
+    return boost::python::make_tuple(VecToList(rnums), pos);
+  }
+
 }
 
 void export_omf_io() {
@@ -88,5 +97,6 @@ void export_omf_io() {
     .def("GetAvgBFactors", &OMF::GetAvgBFactors,(arg("cname")))
     .def("GetSequence", &OMF::GetSequence, (arg("cname")))
     .def("ToAssembly", &wrap_to_assembly, (arg("bu_info")))
+    .def("Trace", &wrap_trace, (arg("cname"), arg("aname")))
   ;
 }

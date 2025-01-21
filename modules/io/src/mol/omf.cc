@@ -5441,6 +5441,34 @@ OMFPtr OMF::ToAssembly(const std::vector<std::vector<String> >& au_chains,
   return omf_ptr;
 }
 
+void OMF::Trace(const String& cname, const String& aname,
+                std::vector<int>& rnums, geom::Vec3List& pos) const {
+
+  rnums.clear();
+  pos.clear();
+
+  auto it = chain_data_.find(cname);
+  if(it == chain_data_.end()) {
+    std::stringstream ss;
+    ss << "Cannot get Trace from non-existent chain '"<<cname<<"'.";
+    throw ost::Error(ss.str());
+  }
+  ChainDataPtr chain_data = it->second;
+
+  int res_idx = 0;
+  int pos_idx = 0;
+  for(auto res_def_idx: chain_data->res_def_indices) {
+    const ResidueDefinition& res_def = residue_definitions_[res_def_idx];
+    int a_idx = res_def.GetIdx(aname);
+    if(a_idx != -1) {
+      rnums.push_back(chain_data->rnums[res_idx]);
+      pos.push_back(chain_data->positions[pos_idx + a_idx]);
+    }
+    ++res_idx;
+    pos_idx += res_def.anames.size();
+  }
+}
+
 void OMF::ToStream(std::ostream& stream) const {
 
   uint16_t magic_number = 42;

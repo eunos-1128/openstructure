@@ -220,6 +220,23 @@ class TestOMF(unittest.TestCase):
         self.assertTrue(compare_ent(omf_assembly.GetEntity(), ent_assembly,
                                     ignore_chain_order=True))
 
+    def test_trace(self):
+        omf = io.OMF.FromEntity(self.ent)
+        rnums, pos = omf.Trace("B", "CA")
+
+        ent_rnums = list()
+        ent_pos = geom.Vec3List()
+        for r in self.ent.FindChain("B").residues:
+            ca = r.FindAtom("CA")
+            if ca.IsValid():
+                ent_rnums.append(r.GetNumber().GetNum())
+                ent_pos.append(ca.GetPos())
+
+        self.assertEqual(rnums, ent_rnums)
+        for a,b in zip(pos, ent_pos):
+            d = geom.Distance(a,b)
+            self.assertTrue(d < 0.001)
+
 
 if __name__== '__main__':
     from ost import testutils

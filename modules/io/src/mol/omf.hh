@@ -216,6 +216,9 @@ public:
                     const std::vector<std::vector<geom::Mat4> >& transformations,
                     const std::vector<std::vector<std::vector<String> > >& bu_chains) const;
 
+  void Trace(const String& cname, const String& aname,
+             std::vector<int>& rnums, geom::Vec3List& pos) const;
+
   int GetVersion() const { return version_; }
 
   static int GetCurrentOMFVersion() { return OMF_VERSION; }
