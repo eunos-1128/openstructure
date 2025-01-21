@@ -186,6 +186,13 @@ const std::vector<std::vector<geom::Mat4> >& BUInfo::GetTransformations() const 
   return transforms_;
 }
 
+const std::vector<std::vector<std::vector<String> > >& BUInfo::GetBUChains() const {
+  if(bu_chains_.empty()) {
+    this->_InitTransforms();
+  }
+  return bu_chains_;
+}
+
 void BUInfo::_InitTransforms() const {
   int n_intervals = chain_intvl.size() / 2;
   for(int intvl_idx = 0; intvl_idx < n_intervals; ++intvl_idx) {
@@ -223,11 +230,9 @@ void BUInfo::_InitTransforms() const {
     }
     transforms_.push_back(transforms);
   }
-}
 
-void BUInfo::GetBUChains(std::vector<String>& bu_chains) const {
-
-  bu_chains.clear();
+  // get bu chain names
+  /////////////////////
 
   // For chain naming. First copy with transformation: 2.<au_cname>, second
   // 3.<au_cname> etc.
@@ -238,15 +243,13 @@ void BUInfo::GetBUChains(std::vector<String>& bu_chains) const {
   // track of this as there can only be one.
   std::set<String> au_chain_copies;
 
-  const std::vector<std::vector<String> >& au_chains = this->GetAUChains();
-  const std::vector<std::vector<geom::Mat4> >& transforms =
-  this->GetTransformations();
-
-  for(uint chain_intvl = 0; chain_intvl < au_chains.size(); ++chain_intvl) {
-    if(au_chains[chain_intvl].empty()) continue;
+  for(uint chain_intvl = 0; chain_intvl < au_chains_.size(); ++chain_intvl) {
+    bu_chains_.push_back(std::vector<std::vector<String> >());
+    if(au_chains_[chain_intvl].empty()) continue;
     // process all transformations
-    for(uint t_idx = 0; t_idx < transforms[chain_intvl].size(); ++t_idx) {
-      const geom::Mat4& m = transforms[chain_intvl][t_idx];
+    for(uint t_idx = 0; t_idx < transforms_[chain_intvl].size(); ++t_idx) {
+      bu_chains_.back().push_back(std::vector<String>());
+      const geom::Mat4& m = transforms_[chain_intvl][t_idx];
       // check if m is identity matrix => no transformation applied
       bool is_identity = true;
       geom::Mat4 identity_matrix = geom::Mat4::Identity();
@@ -259,8 +262,8 @@ void BUInfo::GetBUChains(std::vector<String>& bu_chains) const {
         }
       }
 
-      for(uint c_idx = 0; c_idx < au_chains[chain_intvl].size(); ++c_idx) {
-        String au_cname = au_chains[chain_intvl][c_idx];
+      for(uint c_idx = 0; c_idx < au_chains_[chain_intvl].size(); ++c_idx) {
+        String au_cname = au_chains_[chain_intvl][c_idx];
 
         std::stringstream bu_cname_ss;
         if(is_identity && au_chain_copies.find(au_cname) == au_chain_copies.end()) {
@@ -283,8 +286,7 @@ void BUInfo::GetBUChains(std::vector<String>& bu_chains) const {
           bu_cname_ss << chain_counter[au_cname] << '.' << au_cname;
           chain_counter[au_cname] += 1;
         }
-
-        bu_chains.push_back(bu_cname_ss.str());
+        bu_chains_.back().back().push_back(bu_cname_ss.str());
       }
     }
   }
@@ -302,21 +304,26 @@ ost::mol::EntityHandle CreateBU(const ost::mol::EntityHandle& asu,
   ent.SetName(asu.GetName());
   ost::mol::XCSEditor ed = ent.EditXCS(mol::BUFFERED_EDIT);
 
-  // For chain naming. First copy with transformation: 2.<au_cname>, second
-  // 3.<au_cname> etc.
-  std::map<String, int> chain_counter;
-
-  // The name 1.<au_cname> is reserved for that particular AU chain with
-  // identity transform, i.e. the copy of the actual AU chain. We need to keep
-  // track of this as there can only be one.
-  std::set<String> au_chain_copies;
-
   const std::vector<std::vector<String> >& au_chains = bu_info.GetAUChains();
   const std::vector<std::vector<geom::Mat4> >& transforms =
   bu_info.GetTransformations();
+  const std::vector<std::vector<std::vector<String> > >& bu_chains =
+  bu_info.GetBUChains();
 
   for(uint chain_intvl = 0; chain_intvl < au_chains.size(); ++chain_intvl) {
     if(au_chains[chain_intvl].empty()) continue;
+
+    // check if all chains from the interval are present in AU
+    for(uint c_idx = 0; c_idx < au_chains[chain_intvl].size(); ++c_idx) {
+      String au_cname = au_chains[chain_intvl][c_idx];
+      ost::mol::ChainHandle asu_ch = asu.FindChain(au_cname);
+      if(!asu_ch.IsValid()) {
+        std::stringstream ss;
+        ss << "Cannot construct biounit with missing asu chain "<<au_cname<<".";
+        throw ost::Error(ss.str());
+      }
+    }
+
     // derive all bonds related to that chain_intvl
     // potentially also interchain bonds
     std::stringstream query_ss;
@@ -330,56 +337,15 @@ ost::mol::EntityHandle CreateBU(const ost::mol::EntityHandle& asu,
     // process all transformations
     for(uint t_idx = 0; t_idx < transforms[chain_intvl].size(); ++t_idx) {
       const geom::Mat4& m = transforms[chain_intvl][t_idx];
-      // check if m is identity matrix => no transformation applied
-      bool is_identity = true;
-      geom::Mat4 identity_matrix = geom::Mat4::Identity();
-      const Real* m_data = m.Data();
-      const Real* identity_data = identity_matrix.Data();
-      for(int i = 0; i < 16; ++i) {
-        if(std::abs(m_data[i] - identity_data[i]) > 1e-5) {
-          is_identity = false;
-          break;
-        }
-      }
 
       // key: au_at.GetHashCode, value: bu_at
       // required for bond buildup in the end
       std::map<long, AtomHandle> atom_mapper;
       for(uint c_idx = 0; c_idx < au_chains[chain_intvl].size(); ++c_idx) {
         String au_cname = au_chains[chain_intvl][c_idx];
-
-        std::stringstream bu_cname_ss;
-        if(is_identity && au_chain_copies.find(au_cname) == au_chain_copies.end()) {
-          bu_cname_ss << "1." << au_cname; // 1.<au_cname> reserved for AU chain
-                                           // without transformation
-                                           // at least the first of it...
-                                           // as of January 2024, there were 3
-                                           // entries (8qn6, 8x1h, 2c0x) where
-                                           // the identity transform is applied
-                                           // more than once on the same AU
-                                           // chain, effectively leading to
-                                           // chains sitting on top of each
-                                           // other... But hey, bullshit in,
-                                           // bullshit out
-          au_chain_copies.insert(au_cname);
-        } else {
-          if(chain_counter.find(au_cname) == chain_counter.end()) {
-            chain_counter[au_cname] = 2;
-          }
-          bu_cname_ss << chain_counter[au_cname] << '.' << au_cname;
-          chain_counter[au_cname] += 1;
-        }
         ost::mol::ChainHandle asu_ch = asu.FindChain(au_cname);
-        if(!asu_ch.IsValid()) {
-          std::stringstream ss;
-          ss << "Cannot construct biounit with asu chain "<<au_cname;
-          ss << ". Specified interval only has: " <<au_chains[chain_intvl][0];
-          for(uint i = 1; i < au_chains[chain_intvl].size(); ++i) {
-            ss << ',' << au_chains[chain_intvl][i];
-          }
-          throw ost::Error(ss.str());
-        }
-        ost::mol::ChainHandle bu_ch = ed.InsertChain(bu_cname_ss.str());
+        String bu_cname = bu_chains[chain_intvl][t_idx][c_idx];
+        ost::mol::ChainHandle bu_ch = ed.InsertChain(bu_cname);
         ed.SetChainType(bu_ch, asu_ch.GetType());
         ost::mol::ResidueHandleList au_res_list = asu_ch.GetResidueList();
         for(auto res_it = au_res_list.begin();
@@ -412,7 +378,6 @@ ost::mol::EntityHandle CreateBU(const ost::mol::EntityHandle& asu,
                    atom_mapper[it->GetSecond().GetHashCode()],
                    it->GetBondOrder());
       }
-
     }
   }
   return ent;

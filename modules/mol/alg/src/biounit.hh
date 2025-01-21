@@ -42,7 +42,7 @@ struct BUInfo {
 
   const std::vector<std::vector<geom::Mat4> >& GetTransformations() const;
 
-  void GetBUChains(std::vector<String>& bu_chains) const;
+  const std::vector<std::vector<std::vector<String> > >& GetBUChains() const;
 
   void _InitTransforms() const;
 
@@ -54,6 +54,7 @@ struct BUInfo {
 private:
   mutable std::vector<std::vector<String> > au_chains_;
   mutable std::vector<std::vector<geom::Mat4> > transforms_;
+  mutable std::vector<std::vector<std::vector<String> > > bu_chains_;
 };
 
 ost::mol::EntityHandle CreateBU(const ost::mol::EntityHandle& asu,

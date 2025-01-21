@@ -72,10 +72,18 @@ namespace{
 
   list wrap_get_bu_chains(const ost::mol::alg::BUInfo& info) {
     list return_list;
-    std::vector<String> bu_chains;
-    info.GetBUChains(bu_chains);
-    for(auto cname: bu_chains) {
-      return_list.append(cname);
+    const std::vector<std::vector<std::vector<String> > >& bu_chains =
+    info.GetBUChains();
+    for(auto chain_intvl: bu_chains) {
+      list chain_intvl_list;
+      for(auto transform: chain_intvl) {
+        list transform_list;
+        for(auto ch: transform) {
+          transform_list.append(ch);
+        }
+        chain_intvl_list.append(transform_list);
+      }
+      return_list.append(chain_intvl_list);
     }
     return return_list;
   }

@@ -32,8 +32,8 @@ class TestBioUnit(unittest.TestCase):
     # check whether we can extract the expected chain names of the
     # resulting biounit
     self.assertEqual(bu_info.GetBUChains(),
-                     ["1.A", "1.B", "1.C", "1.D", "1.E", "1.F",
-                      "2.A", "2.B", "2.C", "2.D", "2.E", "2.F"])
+                     [[["1.A", "1.B", "1.C", "1.D", "1.E", "1.F"],
+                       ["2.A", "2.B", "2.C", "2.D", "2.E", "2.F"]]])
 
 
     # reconstruct biounit
