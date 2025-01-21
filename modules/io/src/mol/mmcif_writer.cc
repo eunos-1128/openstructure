@@ -1497,7 +1497,7 @@ namespace {
              preassigned_polymer_chains.end()) {
             std::stringstream ss;
             ss << "If MMCifWriterEntity is provided, all polymer chains must ";
-            ss << "assigned. No assignment for chain \"" << cname << "\"";
+            ss << "be assigned. No assignment for chain \"" << cname << "\"";
             throw ost::io::IOException(ss.str());
           }
         }
