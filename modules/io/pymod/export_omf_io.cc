@@ -20,6 +20,7 @@
 using namespace boost::python;
 
 #include <ost/io/mol/omf.hh>
+#include <ost/mol/alg/biounit.hh>
 
 using namespace ost;
 using namespace ost::io;
@@ -48,6 +49,13 @@ namespace{
 
   boost::python::list wrap_get_chain_names(OMFPtr omf) {
     return VecToList<String>(omf->GetChainNames());
+  }
+
+  OMFPtr wrap_to_assembly(OMFPtr omf,
+                          const ost::mol::alg::BUInfo& bu_info) {
+    return omf->ToAssembly(bu_info.GetAUChains(),
+                           bu_info.GetTransformations(),
+                           bu_info.GetBUChains());
   }
 
 }
@@ -79,5 +87,6 @@ void export_omf_io() {
     .def("GetBFactors", &OMF::GetBFactors, return_value_policy<reference_existing_object>(),(arg("cname")))
     .def("GetAvgBFactors", &OMF::GetAvgBFactors,(arg("cname")))
     .def("GetSequence", &OMF::GetSequence, (arg("cname")))
+    .def("ToAssembly", &wrap_to_assembly, (arg("bu_info")))
   ;
 }

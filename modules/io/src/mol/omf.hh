@@ -212,6 +212,10 @@ public:
     return this->GetAUChain(name);
   }
 
+  OMFPtr ToAssembly(const std::vector<std::vector<String> >& au_chains,
+                    const std::vector<std::vector<geom::Mat4> >& transformations,
+                    const std::vector<std::vector<std::vector<String> > >& bu_chains) const;
+
   int GetVersion() const { return version_; }
 
   static int GetCurrentOMFVersion() { return OMF_VERSION; }
