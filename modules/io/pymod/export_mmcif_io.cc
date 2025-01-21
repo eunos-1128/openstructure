@@ -73,6 +73,13 @@ String WrapEntityToMMCifStringView(const ost::mol::EntityView& ent,
                              mmcif_conform);
 }
 
+String WrapOMFToMMCifString(const ost::io::OMF& omf,
+                            const String& data_name,
+                            ost::conop::CompoundLibPtr compound_lib,
+                            bool mmcif_conform){
+  return OMFToMMCifString(omf, data_name, compound_lib, mmcif_conform);
+}
+
 void WrapStarLoopAddData(StarWriterLoop& sl, const boost::python::list& l) {
   std::vector<StarWriterValue> v;
   for (int i = 0; i < boost::python::len(l); ++i){
@@ -595,4 +602,9 @@ void export_mmcif_io()
                                                              arg("data_name"),
                                                              arg("compound_lib"),
                                                              arg("mmcif_conform")));
+
+  def("OMFToMMCifString",  &WrapOMFToMMCifString, (arg("omf"),
+                                                   arg("data_name"),
+                                                   arg("compound_lib"),
+                                                   arg("mmcif_conform")));
 }

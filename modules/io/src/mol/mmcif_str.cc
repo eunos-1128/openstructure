@@ -45,6 +45,17 @@ String EntityToMMCifString(const ost::mol::EntityView& ent,
   return ss.str();
 }
 
+String OMFToMMCifString(const ost::io::OMF& omf,
+                        const String& data_name,
+                        ost::conop::CompoundLibPtr compound_lib,
+                        bool mmcif_conform) {
+  std::stringstream ss;
+  MMCifWriter writer;
+  writer.SetStructure(omf, compound_lib, mmcif_conform);
+  writer.Write(data_name, ss);
+  return ss.str();
+}
+
 std::tuple<mol::EntityHandle, MMCifInfo, ost::seq::SequenceList>
 MMCifStringToEntity(const String& mmcif, const IOProfile& profile, bool process) {
   std::stringstream stream(mmcif);
