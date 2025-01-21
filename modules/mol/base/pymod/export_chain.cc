@@ -151,4 +151,5 @@ void export_Chain()
 
   def("ChainTypeFromString", ChainTypeFromStringPtr);
   def("StringFromChainType", &StringFromChainType);
+  def("EntityTypeFromChainType", &EntityTypeFromChainType);
 }
