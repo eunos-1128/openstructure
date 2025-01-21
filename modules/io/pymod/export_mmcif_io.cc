@@ -60,24 +60,28 @@ boost::python::tuple WrapMMCifStringToEntity(const String& mmcif,
 String WrapEntityToMMCifStringEnt(const ost::mol::EntityHandle& ent,
                                  const String& data_name,
                                  ost::conop::CompoundLibPtr compound_lib,
-                                 bool mmcif_conform) {
+                                 bool mmcif_conform,
+                                 const std::vector<MMCifWriterEntity>& entity_info) {
   return EntityToMMCifString(ent, data_name, compound_lib,
-                             mmcif_conform);
+                             mmcif_conform, entity_info);
 }
 
 String WrapEntityToMMCifStringView(const ost::mol::EntityView& ent,
                                    const String& data_name,
                                    ost::conop::CompoundLibPtr compound_lib,
-                                   bool mmcif_conform) {
+                                   bool mmcif_conform,
+                                   const std::vector<MMCifWriterEntity>& entity_info) {
   return EntityToMMCifString(ent, data_name, compound_lib,
-                             mmcif_conform);
+                             mmcif_conform, entity_info);
 }
 
 String WrapOMFToMMCifString(const ost::io::OMF& omf,
                             const String& data_name,
                             ost::conop::CompoundLibPtr compound_lib,
-                            bool mmcif_conform){
-  return OMFToMMCifString(omf, data_name, compound_lib, mmcif_conform);
+                            bool mmcif_conform,
+                            const std::vector<MMCifWriterEntity>& entity_info){
+  return OMFToMMCifString(omf, data_name, compound_lib,
+                          mmcif_conform, entity_info);
 }
 
 void WrapStarLoopAddData(StarWriterLoop& sl, const boost::python::list& l) {
@@ -596,15 +600,18 @@ void export_mmcif_io()
   def("EntityToMMCifString",  &WrapEntityToMMCifStringEnt, (arg("ent"),
                                                             arg("data_name"),
                                                             arg("compound_lib"),
-                                                            arg("mmcif_conform")));
+                                                            arg("mmcif_conform"),
+                                                            arg("entity_info")=std::vector<MMCifWriterEntity>()));
 
   def("EntityToMMCifString",  &WrapEntityToMMCifStringView, (arg("ent"),
                                                              arg("data_name"),
                                                              arg("compound_lib"),
-                                                             arg("mmcif_conform")));
+                                                             arg("mmcif_conform"),
+                                                             arg("entity_info")=std::vector<MMCifWriterEntity>()));
 
   def("OMFToMMCifString",  &WrapOMFToMMCifString, (arg("omf"),
                                                    arg("data_name"),
                                                    arg("compound_lib"),
-                                                   arg("mmcif_conform")));
+                                                   arg("mmcif_conform"),
+                                                   arg("entity_info")=std::vector<MMCifWriterEntity>()));
 }
