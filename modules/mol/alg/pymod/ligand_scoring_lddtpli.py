@@ -10,9 +10,9 @@ from ost.mol.alg import chain_mapping
 from ost.mol.alg import ligand_scoring_base
 
 class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
-    """ :class:`LigandScorer` implementing lDDT-PLI.
+    """ :class:`LigandScorer` implementing LDDT-PLI.
 
-    lDDT-PLI is an lDDT score considering contacts between ligand and
+    LDDT-PLI is an LDDT score considering contacts between ligand and
     receptor. Where receptor consists of protein and nucleic acid chains that
     pass the criteria for :class:`chain mapping <ost.mol.alg.chain_mapping>`.
     This means ignoring other ligands, waters, short polymers as well as any
@@ -23,10 +23,10 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
     model chains onto their chemically equivalent target chains are enumerated.
     For each of these enumerations, all possible symmetries, i.e. atom-atom
     assignments of the ligand as given by :class:`LigandScorer`, are evaluated
-    and an lDDT-PLI score is computed. The best possible lDDT-PLI score is
+    and an LDDT-PLI score is computed. The best possible LDDT-PLI score is
     returned.
 
-    The lDDT-PLI score is a variant of lDDT with a custom inclusion radius
+    The LDDT-PLI score is a variant of LDDT with a custom inclusion radius
     (`lddt_pli_radius`), no stereochemistry checks, and which penalizes
     contacts added in the model within `lddt_pli_radius` by default
     (can be changed with the `add_mdl_contacts` flag) but only if the involved
@@ -44,7 +44,7 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
     Populates :attr:`LigandScorer.aux_data` with following :class:`dict` keys:
 
     * lddt_pli: The LDDT-PLI score
-    * lddt_pli_n_contacts: Number of contacts considered in lDDT computation
+    * lddt_pli_n_contacts: Number of contacts considered in LDDT computation
     * target_ligand: The actual target ligand for which the score was computed
     * model_ligand: The actual model ligand for which the score was computed
     * bs_ref_res: :class:`set` of residues with potentially non-zero
@@ -78,17 +78,17 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
     :param max_symmetries: Passed to parent constructor - see
                            :class:`LigandScorer`.
     :type max_symmetries: :class:`int`
-    :param lddt_pli_radius: lDDT inclusion radius for lDDT-PLI.
+    :param lddt_pli_radius: LDDT inclusion radius for LDDT-PLI.
     :type lddt_pli_radius: :class:`float`
     :param add_mdl_contacts: Whether to penalize added model contacts.
     :type add_mdl_contacts: :class:`bool`
-    :param lddt_pli_thresholds: Distance difference thresholds for lDDT.
+    :param lddt_pli_thresholds: Distance difference thresholds for LDDT.
     :type lddt_pli_thresholds: :class:`list` of :class:`float`
     :param lddt_pli_binding_site_radius: Pro param - dont use. Providing a value
                                          Restores behaviour from previous
                                          implementation that first extracted a
                                          binding site with strict distance
-                                         threshold and computed lDDT-PLI only on
+                                         threshold and computed LDDT-PLI only on
                                          those target residues whereas the
                                          current implementation includes every
                                          atom within *lddt_pli_radius*.
@@ -126,8 +126,8 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
 
         # update state decoding from parent with subclass specific stuff
         self.state_decoding[10] = ("no_contact",
-                                   "There were no lDDT contacts between the "
-                                   "binding site and the ligand, and lDDT-PLI "
+                                   "There were no LDDT contacts between the "
+                                   "binding site and the ligand, and LDDT-PLI "
                                    "is undefined.")
         self.state_decoding[20] = ("unknown",
                                    "Unknown error occured in LDDTPLIScorer")
@@ -136,12 +136,12 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
         """ Implements interface from parent
         """
         if self.add_mdl_contacts:
-            LogInfo("Computing lDDT-PLI with added model contacts")
+            LogInfo("Computing LDDT-PLI with added model contacts")
             result = self._compute_lddt_pli_add_mdl_contacts(symmetries,
                                                              target_ligand,
                                                              model_ligand)
         else:
-            LogInfo("Computing lDDT-PLI without added model contacts")
+            LogInfo("Computing LDDT-PLI without added model contacts")
             result = self._compute_lddt_pli_classic(symmetries,
                                                     target_ligand,
                                                     model_ligand)
@@ -330,7 +330,7 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
 
                 for trg_a_idx in ligand_atom_mappings[mdl_a_idx]:
                     # mask selects entries in trg_bs_indices that are not yet
-                    # part of classic lDDT ref_indices for atom at trg_a_idx
+                    # part of classic LDDT ref_indices for atom at trg_a_idx
                     # => added mdl contacts
                     mask = np.isin(trg_bs_indices,
                                    ref_indices[ligand_start_idx + trg_a_idx],
@@ -369,7 +369,7 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
         non_mapped_cache = dict()
 
         ###############################################################
-        # compute lDDT for all possible chain mappings and symmetries #
+        # compute LDDT for all possible chain mappings and symmetries #
         ###############################################################
 
         best_score = -1.0
@@ -594,7 +594,7 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
                                                            mdl_bs, trg_bs)
 
         ###############################################################
-        # compute lDDT for all possible chain mappings and symmetries #
+        # compute LDDT for all possible chain mappings and symmetries #
         ###############################################################
 
         best_score = -1.0

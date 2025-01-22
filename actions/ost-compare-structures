@@ -71,7 +71,7 @@ enabling -rna/--residue-number-alignment is recommended.
 
 Each score is opt-in and can be enabled with optional arguments.
 
-Example to compute global and per-residue lDDT values as well as QS-score:
+Example to compute global and per-residue LDDT values as well as QS-score:
 
 ost compare-structures -m model.pdb -r reference.cif --lddt --local-lddt \
 --qs-score
@@ -225,9 +225,9 @@ def _ParseArgs():
         dest="lddt",
         default=False,
         action="store_true",
-        help=("Compute global lDDT score with default parameterization and "
+        help=("Compute global LDDT score with default parameterization and "
               "store as key \"lddt\". Stereochemical irregularities affecting "
-              "lDDT are reported as keys \"model_clashes\", "
+              "LDDT are reported as keys \"model_clashes\", "
               "\"model_bad_bonds\", \"model_bad_angles\" and the respective "
               "reference counterparts."))
 
@@ -236,13 +236,13 @@ def _ParseArgs():
         dest="local_lddt",
         default=False,
         action="store_true",
-        help=("Compute per-residue lDDT scores with default parameterization "
+        help=("Compute per-residue LDDT scores with default parameterization "
               "and store as key \"local_lddt\". Score for each residue is "
               "accessible by key <chain_name>.<resnum>.<resnum_inscode>. "
               "Residue with number 42 in chain X can be extracted with: "
               "data[\"local_lddt\"][\"X.42.\"]. If there is an insertion "
               "code, lets say A, the residue key becomes \"X.42.A\". "
-              "Stereochemical irregularities affecting lDDT are reported as "
+              "Stereochemical irregularities affecting LDDT are reported as "
               "keys \"model_clashes\", \"model_bad_bonds\", "
               "\"model_bad_angles\" and the respective reference "
               "counterparts. Atoms specified in there follow the following "
@@ -253,7 +253,7 @@ def _ParseArgs():
         dest="aa_local_lddt",
         default=False,
         action="store_true",
-        help=("Compute per-atom lDDT scores with default parameterization "
+        help=("Compute per-atom LDDT scores with default parameterization "
               "and store as key \"aa_local_lddt\". Score for each atom is "
               "accessible by key "
               "<chain_name>.<resnum>.<resnum_inscode>.<aname>. "
@@ -261,7 +261,7 @@ def _ParseArgs():
               "extracted with: data[\"aa_local_lddt\"][\"X.42..CA\"]. "
               "If there is a residue insertion code, lets say A, the atom key "
               "becomes \"X.42.A.CA\". "
-              "Stereochemical irregularities affecting lDDT are reported as "
+              "Stereochemical irregularities affecting LDDT are reported as "
               "keys \"model_clashes\", \"model_bad_bonds\", "
               "\"model_bad_angles\" and the respective reference "
               "counterparts. Atoms specified in there follow the following "
@@ -272,8 +272,8 @@ def _ParseArgs():
         dest="bb_lddt",
         default=False,
         action="store_true",
-        help=("Compute global lDDT score with default parameterization and "
-              "store as key \"bb_lddt\". lDDT in this case is only computed on "
+        help=("Compute global LDDT score with default parameterization and "
+              "store as key \"bb_lddt\". LDDT in this case is only computed on "
               "backbone atoms: CA for peptides and C3' for nucleotides"))
 
     parser.add_argument(
@@ -281,8 +281,8 @@ def _ParseArgs():
         dest="bb_local_lddt",
         default=False,
         action="store_true",
-        help=("Compute per-residue lDDT scores with default parameterization "
-              "and store as key \"bb_local_lddt\". lDDT in this case is only "
+        help=("Compute per-residue LDDT scores with default parameterization "
+              "and store as key \"bb_local_lddt\". LDDT in this case is only "
               "computed on backbone atoms: CA for peptides and C3' for "
               "nucleotides. Per-residue scores are accessible as described for "
               "local_lddt."))
@@ -292,7 +292,7 @@ def _ParseArgs():
         dest="ilddt",
         default=False,
         action="store_true",
-        help=("Compute global lDDT score which is solely based on inter-chain "
+        help=("Compute global LDDT score which is solely based on inter-chain "
               "contacts and store as key \"ilddt\". Same stereochemical "
               "irregularities as for lddt apply."))
 
@@ -509,7 +509,7 @@ def _ParseArgs():
               "transformation matrix that superposes model onto reference, "
               "\"rigid_chain_mapping\": equivalent of \"chain_mapping\" which "
               "is used for rigid scores (optimized for RMSD instead of "
-              "QS-score/lDDT)."))
+              "QS-score/LDDT)."))
 
     parser.add_argument(
         "--patch-scores",
@@ -544,7 +544,7 @@ def _ParseArgs():
         dest="lddt_no_stereochecks",
         default=False,
         action="store_true",
-        help=("Disable stereochecks for lDDT computation"))
+        help=("Disable stereochecks for LDDT computation"))
 
     parser.add_argument(
         "--n-max-naive",
@@ -630,7 +630,7 @@ def _ParseArgs():
         dest="lddt_add_mdl_contacts",
         default=False,
         action="store_true",
-        help=("Only using contacts in lDDT that "
+        help=("Only using contacts in LDDT that "
               "are within a certain distance threshold in the "
               "reference does not penalize for added model "
               "contacts. If set to True, this flag will also "
@@ -645,7 +645,7 @@ def _ParseArgs():
         dest="lddt_inclusion_radius",
         type = float,
         default=15.0,
-        help=("Passed to lDDT scorer. Affects all lDDT scores but not "
+        help=("Passed to LDDT scorer. Affects all LDDT scores but not "
               "chain mapping."))
  
     return parser.parse_args()

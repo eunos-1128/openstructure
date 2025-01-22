@@ -26,7 +26,7 @@ class lDDTBSScorer:
     """Scorer specific for a reference/model pair
 
     Finds best possible binding site representation of reference in model given
-    lDDT score. Uses :class:`ost.mol.alg.chain_mapping.ChainMapper` to deal with
+    LDDT score. Uses :class:`ost.mol.alg.chain_mapping.ChainMapper` to deal with
     chain mapping.
 
     :param reference: Reference structure
@@ -44,8 +44,8 @@ class lDDTBSScorer:
         self.mdl = model
 
     def ScoreBS(self, ligand, radius = 4.0, lddt_radius=10.0):
-        """Computes binding site lDDT score given *ligand*. Best possible
-        binding site representation is selected by lDDT but other scores such as
+        """Computes binding site LDDT score given *ligand*. Best possible
+        binding site representation is selected by LDDT but other scores such as
         CA based RMSD and GDT are computed too and returned.
 
         :param ligand: Defines the scored binding site, i.e. provides positions
@@ -58,7 +58,7 @@ class lDDTBSScorer:
                             :class:`ost.mol.alg.lddt.lDDTScorer`
         :type lddt_radius: :class:`float`
         :returns: Object of type :class:`ost.mol.alg.chain_mapping.ReprResult`
-                  containing all atom lDDT score and mapping information.
+                  containing all atom LDDT score and mapping information.
                   None if no representation could be found.
         """
 
@@ -136,7 +136,7 @@ class Scorer:
                          TM-score. If not given, TM-score will be computed
                          with OpenStructure internal copy of USalign code.
     :type usalign_exec: :class:`str`
-    :param lddt_no_stereochecks: Whether to compute lDDT without stereochemistry
+    :param lddt_no_stereochecks: Whether to compute LDDT without stereochemistry
                                 checks
     :type lddt_no_stereochecks: :class:`bool`
     :param n_max_naive: Parameter for chain mapping. If the number of possible
@@ -172,8 +172,8 @@ class Scorer:
                            produce high sequence identity alignments by pure
                            chance.
     :type min_nuc_length: :class:`int`
-    :param lddt_add_mdl_contacts: lDDT specific flag. Only using contacts in
-                                  lDDT that are within a certain distance 
+    :param lddt_add_mdl_contacts: LDDT specific flag. Only using contacts in
+                                  LDDT that are within a certain distance
                                   threshold in the target does not penalize
                                   for added model contacts. If set to True, this
                                   flag will also consider target contacts
@@ -202,9 +202,9 @@ class Scorer:
                                 scores.
     :type dockq_capri_peptide: :class:`bool`
     :param lddt_symmetry_settings: Passed as *symmetry_settings* parameter to
-                                   lDDT scorer. Default: None
+                                   LDDT scorer. Default: None
     :type lddt_symmetry_settings: :class:`ost.mol.alg.lddt.SymmetrySettings`
-    :param lddt_inclusion_radius: lDDT inclusion radius.
+    :param lddt_inclusion_radius: LDDT inclusion radius.
     """
     def __init__(self, model, target, resnum_alignments=False,
                  molck_settings = None, cad_score_exec = None,
@@ -714,7 +714,7 @@ class Scorer:
 
     @property
     def lddt_scorer(self):
-        """ lDDT scorer for :attr:`~target`/:attr:`~stereochecked_target`
+        """ LDDT scorer for :attr:`~target`/:attr:`~stereochecked_target`
 
         Depending on :attr:`~lddt_no_stereocheck` and
         :attr:`~lddt_symmetry_settings`.
@@ -734,10 +734,10 @@ class Scorer:
 
     @property
     def bb_lddt_scorer(self):
-        """ lDDT scorer for :attr:`~target`, restricted to representative
+        """ LDDT scorer for :attr:`~target`, restricted to representative
         backbone atoms
 
-        No stereochecks applied for bb only lDDT which considers CA atoms
+        No stereochecks applied for bb only LDDT which considers CA atoms
         for peptides and C3' atoms for nucleotides.
 
         :type: :class:`ost.mol.alg.lddt.lDDTScorer`
@@ -778,7 +778,7 @@ class Scorer:
 
     @property
     def lddt(self):
-        """ Global lDDT score in range [0.0, 1.0]
+        """ Global LDDT score in range [0.0, 1.0]
 
         Computed based on :attr:`~stereochecked_model`. In case of oligomers,
         :attr:`~mapping` is used.
@@ -791,7 +791,7 @@ class Scorer:
     
     @property
     def local_lddt(self):
-        """ Per residue lDDT scores in range [0.0, 1.0]
+        """ Per residue LDDT scores in range [0.0, 1.0]
 
         Computed based on :attr:`~stereochecked_model` but scores for all 
         residues in :attr:`~model` are reported. If a residue has been removed
@@ -808,7 +808,7 @@ class Scorer:
 
     @property
     def aa_local_lddt(self):
-        """ Per atom lDDT scores in range [0.0, 1.0]
+        """ Per atom LDDT scores in range [0.0, 1.0]
 
         Computed based on :attr:`~stereochecked_model` but scores for all
         atoms in :attr:`~model` are reported. If an atom has been removed
@@ -825,7 +825,7 @@ class Scorer:
 
     @property
     def bb_lddt(self):
-        """ Global lDDT score restricted to representative backbone atoms in
+        """ Global LDDT score restricted to representative backbone atoms in
         range [0.0, 1.0]
 
         Computed based on :attr:`~model` on representative backbone atoms only.
@@ -840,7 +840,7 @@ class Scorer:
     
     @property
     def bb_local_lddt(self):
-        """ Per residue lDDT scores restricted to representative backbone atoms
+        """ Per residue LDDT scores restricted to representative backbone atoms
         in range [0.0, 1.0]
 
         Computed based on :attr:`~model` on representative backbone atoms only.
@@ -858,9 +858,9 @@ class Scorer:
 
     @property
     def ilddt(self):
-        """ Global interface lDDT score in range [0.0, 1.0]
+        """ Global interface LDDT score in range [0.0, 1.0]
 
-        This is lDDT only based on inter-chain contacts. Value is None if no
+        This is LDDT only based on inter-chain contacts. Value is None if no
         such contacts are present. For example if we're dealing with a monomer.
         Computed based on :attr:`~stereochecked_model` and :attr:`~mapping` for
         chain mapping.
@@ -2062,8 +2062,8 @@ class Scorer:
                                                    self.stereochecked_model)
 
     def _compute_lddt(self):
-        LogScript("Computing all-atom lDDT")
-        # lDDT requires a flat mapping with mdl_ch as key and trg_ch as value
+        LogScript("Computing all-atom LDDT")
+        # LDDT requires a flat mapping with mdl_ch as key and trg_ch as value
         flat_mapping = self.mapping.GetFlatMapping(mdl_as_key=True)
 
         # make alignments accessible by mdl seq name
@@ -2243,14 +2243,14 @@ class Scorer:
         self._aa_local_lddt = aa_local_lddt
 
     def _compute_bb_lddt(self):
-        LogScript("Computing backbone lDDT")
+        LogScript("Computing backbone LDDT")
         # make alignments accessible by mdl seq name
         alns = dict()
         for aln in self.aln:
             mdl_seq = aln.GetSequence(1)
             alns[mdl_seq.name] = aln
 
-        # lDDT requires a flat mapping with mdl_ch as key and trg_ch as value
+        # LDDT requires a flat mapping with mdl_ch as key and trg_ch as value
         flat_mapping = self.mapping.GetFlatMapping(mdl_as_key=True)
         lddt_chain_mapping = dict()
         for mdl_ch, trg_ch in flat_mapping.items():
@@ -2280,8 +2280,8 @@ class Scorer:
         self._bb_local_lddt = local_lddt
 
     def _compute_ilddt(self):
-        LogScript("Computing all-atom ilDDT")
-        # lDDT requires a flat mapping with mdl_ch as key and trg_ch as value
+        LogScript("Computing all-atom iLDDT")
+        # LDDT requires a flat mapping with mdl_ch as key and trg_ch as value
         flat_mapping = self.mapping.GetFlatMapping(mdl_as_key=True)
 
         if self.lddt_no_stereochecks:

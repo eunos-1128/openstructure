@@ -19,7 +19,7 @@ except:
 class CustomCompound:
     """ Defines atoms for custom compounds
 
-    lDDT requires the reference atoms of a compound which are typically
+    LDDT requires the reference atoms of a compound which are typically
     extracted from a :class:`ost.conop.CompoundLib`. This lightweight
     container allows to handle arbitrary compounds which are not
     necessarily in the compound library.
@@ -48,7 +48,7 @@ class CustomCompound:
 class SymmetrySettings:
     """Container for symmetric compounds
 
-    lDDT considers symmetries and selects the one resulting in the highest
+    LDDT considers symmetries and selects the one resulting in the highest
     possible score.
 
     A symmetry is defined as a renaming operation on one or more atoms that
@@ -122,9 +122,9 @@ def GetDefaultSymmetrySettings():
 
 
 class lDDTScorer:
-    """lDDT scorer object for a specific target
+    """LDDT scorer object for a specific target
 
-    Sets up everything to score models of that target. lDDT (local distance
+    Sets up everything to score models of that target. LDDT (local distance
     difference test) is defined as fraction of pairwise distances which exhibit
     a difference < threshold when considering target and model. In case of
     multiple thresholds, the average is returned. See
@@ -287,7 +287,7 @@ class lDDTScorer:
                        self.symmetry_settings, seqres_mapping, self.bb_only)
 
         # distance related members are lazily computed as they're affected
-        # by different flavours of lDDT (e.g. lDDT including inter-chain
+        # by different flavours of LDDT (e.g. LDDT including inter-chain
         # contacts or not etc.)
 
         # stores for each atom the other atoms within inclusion_radius
@@ -440,14 +440,14 @@ class lDDTScorer:
              residue_mapping=None, return_dist_test=False,
              check_resnames=True, add_mdl_contacts=False,
              interaction_data=None, set_atom_props=False):
-        """Computes lDDT of *model* - globally and per-residue
+        """Computes LDDT of *model* - globally and per-residue
 
         :param model: Model to be scored - models are preferably scored upon
                       performing stereo-chemistry checks in order to punish for
                       non-sensical irregularities. This must be done separately
                       as a pre-processing step. Target contacts that are not
                       covered by *model* are considered not conserved, thus
-                      decreasing lDDT score. This also includes missing model
+                      decreasing LDDT score. This also includes missing model
                       chains or model chains for which no mapping is provided in
                       *chain_mapping*.
         :type model: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
@@ -535,11 +535,11 @@ class lDDTScorer:
                                level if *local_lddt_prop*/*local_contact_prop*
                                are set as well.
                                In other words: this is the only way you can
-                               get per-atom lDDT values.
+                               get per-atom LDDT values.
         :type set_atom_props: :class:`bool`
 
-        :returns: global and per-residue lDDT scores as a tuple -
-                  first element is global lDDT score (None if *target* has no
+        :returns: global and per-residue LDDT scores as a tuple -
+                  first element is global LDDT score (None if *target* has no
                   contacts) and second element a list of per-residue scores with
                   length len(*model*.residues). None is assigned to residues that
                   are not covered by target. If a residue is covered but has no
@@ -690,7 +690,7 @@ class lDDTScorer:
 
             summed_per_atom_conserved = per_atom_conserved.sum(axis=1)
             if local_lddt_prop:
-                # the only place where actually need to compute per-atom lDDT
+                # the only place where actually need to compute per-atom LDDT
                 # scores
                 for a_idx in range(len(atom_list)):
                     if per_atom_exp[a_idx] != 0:
@@ -1097,7 +1097,7 @@ class lDDTScorer:
 
         """Compute distance related members of lDDTScorer
 
-        Brute force all vs all distance computation kills lDDT for large
+        Brute force all vs all distance computation kills LDDT for large
         complexes. Instead of building some KD tree data structure, we make use
         of expected spatial proximity of atoms in the same chain. Distances are
         computed as follows:
@@ -1339,7 +1339,7 @@ class lDDTScorer:
             raise NotImplementedError("Congratulations! You're the first one "
                                       "requesting a non-default "
                                       "sequence_separation in the new and "
-                                      "awesome lDDT implementation. A crate of "
+                                      "awesome LDDT implementation. A crate of "
                                       "beer for Gabriel and he'll implement "
                                       "it.")
 
@@ -1355,7 +1355,7 @@ class lDDTScorer:
 
     def _ResolveSymmetries(self, pos, thresholds, symmetries, sym_ref_indices,
                            sym_ref_distances):
-        """Swaps symmetric positions in-place in order to maximize lDDT scores
+        """Swaps symmetric positions in-place in order to maximize LDDT scores
         towards non-symmetric atoms.
         """
         for sym in symmetries:
@@ -1395,6 +1395,6 @@ class lDDTScorer:
             if sym_one_score >= sym_two_score:
                 # switch back, initial positions were better or equal
                 # for the equal case: we still switch back to reproduce the old
-                # lDDT behaviour
+                # LDDT behaviour
                 for pair in sym:
                     pos[[pair[0], pair[1]]] = pos[[pair[1], pair[0]]]

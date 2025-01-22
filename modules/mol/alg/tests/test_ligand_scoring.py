@@ -653,28 +653,28 @@ class TestLigandScoringFancy(unittest.TestCase):
 
     def test_no_lddt_pli_contact(self):
         """
-        Test behaviour where a binding site has no lDDT-PLI contacts.
+        Test behaviour where a binding site has no LDDT-PLI contacts.
 
         We give two copies of the target ligand which have binding site atoms
         within radius=5A but no atoms at 4A. We set lddt_pli_radius=4 so that
-        there are no contacts for the lDDT-PLI computation, and lDDT is None.
+        there are no contacts for the LDDT-PLI computation, and LDDT is None.
 
         We check that:
-        - We don't get an lDDT-PLI assignment
+        - We don't get an LDDT-PLI assignment
         - Both target ligands are unassigned and have the
         - We get an RMSD assignment
         - The second copy of the target and model ligands ensure that the
-          disambiguation code (which checks for the best lDDT-PLI when 2 RMSDs
-          are identical) works in this case (where there is no lDDT-PLI to
+          disambiguation code (which checks for the best LDDT-PLI when 2 RMSDs
+          are identical) works in this case (where there is no LDDT-PLI to
           disambiguate the RMSDs).
-        - We get lDDT-PLI = None with RMSD assignment
+        - We get LDDT-PLI = None with RMSD assignment
         """
         trg = ligand_scoring_base.PDBPrep(_GetTestfilePath("T1118v1.pdb"))
         trg_lig = _LoadEntity("T1118v1_001.sdf")
         mdl = ligand_scoring_base.PDBPrep(_GetTestfilePath("T1118v1LG035_1.pdb"))
         mdl_lig = _LoadEntity("T1118v1LG035_1_1_1.sdf")
 
-        # Ensure it's unassigned in lDDT
+        # Ensure it's unassigned in LDDT
         sc = ligand_scoring_lddtpli.LDDTPLIScorer(mdl, trg, [mdl_lig, mdl_lig],
                                                   [trg_lig, trg_lig],
                                                   lddt_pli_radius=4,
@@ -686,7 +686,7 @@ class TestLigandScoringFancy(unittest.TestCase):
         self.assertEqual(sc.unassigned_model_ligands, [0, 1])
 
         expected_report = [{'state': 10, 'short desc': 'no_contact',
-                            'desc': 'There were no lDDT contacts between the binding site and the ligand, and lDDT-PLI is undefined.',
+                            'desc': 'There were no LDDT contacts between the binding site and the ligand, and LDDT-PLI is undefined.',
                             'indices': [0, 1]}]
 
         # both target ligands are expected to have the same report => no_contact

@@ -225,10 +225,10 @@ class LigandScorer:
 
     * :class:`ost.mol.alg.ligand_scoring_lddtpli.LDDTPLIScorer`
       that assesses the conservation of protein-ligand
-      contacts (lDDT-PLI);
+      contacts (LDDT-PLI);
     * :class:`ost.mol.alg.ligand_scoring_scrmsd.SCRMSDScorer`
       that computes a binding-site superposed, symmetry-corrected RMSD
-      (BiSyRMSD) and ligand pocket lDDT (lDDT-LP).
+      (BiSyRMSD) and ligand pocket LDDT (LDDT-LP).
 
     All versus all scores are available through the lazily computed
     :attr:`score_matrix`. However, many things can go wrong... be it even
@@ -845,8 +845,8 @@ class LigandScorer:
         * `stoichiometry`: there was a possible assignment in the model, but
           the model ligand was already assigned to a different target ligand.
           This indicates different stoichiometries.
-        * `no_contact` (lDDT-PLI only): There were no lDDT contacts between
-          the binding site and the ligand, and lDDT-PLI is undefined.
+        * `no_contact` (LDDT-PLI only): There were no LDDT contacts between
+          the binding site and the ligand, and LDDT-PLI is undefined.
         * `target_binding_site` (SCRMSD only): no polymer residues were in
           proximity of the target ligand.
         * `model_binding_site` (SCRMSD only): the binding site was not found
@@ -929,8 +929,8 @@ class LigandScorer:
         * `stoichiometry`: there was a possible assignment in the target, but
           the model target was already assigned to a different model ligand.
           This indicates different stoichiometries.
-        * `no_contact` (lDDT-PLI only): There were no lDDT contacts between
-          the binding site and the ligand, and lDDT-PLI is undefined.
+        * `no_contact` (LDDT-PLI only): There were no LDDT contacts between
+          the binding site and the ligand, and LDDT-PLI is undefined.
         * `target_binding_site` (SCRMSD only): a potential assignment was found
           in the target, but there were no polymer residues in proximity of the
           ligand in the target.

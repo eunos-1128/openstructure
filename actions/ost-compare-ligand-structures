@@ -98,10 +98,10 @@ The following column is always available:
    --by-model-ligand-output flag was set, this will be model ligand instead,
    following the same rules.
 
-If lDDT-PLI was enabled with --lddt-pli, the following columns are added:
+If LDDT-PLI was enabled with --lddt-pli, the following columns are added:
 
  * "lddt_pli", "lddt_pli_coverage" and "lddt_pli_(model|reference)_ligand"
-   are the lDDT-PLI score result, the corresponding coverage and assigned model
+   are the LDDT-PLI score result, the corresponding coverage and assigned model
    ligand (or reference ligand if the --by-model-ligand-output flag was set)
    if an assignment was found, respectively, empty otherwise.
  * "lddt_pli_unassigned" is empty if an assignment was found, otherwise it
@@ -111,7 +111,7 @@ If BiSyRMSD was enabled with --rmsd, the following columns are added:
 
  * "rmsd", "rmsd_coverage". "lddt_lp" "bb_rmsd" and
    "rmsd_(model|reference)_ligand" are the BiSyRMSD, the corresponding
-   coverage, lDDT-LP, backbone RMSD and assigned model ligand (or reference
+   coverage, LDDT-LP, backbone RMSD and assigned model ligand (or reference
    ligand if the --by-model-ligand-output flag was set) if an assignment
    was found, respectively, empty otherwise.
  * "rmsd_unassigned" is empty if an assignment was found, otherwise it
@@ -320,28 +320,28 @@ def _ParseArgs():
         dest="lddt_pli",
         default=False,
         action="store_true",
-        help=("Compute lDDT-PLI scores and store as key \"lddt_pli\"."))
+        help=("Compute LDDT-PLI scores and store as key \"lddt_pli\"."))
 
     parser.add_argument(
         "--lddt-pli-radius",
         dest="lddt_pli_radius",
         default=6.0,
         type=float,
-        help=("lDDT inclusion radius for lDDT-PLI."))
+        help=("LDDT inclusion radius for LDDT-PLI."))
 
     parser.add_argument(
         "--lddt-pli-add-mdl-contacts",
         dest="lddt_pli_add_mdl_contacts",
         default=True,
         action="store_true",
-        help=("Add model contacts when computing lDDT-PLI."))
+        help=("Add model contacts when computing LDDT-PLI."))
 
     parser.add_argument(
         "--no-lddt-pli-add-mdl-contacts",
         dest="lddt_pli_add_mdl_contacts",
         default=True,
         action="store_false",
-        help=("DO NOT add model contacts when computing lDDT-PLI."))
+        help=("DO NOT add model contacts when computing LDDT-PLI."))
 
     # arguments relevant for rmsd
 
@@ -366,7 +366,7 @@ def _ParseArgs():
         dest="lddt_lp_radius",
         default=15.0,
         type=float,
-        help=("lDDT inclusion radius for lDDT-LP."))
+        help=("LDDT inclusion radius for LDDT-LP."))
 
     parser.add_argument(
         "-fbs",
@@ -617,7 +617,7 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
     ##################
 
     if args.lddt_pli:
-        LogScript("Computing lDDT-PLI scores")
+        LogScript("Computing LDDT-PLI scores")
         out["lddt_pli"] = dict()
         out["lddt_pli"]["assigned_scores"] = list()
         for lig_pair in lddtpli_scorer.assignment:

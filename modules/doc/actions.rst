@@ -126,7 +126,7 @@ Details on the usage (output of ``ost compare-structures --help``):
   
   Each score is opt-in and can be enabled with optional arguments.
   
-  Example to compute global and per-residue lDDT values as well as QS-score:
+  Example to compute global and per-residue LDDT values as well as QS-score:
   
   ost compare-structures -m model.pdb -r reference.cif --lddt --local-lddt --qs-score
   
@@ -187,26 +187,26 @@ Details on the usage (output of ``ost compare-structures --help``):
                           model. Each separate mapping consist of key:value
                           pairs where key is the chain name in reference and
                           value is the chain name in model.
-    --lddt                Compute global lDDT score with default
+    --lddt                Compute global LDDT score with default
                           parameterization and store as key "lddt".
-                          Stereochemical irregularities affecting lDDT are
+                          Stereochemical irregularities affecting LDDT are
                           reported as keys "model_clashes", "model_bad_bonds",
                           "model_bad_angles" and the respective reference
                           counterparts.
-    --local-lddt          Compute per-residue lDDT scores with default
+    --local-lddt          Compute per-residue LDDT scores with default
                           parameterization and store as key "local_lddt". Score
                           for each residue is accessible by key
                           <chain_name>.<resnum>.<resnum_inscode>. Residue with
                           number 42 in chain X can be extracted with:
                           data["local_lddt"]["X.42."]. If there is an insertion
                           code, lets say A, the residue key becomes "X.42.A".
-                          Stereochemical irregularities affecting lDDT are
+                          Stereochemical irregularities affecting LDDT are
                           reported as keys "model_clashes", "model_bad_bonds",
                           "model_bad_angles" and the respective reference
                           counterparts. Atoms specified in there follow the
                           following format:
                           <chain_name>.<resnum>.<resnum_inscode>.<atom_name>
-    --aa-local-lddt       Compute per-atom lDDT scores with default
+    --aa-local-lddt       Compute per-atom LDDT scores with default
                           parameterization and store as key "aa_local_lddt".
                           Score for each atom is accessible by key
                           <chain_name>.<resnum>.<resnum_inscode>.<aname>. Alpha
@@ -214,21 +214,21 @@ Details on the usage (output of ``ost compare-structures --help``):
                           extracted with: data["aa_local_lddt"]["X.42..CA"]. If
                           there is a residue insertion code, lets say A, the
                           atom key becomes "X.42.A.CA". Stereochemical
-                          irregularities affecting lDDT are reported as keys
+                          irregularities affecting LDDT are reported as keys
                           "model_clashes", "model_bad_bonds", "model_bad_angles"
                           and the respective reference counterparts. Atoms
                           specified in there follow the following format:
                           <chain_name>.<resnum>.<resnum_inscode>.<atom_name>
-    --bb-lddt             Compute global lDDT score with default
-                          parameterization and store as key "bb_lddt". lDDT in
+    --bb-lddt             Compute global LDDT score with default
+                          parameterization and store as key "bb_lddt". LDDT in
                           this case is only computed on backbone atoms: CA for
                           peptides and C3' for nucleotides
-    --bb-local-lddt       Compute per-residue lDDT scores with default
+    --bb-local-lddt       Compute per-residue LDDT scores with default
                           parameterization and store as key "bb_local_lddt".
-                          lDDT in this case is only computed on backbone atoms:
+                          LDDT in this case is only computed on backbone atoms:
                           CA for peptides and C3' for nucleotides. Per-residue
                           scores are accessible as described for local_lddt.
-    --ilddt               Compute global lDDT score which is solely based on
+    --ilddt               Compute global LDDT score which is solely based on
                           inter-chain contacts and store as key "ilddt". Same
                           stereochemical irregularities as for lddt apply.
     --cad-score           Compute global CAD's atom-atom (AA) score and store as
@@ -391,7 +391,7 @@ Details on the usage (output of ``ost compare-structures --help``):
                           used 4x4 transformation matrix that superposes model
                           onto reference, "rigid_chain_mapping": equivalent of
                           "chain_mapping" which is used for rigid scores
-                          (optimized for RMSD instead of QS-score/lDDT).
+                          (optimized for RMSD instead of QS-score/LDDT).
     --patch-scores        Local interface quality score used in CASP15. Scores
                           each model residue that is considered in the interface
                           (CB pos within 8A of any CB pos from another chain (CA
@@ -412,7 +412,7 @@ Details on the usage (output of ``ost compare-structures --help``):
                           the mapping are available as keys "tm_score" and
                           "usalign_mapping"
     --lddt-no-stereochecks
-                          Disable stereochecks for lDDT computation
+                          Disable stereochecks for LDDT computation
     --n-max-naive N_MAX_NAIVE
                           Parameter for chain mapping. If the number of possible
                           mappings is <= *n_max_naive*, the full mapping
@@ -455,7 +455,7 @@ Details on the usage (output of ``ost compare-structures --help``):
     -v VERBOSITY, --verbosity VERBOSITY
                           Set verbosity level. Defaults to 2 (Script).
     --lddt-add-mdl-contacts
-                          Only using contacts in lDDT thatare within a certain
+                          Only using contacts in LDDT thatare within a certain
                           distance threshold in the reference does not penalize
                           for added model contacts. If set to True, this flag
                           will also consider reference contacts that are within
@@ -464,7 +464,7 @@ Details on the usage (output of ``ost compare-structures --help``):
                           if the respective atom pair is not resolved in the
                           reference.
     --lddt-inclusion-radius LDDT_INCLUSION_RADIUS
-                          Passed to lDDT scorer. Affects all lDDT scores but not
+                          Passed to LDDT scorer. Affects all LDDT scores but not
                           chain mapping.
 
 .. _ost compare ligand structures:
@@ -473,7 +473,7 @@ Comparing two structures with ligands
 --------------------------------------------------------------------------------
 
 You can compare two structures with non-polymer/small molecule ligands and
-compute lDDT-PLI and ligand RMSD scores from the command line with the
+compute LDDT-PLI and ligand RMSD scores from the command line with the
 ``ost compare-ligand-structures`` action. This can be considered a command
 line interface to :class:`ost.mol.alg.ligand_scoring_base.LigandScorer` and more
 information about arguments and outputs can be found there.
@@ -600,10 +600,10 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
      --by-model-ligand-output flag was set, this will be model ligand instead,
      following the same rules.
 
-  If lDDT-PLI was enabled with --lddt-pli, the following columns are added:
+  If LDDT-PLI was enabled with --lddt-pli, the following columns are added:
 
    * "lddt_pli", "lddt_pli_coverage" and "lddt_pli_(model|reference)_ligand"
-     are the lDDT-PLI score result, the corresponding coverage and assigned model
+     are the LDDT-PLI score result, the corresponding coverage and assigned model
      ligand (or reference ligand if the --by-model-ligand-output flag was set)
      if an assignment was found, respectively, empty otherwise.
    * "lddt_pli_unassigned" is empty if an assignment was found, otherwise it
@@ -613,7 +613,7 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
 
    * "rmsd", "rmsd_coverage". "lddt_lp" "bb_rmsd" and
      "rmsd_(model|reference)_ligand" are the BiSyRMSD, the corresponding
-     coverage, lDDT-LP, backbone RMSD and assigned model ligand (or reference
+     coverage, LDDT-LP, backbone RMSD and assigned model ligand (or reference
      ligand if the --by-model-ligand-output flag was set) if an assignment
      was found, respectively, empty otherwise.
    * "rmsd_unassigned" is empty if an assignment was found, otherwise it
@@ -680,20 +680,20 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
                           Set verbosity level. Defaults to 2 (Script).
     --full-results        Outputs scoring results for all model/reference ligand
                           pairs and store as key "full_results"
-    --lddt-pli            Compute lDDT-PLI scores and store as key "lddt_pli".
+    --lddt-pli            Compute LDDT-PLI scores and store as key "lddt_pli".
     --lddt-pli-radius LDDT_PLI_RADIUS
-                          lDDT inclusion radius for lDDT-PLI.
+                          LDDT inclusion radius for LDDT-PLI.
     --lddt-pli-add-mdl-contacts
-                          Add model contacts when computing lDDT-PLI.
+                          Add model contacts when computing LDDT-PLI.
     --no-lddt-pli-add-mdl-contacts
-                          DO NOT add model contacts when computing lDDT-PLI.
+                          DO NOT add model contacts when computing LDDT-PLI.
     --rmsd                Compute RMSD scores and store as key "rmsd".
     --radius RADIUS       Inclusion radius to extract reference binding site
                           that is used for RMSD computation. Any residue with
                           atoms within this distance of the ligand will be
                           included in the binding site.
     --lddt-lp-radius LDDT_LP_RADIUS
-                          lDDT inclusion radius for lDDT-LP.
+                          LDDT inclusion radius for LDDT-LP.
     -fbs, --full-bs-search
                           Enumerate all potential binding sites in the model
                           when searching rigid superposition for RMSD
