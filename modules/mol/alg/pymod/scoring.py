@@ -734,7 +734,8 @@ class Scorer:
 
     @property
     def bb_lddt_scorer(self):
-        """ Backbone only lDDT scorer for :attr:`~target`
+        """ lDDT scorer for :attr:`~target`, restricted to representative
+        backbone atoms
 
         No stereochecks applied for bb only lDDT which considers CA atoms
         for peptides and C3' atoms for nucleotides.
@@ -824,11 +825,12 @@ class Scorer:
 
     @property
     def bb_lddt(self):
-        """ Backbone only global lDDT score in range [0.0, 1.0]
+        """ Global lDDT score restricted to representative backbone atoms in
+        range [0.0, 1.0]
 
-        Computed based on :attr:`~model` on backbone atoms only. This is CA for
-        peptides and C3' for nucleotides. No stereochecks are performed. In case
-        of oligomers, :attr:`~mapping` is used.
+        Computed based on :attr:`~model` on representative backbone atoms only.
+        This is CA for peptides and C3' for nucleotides. No stereochecks are
+        performed. In case of oligomers, :attr:`~mapping` is used.
 
         :type: :class:`float`
         """
@@ -838,13 +840,15 @@ class Scorer:
     
     @property
     def bb_local_lddt(self):
-        """ Backbone only per residue lDDT scores in range [0.0, 1.0]
+        """ Per residue lDDT scores restricted to representative backbone atoms
+        in range [0.0, 1.0]
 
-        Computed based on :attr:`~model` on backbone atoms only. This is CA for
-        peptides and C3' for nucleotides. No stereochecks are performed. If a
-        residue is not covered by the target or is in a chain skipped by the
-        chain mapping procedure (happens for super short chains), the respective
-        score is set to None. In case of oligomers, :attr:`~mapping` is used.
+        Computed based on :attr:`~model` on representative backbone atoms only.
+        This is CA for peptides and C3' for nucleotides. No stereochecks are
+        performed. If a residue is not covered by the target or is in a chain
+        skipped by the chain mapping procedure (happens for super short
+        chains), the respective score is set to None. In case of oligomers,
+        :attr:`~mapping` is used.
 
         :type: :class:`dict`
         """
