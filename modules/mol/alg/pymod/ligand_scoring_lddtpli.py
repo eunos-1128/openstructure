@@ -47,6 +47,8 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
     * lddt_pli_n_contacts: Number of contacts considered in LDDT computation
     * target_ligand: The actual target ligand for which the score was computed
     * model_ligand: The actual model ligand for which the score was computed
+    * chain_mapping: :class:`dict` with a chain mapping of chains involved in
+      binding site - key: trg chain name, value: mdl chain name
     * bs_ref_res: :class:`set` of residues with potentially non-zero
       contribution to score. That is every residue with at least one
       atom within *lddt_pli_radius* + max(*lddt_pli_thresholds*) of
@@ -374,7 +376,8 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
 
         best_score = -1.0
         best_result = {"lddt_pli": None,
-                       "lddt_pli_n_contacts": 0}
+                       "lddt_pli_n_contacts": 0,
+                       "chain_mapping": None}
 
         # dummy alignment for ligand chains which is needed as input later on
         ligand_aln = seq.CreateAlignment()
@@ -523,8 +526,11 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
 
                 if score is not None and score > best_score:
                     best_score = score
+                    save_chain_mapping = dict(lddt_chain_mapping)
+                    del save_chain_mapping[mdl_ligand_chain.name]
                     best_result = {"lddt_pli": score,
-                                   "lddt_pli_n_contacts": N}
+                                   "lddt_pli_n_contacts": N,
+                                   "chain_mapping": save_chain_mapping}
 
         # fill misc info to result object
         best_result["target_ligand"] = target_ligand
@@ -570,6 +576,7 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
             # no contacts... nothing to compute...
             return {"lddt_pli": None,
                     "lddt_pli_n_contacts": 0,
+                    "chain_mapping": None,
                     "target_ligand": target_ligand,
                     "model_ligand": model_ligand,
                     "bs_ref_res": trg_residues,
@@ -656,14 +663,17 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
 
                 if score > best_score:
                     best_score = score
+                    save_chain_mapping = dict(lddt_chain_mapping)
+                    del save_chain_mapping[mdl_ligand_chain.name]
+                    best_result = {"lddt_pli": score,
+                                   "chain_mapping": save_chain_mapping}
 
         # fill misc info to result object
-        best_result = {"lddt_pli": best_score,
-                       "lddt_pli_n_contacts": n_exp,
-                       "target_ligand": target_ligand,
-                       "model_ligand": model_ligand,
-                       "bs_ref_res": trg_residues,
-                       "bs_mdl_res": mdl_residues}
+        best_result["lddt_pli_n_contacts"] = n_exp
+        best_result["target_ligand"] = target_ligand
+        best_result["model_ligand"] = model_ligand
+        best_result["bs_ref_res"] = trg_residues
+        best_result["bs_mdl_res"] = mdl_residues
 
         return best_result
 
