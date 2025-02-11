@@ -5656,6 +5656,14 @@ std::vector<Real> OMF::GetAvgBFactors(const String& cname) const {
   return avg_bfactors;
 }
 
+const std::vector<Real>& OMF::GetOccupancies(const String& cname) const {
+  auto it = chain_data_.find(cname);
+  if(it == chain_data_.end()) {
+    throw ost::Error("Provided chain name not in OMF structure");
+  }
+  return it->second->occupancies;
+}
+
 String OMF::GetSequence(const String& cname) const {
   auto it = chain_data_.find(cname);
   if(it == chain_data_.end()) {

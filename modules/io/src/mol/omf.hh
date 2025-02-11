@@ -238,6 +238,8 @@ public:
 
   std::vector<Real> GetAvgBFactors(const String& cname) const;
 
+  const std::vector<Real>& GetOccupancies(const String& cname) const;
+
   String GetSequence(const String& cname) const;
 
   // raw data access - pros only...

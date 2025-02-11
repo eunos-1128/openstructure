@@ -95,6 +95,7 @@ void export_omf_io() {
     .def("GetPositions", &OMF::GetPositions, return_value_policy<reference_existing_object>(),(arg("cname")))
     .def("GetBFactors", &OMF::GetBFactors, return_value_policy<reference_existing_object>(),(arg("cname")))
     .def("GetAvgBFactors", &OMF::GetAvgBFactors,(arg("cname")))
+    .def("GetOccupancies", &OMF::GetOccupancies, return_value_policy<reference_existing_object>(),(arg("cname")))
     .def("GetSequence", &OMF::GetSequence, (arg("cname")))
     .def("ToAssembly", &wrap_to_assembly, (arg("bu_info")))
     .def("Trace", &wrap_trace, (arg("cname"), arg("aname")))
