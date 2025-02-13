@@ -95,6 +95,34 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
                                          current implementation includes every
                                          atom within *lddt_pli_radius*.
     :type lddt_pli_binding_site_radius: :class:`float`
+    :param min_pep_length: Relevant parameter if short peptides are involved in
+                           the polymer binding site. Minimum peptide length for
+                           a chain to be considered in chain mapping.
+                           The chain mapping algorithm first performs an all vs.
+                           all pairwise sequence alignment to identify \"equal\"
+                           chains within the target structure. We go for simple
+                           sequence identity there. Short sequences can be
+                           problematic as they may produce high sequence identity
+                           alignments by pure chance.
+    :type min_pep_length: :class:`int`
+    :param min_nuc_length: Same for nucleotides
+    :type min_nuc_length: :class:`int`
+    :param pep_seqid_thr: Parameter that affects identification of identical
+                          chains in target - see 
+                          :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type pep_seqid_thr: :class:`float`
+    :param nuc_seqid_thr: Parameter that affects identification of identical
+                          chains in target - see 
+                          :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type nuc_seqid_thr: :class:`float`
+    :param mdl_map_pep_seqid_thr: Parameter that affects mapping of model chains
+                                  to target chains - see 
+                                  :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type mdl_map_pep_seqid_thr: :class:`float`
+    :param mdl_map_nuc_seqid_thr: Parameter that affects mapping of model chains
+                                  to target chains - see 
+                                  :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type mdl_map_nuc_seqid_thr: :class:`float`
     """
 
     def __init__(self, model, target, model_ligands, target_ligands,
@@ -103,14 +131,25 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
                  max_symmetries=1e4, lddt_pli_radius=6.0,
                  add_mdl_contacts=True,
                  lddt_pli_thresholds = [0.5, 1.0, 2.0, 4.0],
-                 lddt_pli_binding_site_radius=None):
+                 lddt_pli_binding_site_radius=None,
+                 min_pep_length = 6,
+                 min_nuc_length = 4, pep_seqid_thr = 95.,
+                 nuc_seqid_thr = 95.,
+                 mdl_map_pep_seqid_thr = 0.,
+                 mdl_map_nuc_seqid_thr = 0.):
 
         super().__init__(model, target, model_ligands, target_ligands,
                          resnum_alignments = resnum_alignments,
                          rename_ligand_chain = rename_ligand_chain,
                          substructure_match = substructure_match,
                          coverage_delta = coverage_delta,
-                         max_symmetries = max_symmetries)
+                         max_symmetries = max_symmetries,
+                         min_pep_length = min_pep_length,
+                         min_nuc_length = min_nuc_length,
+                         pep_seqid_thr = pep_seqid_thr,
+                         nuc_seqid_thr = nuc_seqid_thr,
+                         mdl_map_pep_seqid_thr = mdl_map_pep_seqid_thr,
+                         mdl_map_nuc_seqid_thr = mdl_map_nuc_seqid_thr)
 
         self.lddt_pli_radius = lddt_pli_radius
         self.add_mdl_contacts = add_mdl_contacts

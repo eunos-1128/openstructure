@@ -357,12 +357,44 @@ class LigandScorer:
                            a target-ligand pair, it will be ignored and reported
                            as unassigned.
     :type max_symmetries: :class:`int`
+    :param min_pep_length: Relevant parameter if short peptides are involved in
+                           the polymer binding site. Minimum peptide length for
+                           a chain to be considered in chain mapping.
+                           The chain mapping algorithm first performs an all vs.
+                           all pairwise sequence alignment to identify \"equal\"
+                           chains within the target structure. We go for simple
+                           sequence identity there. Short sequences can be
+                           problematic as they may produce high sequence identity
+                           alignments by pure chance.
+    :type min_pep_length: :class:`int`
+    :param min_nuc_length: Same for nucleotides
+    :type min_nuc_length: :class:`int`
+    :param pep_seqid_thr: Parameter that affects identification of identical
+                          chains in target - see 
+                          :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type pep_seqid_thr: :class:`float`
+    :param nuc_seqid_thr: Parameter that affects identification of identical
+                          chains in target - see 
+                          :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type nuc_seqid_thr: :class:`float`
+    :param mdl_map_pep_seqid_thr: Parameter that affects mapping of model chains
+                                  to target chains - see 
+                                  :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type mdl_map_pep_seqid_thr: :class:`float`
+    :param mdl_map_nuc_seqid_thr: Parameter that affects mapping of model chains
+                                  to target chains - see 
+                                  :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type mdl_map_nuc_seqid_thr: :class:`float`
     """
 
     def __init__(self, model, target, model_ligands, target_ligands,
                  resnum_alignments=False, substructure_match=False,
                  coverage_delta=0.2, max_symmetries=1e5,
-                 rename_ligand_chain=False):
+                 rename_ligand_chain=False, min_pep_length = 6,
+                 min_nuc_length = 4, pep_seqid_thr = 95.,
+                 nuc_seqid_thr = 95.,
+                 mdl_map_pep_seqid_thr = 0.,
+                 mdl_map_nuc_seqid_thr = 0.):
 
         if isinstance(model, mol.EntityView):
             self._model = mol.CreateEntityFromView(model, False)
@@ -435,6 +467,12 @@ class LigandScorer:
         self._substructure_match = substructure_match
         self._coverage_delta = coverage_delta
         self._max_symmetries = max_symmetries
+        self._min_pep_length = min_pep_length
+        self._min_nuc_length = min_nuc_length
+        self._pep_seqid_thr = pep_seqid_thr
+        self._nuc_seqid_thr = nuc_seqid_thr
+        self._mdl_map_pep_seqid_thr = mdl_map_pep_seqid_thr
+        self._mdl_map_nuc_seqid_thr = mdl_map_nuc_seqid_thr
 
         # lazily computed attributes
         self.__chain_mapper = None
@@ -556,6 +594,42 @@ class LigandScorer:
         """ Given at :class:`LigandScorer` construction
         """
         return self._resnum_alignments
+
+    @property
+    def min_pep_length(self):
+        """ Given at :class:`LigandScorer` construction
+        """
+        return self._min_pep_length
+    
+    @property
+    def min_nuc_length(self):
+        """ Given at :class:`LigandScorer` construction
+        """
+        return self._min_nuc_length
+
+    @property
+    def pep_seqid_thr(self):
+        """ Given at :class:`LigandScorer` construction
+        """
+        return self._pep_seqid_thr
+    
+    @property
+    def nuc_seqid_thr(self):
+        """ Given at :class:`LigandScorer` construction
+        """
+        return self._nuc_seqid_thr
+
+    @property
+    def mdl_map_pep_seqid_thr(self):
+        """ Given at :class:`LigandScorer` construction
+        """
+        return self._mdl_map_pep_seqid_thr
+    
+    @property
+    def mdl_map_nuc_seqid_thr(self):
+        """ Given at :class:`LigandScorer` construction
+        """
+        return self._mdl_map_nuc_seqid_thr
 
     @property
     def substructure_match(self):
@@ -1041,7 +1115,13 @@ class LigandScorer:
                 self.__chain_mapper = \
                 chain_mapping.ChainMapper(self.target,
                                           n_max_naive=1e9,
-                                          resnum_alignments=self.resnum_alignments)
+                                          resnum_alignments=self.resnum_alignments,
+                                          min_pep_length=self.min_pep_length,
+                                          min_nuc_length=self.min_nuc_length,
+                                          pep_seqid_thr=self.pep_seqid_thr,
+                                          nuc_seqid_thr=self.nuc_seqid_thr,
+                                          mdl_map_pep_seqid_thr=self.mdl_map_pep_seqid_thr,
+                                          mdl_map_nuc_seqid_thr=self.mdl_map_nuc_seqid_thr)
         return self.__chain_mapper
 
     @property

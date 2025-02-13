@@ -107,20 +107,58 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
                            ligands not being scored if the predicted ligand
                            pose is too far from the actual binding site.
     :type full_bs_search: :class:`bool`
+    :param min_pep_length: Relevant parameter if short peptides are involved in
+                           the polymer binding site. Minimum peptide length for
+                           a chain to be considered in chain mapping.
+                           The chain mapping algorithm first performs an all vs.
+                           all pairwise sequence alignment to identify \"equal\"
+                           chains within the target structure. We go for simple
+                           sequence identity there. Short sequences can be
+                           problematic as they may produce high sequence identity
+                           alignments by pure chance.
+    :type min_pep_length: :class:`int`
+    :param min_nuc_length: Same for nucleotides
+    :type min_nuc_length: :class:`int`
+    :param pep_seqid_thr: Parameter that affects identification of identical
+                          chains in target - see 
+                          :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type pep_seqid_thr: :class:`float`
+    :param nuc_seqid_thr: Parameter that affects identification of identical
+                          chains in target - see 
+                          :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type nuc_seqid_thr: :class:`float`
+    :param mdl_map_pep_seqid_thr: Parameter that affects mapping of model chains
+                                  to target chains - see 
+                                  :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type mdl_map_pep_seqid_thr: :class:`float`
+    :param mdl_map_nuc_seqid_thr: Parameter that affects mapping of model chains
+                                  to target chains - see 
+                                  :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type mdl_map_nuc_seqid_thr: :class:`float`
     """
     def __init__(self, model, target, model_ligands, target_ligands,
                  resnum_alignments=False, rename_ligand_chain=False,
                  substructure_match=False, coverage_delta=0.2,
                  max_symmetries=1e5, bs_radius=4.0, lddt_lp_radius=15.0,
                  model_bs_radius=25, binding_sites_topn=100000,
-                 full_bs_search=False):
+                 full_bs_search=False, min_pep_length = 6,
+                 min_nuc_length = 4, pep_seqid_thr = 95.,
+                 nuc_seqid_thr = 95.,
+                 mdl_map_pep_seqid_thr = 0.,
+                 mdl_map_nuc_seqid_thr = 0.):
 
         super().__init__(model, target, model_ligands, target_ligands,
                          resnum_alignments = resnum_alignments,
                          rename_ligand_chain = rename_ligand_chain,
                          substructure_match = substructure_match,
                          coverage_delta = coverage_delta,
-                         max_symmetries = max_symmetries)
+                         max_symmetries = max_symmetries,
+                         min_pep_length = min_pep_length,
+                         min_nuc_length = min_nuc_length,
+                         pep_seqid_thr = pep_seqid_thr,
+                         nuc_seqid_thr = nuc_seqid_thr,
+                         mdl_map_pep_seqid_thr = mdl_map_pep_seqid_thr,
+                         mdl_map_nuc_seqid_thr = mdl_map_nuc_seqid_thr)
 
         self.bs_radius = bs_radius
         self.lddt_lp_radius = lddt_lp_radius
