@@ -124,6 +124,7 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
         self.__chem_mapping = None
         self.__chem_group_alns = None
         self.__ref_mdl_alns = None
+        self.__unmapped_mdl_chains = None
         self.__chain_mapping_mdl = None
 
         # update state decoding from parent with subclass specific stuff
@@ -918,7 +919,7 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
     def _chem_mapping(self):
         if self.__chem_mapping is None:
             self.__chem_mapping, self.__chem_group_alns, \
-            self.__chain_mapping_mdl = \
+            self.__unmapped_mdl_chains, self.__chain_mapping_mdl = \
             self._chain_mapper.GetChemMapping(self.model)
         return self.__chem_mapping
 
@@ -926,7 +927,7 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
     def _chem_group_alns(self):
         if self.__chem_group_alns is None:   
             self.__chem_mapping, self.__chem_group_alns, \
-            self.__chain_mapping_mdl = \
+            self.__unmapped_mdl_chains, self.__chain_mapping_mdl = \
             self._chain_mapper.GetChemMapping(self.model)
         return self.__chem_group_alns
 
@@ -945,9 +946,17 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
         if self.__chain_mapping_mdl is None:
             with ligand_scoring_base._SinkVerbosityLevel():
                 self.__chem_mapping, self.__chem_group_alns, \
-                self.__chain_mapping_mdl = \
+                self.__unmapped_mdl_chains, self.__chain_mapping_mdl = \
                 self._chain_mapper.GetChemMapping(self.model)
         return self.__chain_mapping_mdl
+
+    @property
+    def _unmapped_mdl_chains(self):
+        if self.__unmapped_mdl_chains is None:
+            self.__chem_mapping, self.__chem_group_alns, \
+            self.__unmapped_mdl_chains, self.__chain_mapping_mdl = \
+            self._chain_mapper.GetChemMapping(self.model)
+        return self.__unmapped_mdl_chains
 
 # specify public interface
 __all__ = ('LDDTPLIScorer',)

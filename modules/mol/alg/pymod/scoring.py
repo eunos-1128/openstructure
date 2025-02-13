@@ -3039,7 +3039,7 @@ class Scorer:
         LogInfo("Setting custom chain mapping")
 
         chain_mapper = self.chain_mapper
-        chem_mapping, chem_group_alns, mdl = \
+        chem_mapping, chem_group_alns, unmapped_mdl_chains, mdl = \
         chain_mapper.GetChemMapping(self.model)
 
         # now that we have a chem mapping, lets do consistency checks
