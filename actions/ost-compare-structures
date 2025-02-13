@@ -17,7 +17,8 @@ Loads the structures and performs basic cleanup:
 The cleaned structures are optionally dumped using -d/--dump-structures
 
 Output is written in JSON format (default: out.json). In case of no additional
-options, this is a dictionary with 8 keys describing model/reference comparison:
+options, this is a dictionary with the following keys describing model/reference
+comparison:
 
  * "reference_chains": Chain names of reference
  * "model_chains": Chain names of model
@@ -28,6 +29,9 @@ options, this is a dictionary with 8 keys describing model/reference comparison:
  * "chem_mapping": List of same length as "chem_groups". Assigns model chains to
    the respective chem group. Again, only contains chains that are considered
    in chain mapping.
+ * "unmapped_mdl_chains": Model chains that could be considered in chain mapping
+   but could not be mapped to any chem group. Depends on --chem-map-seqid-thresh
+   and a mapping for each model chain can be enforced by setting it to 0.
  * "chain_mapping": A dictionary with reference chain names as keys and the
    mapped model chain names as values. Missing chains are either not mapped
    (but present in "chem_groups", "chem_mapping") or were not considered in
@@ -647,6 +651,33 @@ def _ParseArgs():
         default=15.0,
         help=("Passed to LDDT scorer. Affects all LDDT scores but not "
               "chain mapping."))
+
+    parser.add_argument(
+        "--chem-group-seqid-thresh",
+        dest="chem_group_seqid_thresh",
+        type = float,
+        default = 95.,
+        help=("Default: 95 - Sequence identity threshold used to group "
+              "identical chains in reference structure in the chain mapping "
+              "step. The same threshold is applied to peptide and nucleotide "
+              "chains.")
+    )
+
+    parser.add_argument(
+        "--chem-map-seqid-thresh",
+        dest="chem_map_seqid_thresh",
+        type = float,
+        default = 70.,
+        help=("Default: 70 - Sequence identity threshold used to map model "
+              "chains to groups derived in the chem grouping step in chain "
+              "mapping. If set to 0., a mapping is enforced and each model "
+              "chain is assigned to the chem group with maximum sequence "
+              "identity. If larger than 0., a mapping only happens if the "
+              "respective model chain can be aligned to a chem group with the "
+              "specified sequence identity threshold AND if at least "
+              "min-pep-length/min-nuc-length residues are aligned. The same "
+              "threshold is applied to peptide and nucleotide chains.")
+    )
  
     return parser.parse_args()
 
@@ -858,7 +889,11 @@ def _Process(model, reference, args, model_format, reference_format):
                             min_nuc_length = args.min_nuc_length,
                             lddt_add_mdl_contacts = args.lddt_add_mdl_contacts,
                             dockq_capri_peptide = args.dockq_capri_peptide,
-                            lddt_inclusion_radius = args.lddt_inclusion_radius)
+                            lddt_inclusion_radius = args.lddt_inclusion_radius,
+                            pep_seqid_thr = args.chem_group_seqid_thresh,
+                            nuc_seqid_thr = args.chem_group_seqid_thresh,
+                            mdl_map_pep_seqid_thr = args.chem_map_seqid_thresh,
+                            mdl_map_nuc_seqid_thr = args.chem_map_seqid_thresh)
 
     ir = _GetInconsistentResidues(scorer.aln)
     if len(ir) > 0 and args.enforce_consistency:
@@ -869,6 +904,7 @@ def _Process(model, reference, args, model_format, reference_format):
     out["model_chains"] = [ch.GetName() for ch in scorer.model.chains]
     out["chem_groups"] = scorer.chain_mapper.chem_groups
     out["chem_mapping"] = scorer.mapping.chem_mapping
+    out["unmapped_mdl_chains"] = scorer.mapping.unmapped_mdl_chains
     out["chain_mapping"] = scorer.mapping.GetFlatMapping()
     out["aln"] = [_AlnToFastaStr(aln) for aln in scorer.aln]
     out["inconsistent_residues"] = ir

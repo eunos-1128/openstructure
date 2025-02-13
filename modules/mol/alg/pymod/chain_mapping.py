@@ -36,12 +36,13 @@ class MappingResult:
     Constructor is directly called within the functions, no need to construct
     such objects yourself.
     """
-    def __init__(self, target, model, chem_groups, chem_mapping, mapping, alns,
-                 opt_score=None):
+    def __init__(self, target, model, chem_groups, chem_mapping,
+                 unmapped_mdl_chains, mapping, alns, opt_score=None):
         self._target = target
         self._model = model
         self._chem_groups = chem_groups
         self._chem_mapping = chem_mapping
+        self._unmapped_mdl_chains = unmapped_mdl_chains
         self._mapping = mapping
         self._alns = alns
         self._opt_score = opt_score
@@ -82,6 +83,16 @@ class MappingResult:
         :class:`list` of :class:`list` of :class:`str` (chain names)
         """
         return self._chem_mapping
+
+    @property
+    def unmapped_mdl_chains(self):
+        """ Model chains that cannot be mapped to :attr:`chem_groups`
+
+        Depends on parameterization of :class:`ChainMapper`
+
+        :class:`list` of class:`str` (chain names)
+        """
+        return self._unmapped_mdl_chains
 
     @property
     def mapping(self):
@@ -869,7 +880,7 @@ class ChainMapper:
                         aln.AttachView(1, _CSel(mdl, [mdl_ch]))
                         alns[(ref_ch, mdl_ch)] = aln
             return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
-                                 one_to_one, alns)
+                                 unmapped_mdl_chains, one_to_one, alns)
 
         if strategy == "heuristic":
             if _NMappingsWithin(self.chem_groups, chem_mapping,
@@ -913,7 +924,8 @@ class ChainMapper:
                     alns[(ref_ch, mdl_ch)] = aln
 
         return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
-                             mapping, alns, opt_score = opt_lddt)
+                             unmapped_mdl_chains, mapping, alns,
+                             opt_score = opt_lddt)
 
 
     def GetQSScoreMapping(self, model, contact_d = 12.0, strategy = "heuristic",
@@ -1008,7 +1020,7 @@ class ChainMapper:
                         aln.AttachView(1, _CSel(mdl, [mdl_ch]))
                         alns[(ref_ch, mdl_ch)] = aln
             return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
-                                 one_to_one, alns)
+                                 unmapped_mdl_chains, one_to_one, alns)
 
         if strategy == "heuristic":
             if _NMappingsWithin(self.chem_groups, chem_mapping,
@@ -1053,7 +1065,8 @@ class ChainMapper:
                     alns[(ref_ch, mdl_ch)] = aln
 
         return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
-                             mapping, alns, opt_score = opt_qsscore)
+                             unmapped_mdl_chains, mapping, alns,
+                             opt_score = opt_qsscore)
 
     def GetRMSDMapping(self, model, strategy = "heuristic", subsampling=50,
                        chem_mapping_result = None, heuristic_n_max_naive = 120):
@@ -1127,7 +1140,7 @@ class ChainMapper:
                         aln.AttachView(1, _CSel(mdl, [mdl_ch]))
                         alns[(ref_ch, mdl_ch)] = aln
             return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
-                                 one_to_one, alns)
+                                 unmapped_mdl_chains, one_to_one, alns)
 
         trg_group_pos, mdl_group_pos = _GetRefPos(self.target, mdl,
                                                   self.chem_group_alignments,
@@ -1200,7 +1213,7 @@ class ChainMapper:
                     alns[(ref_ch, mdl_ch)] = aln
 
         return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
-                             final_mapping, alns)
+                             unmapped_mdl_chains, final_mapping, alns)
 
     def GetMapping(self, model, n_max_naive = 40320):
         """ Convenience function to get mapping with currently preferred method

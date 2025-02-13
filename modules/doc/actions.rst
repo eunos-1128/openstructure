@@ -53,13 +53,15 @@ Details on the usage (output of ``ost compare-structures --help``):
                                 [--min-nuc-length MIN_NUC_LENGTH] [-v VERBOSITY]
                                 [--lddt-add-mdl-contacts]
                                 [--lddt-inclusion-radius LDDT_INCLUSION_RADIUS]
-  
+                                [--chem-group-seqid-thresh CHEM_GROUP_SEQID_THRESH]
+                                [--chem-map-seqid-thresh CHEM_MAP_SEQID_THRESH]
+
   Evaluate model against reference 
-  
+
   Example: ost compare-structures -m model.pdb -r reference.cif
-  
+
   Loads the structures and performs basic cleanup:
-  
+
    * Assign elements according to the PDB Chemical Component Dictionary
    * Map nonstandard residues to their parent residues as defined by the PDB
      Chemical Component Dictionary, e.g. phospho-serine => serine
@@ -68,12 +70,13 @@ Details on the usage (output of ``ost compare-structures --help``):
    * Remove unknown atoms, i.e. atoms that are not expected according to the PDB
      Chemical Component Dictionary
    * Select for peptide/nucleotide residues
-  
+
   The cleaned structures are optionally dumped using -d/--dump-structures
-  
+
   Output is written in JSON format (default: out.json). In case of no additional
-  options, this is a dictionary with 8 keys describing model/reference comparison:
-  
+  options, this is a dictionary with the following keys describing model/reference
+  comparison:
+
    * "reference_chains": Chain names of reference
    * "model_chains": Chain names of model
    * "chem_groups": Groups of polypeptides/polynucleotides from reference that
@@ -83,6 +86,9 @@ Details on the usage (output of ``ost compare-structures --help``):
    * "chem_mapping": List of same length as "chem_groups". Assigns model chains to
      the respective chem group. Again, only contains chains that are considered
      in chain mapping.
+   * "unmapped_mdl_chains": Model chains that could be considered in chain mapping
+     but could not be mapped to any chem group. Depends on --chem-map-seqid-thresh
+     and a mapping for each model chain can be enforced by setting it to 0.
    * "chain_mapping": A dictionary with reference chain names as keys and the
      mapped model chain names as values. Missing chains are either not mapped
      (but present in "chem_groups", "chem_mapping") or were not considered in
@@ -98,10 +104,10 @@ Details on the usage (output of ``ost compare-structures --help``):
    * "status": SUCCESS if everything ran through. In case of failure, the only
      content of the JSON output will be "status" set to FAILURE and an
      additional key: "traceback".
-  
+
   The following additional keys store relevant input parameters to reproduce
   results:
-  
+
    * "model"
    * "reference"
    * "fault_tolerant"
@@ -118,22 +124,22 @@ Details on the usage (output of ``ost compare-structures --help``):
    * "lddt_inclusion_radius"
    * "dockq_capri_peptide"
    * "ost_version"
-  
+
   The pairwise sequence alignments are computed with Needleman-Wunsch using
   BLOSUM62 (NUC44 for nucleotides). Many benchmarking scenarios preprocess the
   structures to ensure matching residue numbers (CASP/CAMEO). In these cases,
   enabling -rna/--residue-number-alignment is recommended.
-  
+
   Each score is opt-in and can be enabled with optional arguments.
-  
+
   Example to compute global and per-residue LDDT values as well as QS-score:
-  
+
   ost compare-structures -m model.pdb -r reference.cif --lddt --local-lddt --qs-score
-  
+
   Example to inject custom chain mapping
-  
+
   ost compare-structures -m model.pdb -r reference.cif -c A:B B:A
-  
+
   options:
     -h, --help            show this help message and exit
     -m MODEL, --model MODEL
@@ -455,7 +461,7 @@ Details on the usage (output of ``ost compare-structures --help``):
     -v VERBOSITY, --verbosity VERBOSITY
                           Set verbosity level. Defaults to 2 (Script).
     --lddt-add-mdl-contacts
-                          Only using contacts in LDDT thatare within a certain
+                          Only using contacts in LDDT that are within a certain
                           distance threshold in the reference does not penalize
                           for added model contacts. If set to True, this flag
                           will also consider reference contacts that are within
@@ -466,6 +472,24 @@ Details on the usage (output of ``ost compare-structures --help``):
     --lddt-inclusion-radius LDDT_INCLUSION_RADIUS
                           Passed to LDDT scorer. Affects all LDDT scores but not
                           chain mapping.
+    --chem-group-seqid-thresh CHEM_GROUP_SEQID_THRESH
+                          Default: 95 - Sequence identity threshold used to
+                          group identical chains in reference structure in the
+                          chain mapping step. The same threshold is applied to
+                          peptide and nucleotide chains.
+    --chem-map-seqid-thresh CHEM_MAP_SEQID_THRESH
+                          Default: 70 - Sequence identity threshold used to map
+                          model chains to groups derived in the chem grouping
+                          step in chain mapping. If set to 0., a mapping is
+                          enforced and each model chain is assigned to the chem
+                          group with maximum sequence identity. If larger than
+                          0., a mapping only happens if the respective model
+                          chain can be aligned to a chem group with the
+                          specified sequence identity threshold AND if at least
+                          min-pep-length/min-nuc-length residues are aligned.
+                          The same threshold is applied to peptide and
+                          nucleotide chains.
+
 
 .. _ost compare ligand structures:
 
