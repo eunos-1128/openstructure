@@ -205,6 +205,22 @@ class Scorer:
                                    LDDT scorer. Default: None
     :type lddt_symmetry_settings: :class:`ost.mol.alg.lddt.SymmetrySettings`
     :param lddt_inclusion_radius: LDDT inclusion radius.
+    :param pep_seqid_thr: Parameter that affects identification of identical
+                          chains in target - see 
+                          :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type pep_seqid_thr: :class:`float`
+    :param nuc_seqid_thr: Parameter that affects identification of identical
+                          chains in target - see 
+                          :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type nuc_seqid_thr: :class:`float`
+    :param mdl_map_pep_seqid_thr: Parameter that affects mapping of model chains
+                                  to target chains - see 
+                                  :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type mdl_map_pep_seqid_thr: :class:`float`
+    :param mdl_map_nuc_seqid_thr: Parameter that affects mapping of model chains
+                                  to target chains - see 
+                                  :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type mdl_map_nuc_seqid_thr: :class:`float`
     """
     def __init__(self, model, target, resnum_alignments=False,
                  molck_settings = None, cad_score_exec = None,
@@ -213,7 +229,10 @@ class Scorer:
                  n_max_naive=40320, oum=False, min_pep_length = 6,
                  min_nuc_length = 4, lddt_add_mdl_contacts=False,
                  dockq_capri_peptide=False, lddt_symmetry_settings = None,
-                 lddt_inclusion_radius = 15.0):
+                 lddt_inclusion_radius = 15.0,
+                 pep_seqid_thr = 95., nuc_seqid_thr = 95.,
+                 mdl_map_pep_seqid_thr = 0.,
+                 mdl_map_nuc_seqid_thr = 0.):
 
         self._target_orig = target
         self._model_orig = model
@@ -319,6 +338,10 @@ class Scorer:
         self.dockq_capri_peptide = dockq_capri_peptide
         self.lddt_symmetry_settings = lddt_symmetry_settings
         self.lddt_inclusion_radius = lddt_inclusion_radius
+        self.pep_seqid_thr = pep_seqid_thr
+        self.nuc_seqid_thr = nuc_seqid_thr
+        self.mdl_map_pep_seqid_thr = mdl_map_pep_seqid_thr
+        self.mdl_map_nuc_seqid_thr = mdl_map_nuc_seqid_thr
 
         # lazily evaluated attributes
         self._stereochecked_model = None
@@ -653,7 +676,11 @@ class Scorer:
                                                            n_max_naive=1e9,
                                                            resnum_alignments=self.resnum_alignments,
                                                            min_pep_length=self.min_pep_length,
-                                                           min_nuc_length=self.min_nuc_length)
+                                                           min_nuc_length=self.min_nuc_length,
+                                                           pep_seqid_thr=self.pep_seqid_thr,
+                                                           nuc_seqid_thr=self.nuc_seqid_thr,
+                                                           mdl_map_pep_seqid_thr=self.mdl_map_pep_seqid_thr,
+                                                           mdl_map_nuc_seqid_thr=self.mdl_map_nuc_seqid_thr)
         return self._chain_mapper
 
     @property
