@@ -139,11 +139,6 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
 
         # lazily precomputed variables to speedup GetRepr chain mapping calls
         # for localized GetRepr searches
-        self.__chem_mapping = None
-        self.__chem_group_alns = None
-        self.__ref_mdl_alns = None
-        self.__unmapped_mdl_chains = None
-        self.__chain_mapping_mdl = None
         self._get_repr_input = dict()
 
         # update state decoding from parent with subclass specific stuff
@@ -304,48 +299,6 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
             self._binding_sites[target_ligand.handle.hash_code] = ref_bs
 
         return self._binding_sites[target_ligand.handle.hash_code]
-
-    @property
-    def _chem_mapping(self):
-        if self.__chem_mapping is None:
-            self.__chem_mapping, self.__chem_group_alns, \
-            self.__unmapped_mdl_chains, self.__chain_mapping_mdl = \
-            self._chain_mapper.GetChemMapping(self.model)
-        return self.__chem_mapping
-
-    @property
-    def _chem_group_alns(self):
-        if self.__chem_group_alns is None:   
-            self.__chem_mapping, self.__chem_group_alns, \
-            self.__unmapped_mdl_chains, self.__chain_mapping_mdl = \
-            self._chain_mapper.GetChemMapping(self.model)
-        return self.__chem_group_alns
-
-    @property
-    def _ref_mdl_alns(self):
-        if self.__ref_mdl_alns is None:
-            self.__ref_mdl_alns = \
-            chain_mapping._GetRefMdlAlns(self._chain_mapper.chem_groups,
-                                    self._chain_mapper.chem_group_alignments,
-                                    self._chem_mapping,
-                                    self._chem_group_alns)
-        return self.__ref_mdl_alns
-  
-    @property
-    def _chain_mapping_mdl(self):
-        if self.__chain_mapping_mdl is None:   
-            self.__chem_mapping, self.__chem_group_alns, \
-            self.__unmapped_mdl_chains, self.__chain_mapping_mdl = \
-            self._chain_mapper.GetChemMapping(self.model)
-        return self.__chain_mapping_mdl
-
-    @property
-    def _unmapped_mdl_chains(self):
-        if self.__unmapped_mdl_chains is None:
-            self.__chem_mapping, self.__chem_group_alns, \
-            self.__unmapped_mdl_chains, self.__chain_mapping_mdl = \
-            self._chain_mapper.GetChemMapping(self.model)
-        return self.__unmapped_mdl_chains
 
     def _get_get_repr_input(self, mdl_ligand):
         if mdl_ligand.handle.hash_code not in self._get_repr_input:

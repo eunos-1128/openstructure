@@ -438,6 +438,11 @@ class LigandScorer:
 
         # lazily computed attributes
         self.__chain_mapper = None
+        self.__chem_mapping = None
+        self.__chem_group_alns = None
+        self.__ref_mdl_alns = None
+        self.__unmapped_mdl_chains = None
+        self.__chain_mapping_mdl = None
 
         # keep track of states
         # simple integers instead of enums - encoding available in
@@ -1038,6 +1043,49 @@ class LigandScorer:
                                           n_max_naive=1e9,
                                           resnum_alignments=self.resnum_alignments)
         return self.__chain_mapper
+
+    @property
+    def _chem_mapping(self):
+        if self.__chem_mapping is None:
+            self.__chem_mapping, self.__chem_group_alns, \
+            self.__unmapped_mdl_chains, self.__chain_mapping_mdl = \
+            self._chain_mapper.GetChemMapping(self.model)
+        return self.__chem_mapping
+
+    @property
+    def _chem_group_alns(self):
+        if self.__chem_group_alns is None:   
+            self.__chem_mapping, self.__chem_group_alns, \
+            self.__unmapped_mdl_chains, self.__chain_mapping_mdl = \
+            self._chain_mapper.GetChemMapping(self.model)
+        return self.__chem_group_alns
+
+    @property
+    def _ref_mdl_alns(self):
+        if self.__ref_mdl_alns is None:
+            self.__ref_mdl_alns = \
+            chain_mapping._GetRefMdlAlns(self._chain_mapper.chem_groups,
+                                    self._chain_mapper.chem_group_alignments,
+                                    self._chem_mapping,
+                                    self._chem_group_alns)
+        return self.__ref_mdl_alns
+  
+    @property
+    def _chain_mapping_mdl(self):
+        if self.__chain_mapping_mdl is None:
+            with _SinkVerbosityLevel():
+                self.__chem_mapping, self.__chem_group_alns, \
+                self.__unmapped_mdl_chains, self.__chain_mapping_mdl = \
+                self._chain_mapper.GetChemMapping(self.model)
+        return self.__chain_mapping_mdl
+
+    @property
+    def _unmapped_mdl_chains(self):
+        if self.__unmapped_mdl_chains is None:
+            self.__chem_mapping, self.__chem_group_alns, \
+            self.__unmapped_mdl_chains, self.__chain_mapping_mdl = \
+            self._chain_mapper.GetChemMapping(self.model)
+        return self.__unmapped_mdl_chains
 
     def _compute_scores(self):
         """

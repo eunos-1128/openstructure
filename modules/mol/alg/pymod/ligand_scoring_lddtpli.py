@@ -121,11 +121,6 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
         self._lddt_pli_target_data = dict()
         self._lddt_pli_model_data = dict()
         self.__mappable_atoms = None
-        self.__chem_mapping = None
-        self.__chem_group_alns = None
-        self.__ref_mdl_alns = None
-        self.__unmapped_mdl_chains = None
-        self.__chain_mapping_mdl = None
 
         # update state decoding from parent with subclass specific stuff
         self.state_decoding[10] = ("no_contact",
@@ -914,49 +909,6 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
                                 self.__mappable_atoms[c_key].add(at_key)
 
         return self.__mappable_atoms
-
-    @property
-    def _chem_mapping(self):
-        if self.__chem_mapping is None:
-            self.__chem_mapping, self.__chem_group_alns, \
-            self.__unmapped_mdl_chains, self.__chain_mapping_mdl = \
-            self._chain_mapper.GetChemMapping(self.model)
-        return self.__chem_mapping
-
-    @property
-    def _chem_group_alns(self):
-        if self.__chem_group_alns is None:   
-            self.__chem_mapping, self.__chem_group_alns, \
-            self.__unmapped_mdl_chains, self.__chain_mapping_mdl = \
-            self._chain_mapper.GetChemMapping(self.model)
-        return self.__chem_group_alns
-
-    @property
-    def _ref_mdl_alns(self):
-        if self.__ref_mdl_alns is None:
-            self.__ref_mdl_alns = \
-            chain_mapping._GetRefMdlAlns(self._chain_mapper.chem_groups,
-                                    self._chain_mapper.chem_group_alignments,
-                                    self._chem_mapping,
-                                    self._chem_group_alns)
-        return self.__ref_mdl_alns
-  
-    @property
-    def _chain_mapping_mdl(self):
-        if self.__chain_mapping_mdl is None:
-            with ligand_scoring_base._SinkVerbosityLevel():
-                self.__chem_mapping, self.__chem_group_alns, \
-                self.__unmapped_mdl_chains, self.__chain_mapping_mdl = \
-                self._chain_mapper.GetChemMapping(self.model)
-        return self.__chain_mapping_mdl
-
-    @property
-    def _unmapped_mdl_chains(self):
-        if self.__unmapped_mdl_chains is None:
-            self.__chem_mapping, self.__chem_group_alns, \
-            self.__unmapped_mdl_chains, self.__chain_mapping_mdl = \
-            self._chain_mapper.GetChemMapping(self.model)
-        return self.__unmapped_mdl_chains
 
 # specify public interface
 __all__ = ('LDDTPLIScorer',)
