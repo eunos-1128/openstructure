@@ -285,6 +285,17 @@ class LigandScorer:
     to be used by the :class:`LigandScorer` based on "non-polymer" entity types.
     In case of PDB file format, ligands must be loaded separately as SDF files.
 
+    Only polymers (protein and nucleic acids) of model and target are considered
+    for ligand binding sites. The
+    :class:`ost.mol.alg.chain_mapping.ChainMapper` is used to enumerate possible
+    mappings of these chains. In short: identical chains in the target are
+    grouped based on pairwise sequence identity
+    (see pep_seqid_thr/nuc_seqid_thr param). Each model chain is assigned to
+    one of these groups (see mdl_map_pep_seqid_thr/mdl_map_nuc_seqid_thr param).
+    To avoid spurious matches, only polymers of a certain length are considered
+    in this matching procedure (see min_pep_length/min_nuc_length param).
+    Shorter polymers are never mapped and do not contribute to scoring.
+
     Here is an example of how to setup a scorer::
 
         from ost.mol.alg.ligand_scoring_scrmsd import SCRMSDScorer
@@ -312,6 +323,7 @@ class LigandScorer:
         # check cleanup in model and target structure:
         print("model cleanup:", sc.model_cleanup_log)
         print("target cleanup:", sc.target_cleanup_log)
+
 
     :param model: Model structure - a deep copy is available as :attr:`model`.
                   The model undergoes the following cleanup steps which are
