@@ -107,33 +107,17 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
                            ligands not being scored if the predicted ligand
                            pose is too far from the actual binding site.
     :type full_bs_search: :class:`bool`
-    :param min_pep_length: Relevant parameter if short peptides are involved in
-                           the polymer binding site. Minimum peptide length for
-                           a chain to be considered in chain mapping.
-                           The chain mapping algorithm first performs an all vs.
-                           all pairwise sequence alignment to identify \"equal\"
-                           chains within the target structure. We go for simple
-                           sequence identity there. Short sequences can be
-                           problematic as they may produce high sequence identity
-                           alignments by pure chance.
+    :param min_pep_length: See :class:`ost.mol.alg.ligand_scoring_base.LigandScorer`.
     :type min_pep_length: :class:`int`
-    :param min_nuc_length: Same for nucleotides
+    :param min_nuc_length: See :class:`ost.mol.alg.ligand_scoring_base.LigandScorer`
     :type min_nuc_length: :class:`int`
-    :param pep_seqid_thr: Parameter that affects identification of identical
-                          chains in target - see 
-                          :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :param pep_seqid_thr: See :class:`ost.mol.alg.ligand_scoring_base.LigandScorer`
     :type pep_seqid_thr: :class:`float`
-    :param nuc_seqid_thr: Parameter that affects identification of identical
-                          chains in target - see 
-                          :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :param nuc_seqid_thr: See :class:`ost.mol.alg.ligand_scoring_base.LigandScorer`
     :type nuc_seqid_thr: :class:`float`
-    :param mdl_map_pep_seqid_thr: Parameter that affects mapping of model chains
-                                  to target chains - see 
-                                  :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :param mdl_map_pep_seqid_thr: See :class:`ost.mol.alg.ligand_scoring_base.LigandScorer`
     :type mdl_map_pep_seqid_thr: :class:`float`
-    :param mdl_map_nuc_seqid_thr: Parameter that affects mapping of model chains
-                                  to target chains - see 
-                                  :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :param mdl_map_nuc_seqid_thr: See :class:`ost.mol.alg.ligand_scoring_base.LigandScorer`
     :type mdl_map_nuc_seqid_thr: :class:`float`
     """
     def __init__(self, model, target, model_ligands, target_ligands,
