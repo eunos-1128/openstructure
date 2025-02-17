@@ -9,11 +9,13 @@ OpenStructure provides "actions" for general benchmarking use cases.
   polymer entities and non-polymer entities, i.e. small molecule ligands
   
 The example commands here assume an OpenStructure installation
-(compile instructions: https://openstructure.org/docs/dev/install/). Detailed
-instructions for running equivalent computations are available for
+(compile instructions: https://openstructure.org/docs/dev/install/). 
+Running the computations in containers provide a considerably easier setup than
+compiling OpenStructure from source. Instructions for setup and running
+equivalent computations are available for
 
 * Docker: https://git.scicore.unibas.ch/schwede/openstructure/tree/master/docker
-* Singularity https://git.scicore.unibas.ch/schwede/openstructure/tree/master/singularity
+* Singularity: https://git.scicore.unibas.ch/schwede/openstructure/tree/master/singularity
 
 The command
 
