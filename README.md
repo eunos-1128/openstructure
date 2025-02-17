@@ -1,4 +1,5 @@
-================= OpenStructure molecular modelling framework ==================
+OpenStructure - A computational structural biology framework
+============================================================
 
 OpenStructure provides a modular, flexible, molecular modelling environment
 which allows to integrate, process and visualize information of different origin
