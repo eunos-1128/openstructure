@@ -310,27 +310,28 @@ observed for OpenMM versions 6.1 until 7.1.1 when compiling with gcc versions >=
 from source.
 
 
-**Ubuntu 20.04 LTS / Debian 10 with GUI**
+**Ubuntu 24.04 LTS**
 
+Besides the molecular mechanics module, we also enable parasail here.
 All the dependencies can be installed from the package manager as follows:
 
 .. code-block:: bash
 
   sudo apt-get install cmake g++ libtiff-dev libfftw3-dev libeigen3-dev \
                libpng-dev python3-all python3-pyqt5 libboost-all-dev \
-               qt5-qmake qtbase5-dev libpng-dev libsqlite3-dev
+               qt5-qmake qtbase5-dev libpng-dev libsqlite3-dev \
+               libopenmm-dev libopenmm-plugins libparasail-dev
 
 Now, all dependencies are located in standard locations and cmake will
-automatically find them without the need to pass any additional parameters. 
-We add -DOPTIMIZE, which will tell cmake to build an optimised version of 
-OpenStructure.
+automatically find them. As a single quirk, we need to specify the
+OpenMM plugin directory. Lets do a proper out of source build here:
 
 .. code-block:: bash
 
-  cmake . -DOPTIMIZE=ON
-
-
-
+  mkdir build
+  cd build
+  cmake .. -DOPTIMIZE=ON -DENABLE_MM=1 -DENABLE_PARASAIL=1 \
+           -DOPEN_MM_PLUGIN_DIR=/lib/x86_64-linux-gnu/openmm/plugins
 
 
 **macOS (Catalina/ Big Sur/ Monterey) with Homebrew**
@@ -413,6 +414,26 @@ to run multiple jobs at once.
 What's next?
 --------------------------------------------------------------------------------
 
+One thing is missing for a fully functional OpenStructure installation.
+The compound library. It is used at various places for connectivity
+information and certain algorithms do not work without.
+Besides an OpenStructure executable, we just built the
+chemdict_tool which converts the PDB chemical component dictionary
+into our internal format:
+
+.. code-block:: bash
+
+  wget https://files.wwpdb.org/pub/pdb/data/monomers/components.cif.gz
+  stage/bin/chemdict_tool create components.cif.gz <compounds.chemlib>
+
+We can rerun cmake and make. All cmake parameters from the original
+configuration remain in the cache.
+
+.. code-block:: bash
+
+  cmake .. -DCOMPOUND_LIB=<compounds.chemlib>
+  make
+
 On Linux and macOS, you can start dng from the command-line. The binaries are
 all located in stage/bin:
 
@@ -425,6 +446,12 @@ or, to start the command-line interpreter:
 .. code-block:: bash
 
   stage/bin/ost
+  
+But hey, good citizen run the unit tests first:
+
+.. code-block:: bash
+
+  make check
   
 If you repeatedly use OpenStructure, it is recommended to add
 /path/to/ost/stage/bin to your path.
