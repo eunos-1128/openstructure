@@ -20,6 +20,16 @@ nucleotide linking according to the component dictionary 4) removal of atoms
 that are not defined for respective residues in the component dictionary. Except
 step 1), every cleanup is logged and a report is available in the json outfile.
 
+Only polymers (protein and nucleic acids) of model and reference are considered
+for ligand binding sites. The mapping of possible reference/model chain
+assignments requires a preprocessing. In short: identical chains in the
+reference are grouped based on pairwise sequence identity
+(see --chem-group-seqid-thresh). Each model chain is assigned to
+one of these groups (see --chem-map-seqid-thresh param).
+To avoid spurious matches, only polymers of a certain length are considered
+in this matching procedure (see --min_pep_length/--min_nuc_length param).
+Shorter polymers are never mapped and do not contribute to scoring.
+
 Ligands can be given as path to SDF files containing the ligand for both model
 (--model-ligands/-ml) and reference (--reference-ligands/-rl). If omitted,
 ligands are optionally detected from a structure file if it is given in mmCIF
@@ -47,19 +57,30 @@ keys:
    the ligand SDF file(s). Otherwise, they will be the chain name, residue
    number and insertion code of the ligand, separated by a dot.
  * "reference_ligands": Same for reference ligands.
+ * "chem_groups": Groups of polypeptides/polynucleotides from reference that
+   are considered chemically equivalent, i.e. pass a pairwise sequence identity
+   threshold that can be controlled with --chem-group-seqid-thresh.
+   You can derive stoichiometry from this. Contains only chains that are
+   considered in chain mapping, i.e. pass a size threshold (defaults: 6 for
+   peptides, 4 for nucleotides).
+ * "chem_mapping": List of same length as "chem_groups". Assigns model chains to
+   the respective chem group. Again, only contains chains that are considered
+   in chain mapping. That is 1) pass the same size threshold as for chem_groups
+   2) can be aligned to any of the chem groups with a sequence identity
+   threshold that can be controlled by --chem-map-seqid-thresh.
+ * "unmapped_mdl_chains": Model chains that could be considered in chain mapping,
+   i.e. are long enough, but could not be mapped to any chem group.
+   Depends on --chem-map-seqid-thresh. A mapping for each model chain can be
+   enforced by setting it to 0.
  * "status": SUCCESS if everything ran through. In case of failure, the only
    content of the JSON output will be \"status\" set to FAILURE and an
    additional key: "traceback".
  * "ost_version": The OpenStructure version used for computation.
  * "model_cleanup_log": Lists residues/atoms that have been removed in model
    cleanup process.
- * "reference_cleanup_log": Same for reference. 
- * "reference": Parameter provided for --reference/-r
- * "model": Parameter provided for --model/-m
- * "resnum_alignments": Parameter provided for --residue-number-alignment/-rna
- * "substructure_match": Parameter provided for --substructure-match/-sm
- * "coverage_delta": Parameter provided for --coverage-delta/-cd
- * "max_symmetries": Parameter provided for --max-symmetries/-ms 
+ * "reference_cleanup_log": Same for reference.
+
+Additional keys represent input options.
 
 Each score is opt-in and the respective results are available in three keys:
 
@@ -386,6 +407,53 @@ def _ParseArgs():
         help=("If more than that many isomorphisms exist for a target-ligand "
               "pair, it will be ignored and reported as unassigned."))
 
+    parser.add_argument(
+        "--min-pep-length",
+        dest="min_pep_length",
+        default = 6,
+        type=int,
+        help=("Default: 6 - "
+              "Minimum length of a protein chain to be considered for being "
+              "part of a binding site.")
+    )
+
+    parser.add_argument(
+        "--min-nuc-length",
+        dest="min_nuc_length",
+        default = 4,
+        type=int,
+        help=("Default: 4 - "
+              "Minimum length of a NA chain to be considered for being "
+              "part of a binding site.")
+    )
+
+    parser.add_argument(
+        "--chem-group-seqid-thresh",
+        dest="chem_group_seqid_thresh",
+        type = float,
+        default = 95.,
+        help=("Default: 95 - Sequence identity threshold used to group "
+              "identical chains in reference structure in the chain mapping "
+              "step. The same threshold is applied to peptide and nucleotide "
+              "chains.")
+    )
+
+    parser.add_argument(
+        "--chem-map-seqid-thresh",
+        dest="chem_map_seqid_thresh",
+        type = float,
+        default = 70.,
+        help=("Default: 70 - Sequence identity threshold used to map model "
+              "chains to groups derived in the chem grouping step in chain "
+              "mapping. If set to 0., a mapping is enforced and each model "
+              "chain is assigned to the chem group with maximum sequence "
+              "identity. If larger than 0., a mapping only happens if the "
+              "respective model chain can be aligned to a chem group with the "
+              "specified sequence identity threshold AND if at least "
+              "min-pep-length/min-nuc-length residues are aligned. The same "
+              "threshold is applied to peptide and nucleotide chains.")
+    )
+
     args = parser.parse_args()
     if args.output is None:
         args.output = "out.%s" % args.output_format
@@ -513,7 +581,13 @@ def _SetupLDDTPLIScorer(model, model_ligands, reference, reference_ligands, args
                                                 coverage_delta = args.coverage_delta,
                                                 lddt_pli_radius = args.lddt_pli_radius,
                                                 add_mdl_contacts = args.lddt_pli_add_mdl_contacts,
-                                                max_symmetries = args.max_symmetries)
+                                                max_symmetries = args.max_symmetries,
+                                                min_pep_length = args.min_pep_length,
+                                                min_nuc_length = args.min_nuc_length,
+                                                pep_seqid_thr = args.chem_group_seqid_thresh,
+                                                nuc_seqid_thr = args.chem_group_seqid_thresh,
+                                                mdl_map_pep_seqid_thr = args.chem_map_seqid_thresh,
+                                                mdl_map_nuc_seqid_thr = args.chem_map_seqid_thresh)
 
 def _SetupSCRMSDScorer(model, model_ligands, reference, reference_ligands, args):
     return ligand_scoring_scrmsd.SCRMSDScorer(model, reference,
@@ -526,7 +600,13 @@ def _SetupSCRMSDScorer(model, model_ligands, reference, reference_ligands, args)
                                               bs_radius = args.radius,
                                               lddt_lp_radius = args.lddt_lp_radius,
                                               full_bs_search = args.full_bs_search,
-                                              max_symmetries = args.max_symmetries)
+                                              max_symmetries = args.max_symmetries,
+                                              min_pep_length = args.min_pep_length,
+                                              min_nuc_length = args.min_nuc_length,
+                                              pep_seqid_thr = args.chem_group_seqid_thresh,
+                                              nuc_seqid_thr = args.chem_group_seqid_thresh,
+                                              mdl_map_pep_seqid_thr = args.chem_map_seqid_thresh,
+                                              mdl_map_nuc_seqid_thr = args.chem_map_seqid_thresh)
 
 def _Process(model, model_ligands, reference, reference_ligands, args):
 
@@ -761,15 +841,12 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
                                                             "reference_ligand": target_key,
                                                             "reason": reason})
 
-    # add cleanup logs and parameters relevant for reproducibility
-    out["model"] = args.model
-    out["reference"] = args.reference
+    # add info relevant for chain mapping and cleanup
+    out["chem_groups"] = scorer._chain_mapper.chem_groups
+    out["chem_mapping"] = scorer._chem_mapping
+    out["unmapped_mdl_chains"] = scorer._unmapped_mdl_chains
     out["model_cleanup_log"] = scorer.model_cleanup_log
     out["reference_cleanup_log"] = scorer.target_cleanup_log
-    out["resnum_alignments"] = scorer.resnum_alignments
-    out["substructure_match"] = scorer.substructure_match
-    out["coverage_delta"] = scorer.coverage_delta
-    out["max_symmetries"] = scorer.max_symmetries
 
     return out
 
@@ -872,6 +949,32 @@ def _Main():
 
         out = _Process(model, model_ligands, reference, reference_ligands, args)
 
+        # append input arguments
+        out["model"] = args.model
+        out["reference"] = args.reference
+        out["model-biounit"] = args.model_biounit
+        out["reference-biounit"] = args.reference_biounit
+        out["fault-tolerant"] = args.fault_tolerant
+        out["residue-number-alignment"] = args.residue_number_alignment
+        out["substructure-match"] = args.substructure_match
+        out["coverage-delta"] = args.coverage_delta
+        out["max-symmetries"] = args.max_symmetries
+        out["min-pep-length"] = args.min_pep_length
+        out["min-nuc-length"] = args.min_nuc_length
+        out["chem-group-seqid-thresh"] = args.chem_group_seqid_thresh
+        out["chem-map-seqid-thresh"] = args.chem_map_seqid_thresh
+
+        # only add lddtpli if actually computed
+        if args.lddt_pli:
+            out["lddt-pli-radius"] = args.lddt_pli_radius
+            out["lddt-pli-add-mdl-contacts"] = args.lddt_pli_add_mdl_contacts
+        # same for rmsd
+        if args.rmsd:
+            out["radius"] = args.radius
+            out["lddt-lp-radius"] = args.lddt_lp_radius
+            out["full-bs-search"] = args.full_bs_search
+
+        # finalize
         out["ost_version"] = ost.__version__
         out["status"] = "SUCCESS"
         if args.output_format == "json":
