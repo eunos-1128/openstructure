@@ -17,7 +17,9 @@ equivalent computations are available for
 * [Docker](https://git.scicore.unibas.ch/schwede/openstructure/tree/master/docker)
 * [Singularity](https://git.scicore.unibas.ch/schwede/openstructure/tree/master/singularity)
 
-The command
+A detailed list of options can be found in the
+[action documentation](https://openstructure.org/docs/actions/).
+Alternatively, the command
 
 ```
 ost <ACTION> -h
