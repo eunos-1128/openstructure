@@ -1,3 +1,9 @@
+Changes in Release 2.9.2
+--------------------------------------------------------------------------------
+ * Examples for comparing macromolecular complexes
+ * Documentation updates
+
+
 Changes in Release 2.9.1
 --------------------------------------------------------------------------------
 

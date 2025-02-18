@@ -310,98 +310,28 @@ observed for OpenMM versions 6.1 until 7.1.1 when compiling with gcc versions >=
 from source.
 
 
-**Ubuntu 20.04 LTS / Debian 10 with GUI**
+**Ubuntu 24.04 LTS**
 
+Besides the molecular mechanics module, we also enable parasail here.
 All the dependencies can be installed from the package manager as follows:
 
 .. code-block:: bash
 
   sudo apt-get install cmake g++ libtiff-dev libfftw3-dev libeigen3-dev \
                libpng-dev python3-all python3-pyqt5 libboost-all-dev \
-               qt5-qmake qtbase5-dev libpng-dev libsqlite3-dev
+               qt5-qmake qtbase5-dev libpng-dev libsqlite3-dev \
+               libopenmm-dev libopenmm-plugins libparasail-dev
 
 Now, all dependencies are located in standard locations and cmake will
-automatically find them without the need to pass any additional parameters. 
-We add -DOPTIMIZE, which will tell cmake to build an optimised version of 
-OpenStructure.
+automatically find them. As a single quirk, we need to specify the
+OpenMM plugin directory. Lets do a proper out of source build here:
 
 .. code-block:: bash
 
-  cmake . -DOPTIMIZE=ON
-
-
-
-
-
-**macOS (Catalina/ Big Sur/ Monterey) with Homebrew**
-
-.. note::
-
-  When switching the Qt version used for compiling OST with support for the
-  graphical user interface, dng may start behaving weird. Symptoms are that the
-  user interface starts being unresponsive to mouse clicks. An easy solution
-  may be to close dng and remove
-  ``$HOME/Library/Preferences/org.openstructure.dng.plist`` and start dng again.
-
-`Homebrew <https://brew.sh/>`_ can be used to conveniently install all
-dependencies. The current Python version, as of writing these instructions, is
-3.9.10 but works so far. Boost comes as 1.76.0 which seems to be OK. Do not
-forget to also install boost-python3 (your system may have a lower version of
-Python than 3.9.10 but it seems like boost-python3 was compiled for 3.9.10).
-Eigen and SQLite also seem to be unproblematic concerning higher version
-numbers. To build the graphical user interface, use Qt version 5 by installing
-packages qt@5 and pyqt@5 from Homebrew.
-
-If you want to build the info module or the graphical user interface, make sure
-you have the Xcode app installed. Just the Xcode command line tools which are
-sufficient for Homebrew, will not work with Qt5.
-
-Before running CMake, some environment variables need to be set on the command
-line. If omitted, the linker will throw a bunch of warnings later:
-
-.. code-block:: bash
-
-  export SDKROOT=/Applications/Xcode.app/Contents/Developer/Platforms/\
-  MacOSX.platform/Developer/SDKs/MacOSX.sdk
-
-If building the info module or with graphical user interface, get the Qt
-binaries in your Path for CMake to determine its configuration:
-
-.. code-block:: bash
-
-  export PATH="/usr/local/opt/qt@5/bin:$PATH"
-
-Homebrew installs all the software under /usr/local. Thus we have to tell cmake
-where to find Python. Also the Python headers and libraries are not located as
-they are on Linux and hence they must be specified too. To get rid of a ton of
-compilation warnings from third party software, we add some dedicated C flags:
-
-.. code-block:: bash
-
-  cmake . -DPython_INCLUDE_DIRS=/usr/local/opt/python@3.9/Frameworks/\
-  Python.framework/Versions/Current/include/python3.9/ \
-          -DPython_LIBRARIES=/usr/local/opt/python@3.9/Frameworks/\
-  Python.framework/Versions/Current/lib/libpython3.9.dylib \
-          -DPython_ROOT_DIR=/usr/local/opt/python@3.9/ \
-          -DBOOST_ROOT=/usr/local \
-          -DSYS_ROOT=/usr/local \
-          -DOPTIMIZE=ON \
-          -DCMAKE_C_FLAGS="-isystem /Applications/Xcode.app/Contents/\
-  Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/\
-  Library/Frameworks/OpenGL.framework/Headers/ -isystem /usr/local/opt/\
-  qt@5/lib/QtCore.framework/Headers/ -isystem /usr/local/opt/qt@5/lib/\
-  QtWidgets.framework/Headers/ -isystem /Applications/Xcode.app/\
-  Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/\
-  MacOSX.sdk/System/Library/Frameworks/Security.framework/ \
-  -isystem /usr/local/opt/qt@5/lib/QtGui.framework/Headers/" \
-         -DCMAKE_CXX_FLAGS="-isystem /Applications/Xcode.app/\
-  Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/\
-  System/Library/Frameworks/OpenGL.framework/Headers/ -isystem /usr/local/opt/\
-  qt@5/lib/QtCore.framework/Headers/ -isystem /usr/local/opt/qt@5/lib/\
-  QtWidgets.framework/Headers/ -isystem /Applications/Xcode.app/\
-  Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/\
-  MacOSX.sdk/System/Library/Frameworks/Security.framework/ \
-  -isystem /usr/local/opt/qt@5/lib/QtGui.framework/Headers/"
+  mkdir build
+  cd build
+  cmake .. -DOPTIMIZE=ON -DENABLE_MM=1 -DENABLE_PARASAIL=1 \
+           -DOPEN_MM_PLUGIN_DIR=/lib/x86_64-linux-gnu/openmm/plugins
 
 Building the Project
 --------------------------------------------------------------------------------
@@ -412,6 +342,26 @@ to run multiple jobs at once.
 
 What's next?
 --------------------------------------------------------------------------------
+
+One thing is missing for a fully functional OpenStructure installation.
+The compound library. It is used at various places for connectivity
+information and certain algorithms do not work without.
+Besides an OpenStructure executable, we just built the
+chemdict_tool which converts the PDB chemical component dictionary
+into our internal format:
+
+.. code-block:: bash
+
+  wget https://files.wwpdb.org/pub/pdb/data/monomers/components.cif.gz
+  stage/bin/chemdict_tool create components.cif.gz <compounds.chemlib>
+
+We can rerun cmake and make. All cmake parameters from the original
+configuration remain in the cache.
+
+.. code-block:: bash
+
+  cmake .. -DCOMPOUND_LIB=<compounds.chemlib>
+  make
 
 On Linux and macOS, you can start dng from the command-line. The binaries are
 all located in stage/bin:
@@ -425,6 +375,12 @@ or, to start the command-line interpreter:
 .. code-block:: bash
 
   stage/bin/ost
+  
+But hey, good citizen run the unit tests first:
+
+.. code-block:: bash
+
+  make check
   
 If you repeatedly use OpenStructure, it is recommended to add
 /path/to/ost/stage/bin to your path.
