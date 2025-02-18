@@ -18,7 +18,8 @@ Please do not hesitate to contact us for feedback or troubleshooting:
 For a simple and portable setup, we recommend using a containerized
 solution. OpenStructure provides its own Docker container registry,
 making deployment easier. Deploying a docker image just needs a
-docker pull which typically takes less than a minute. Singularity
+docker pull which typically finishes in about a minute depending
+on your local hardware and internet connection. Singularity
 containers bootstrap from the docker container but must be built
 by the user. Detailed instructions can be found here:
 
