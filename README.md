@@ -38,13 +38,13 @@ use cases worth highlighting.
 ### Benchmarking and Scoring
 
 OpenStructure implements a benchmarking suite for comparing macromolecular
-complexes. To get started, check out the examples in the `examples/scoring`
+complexes. To get started, check out the examples in the [examples/scoring](examples/scoring)
 directory of this repository.
 
 ### Modeling
 
-ProMod3 is a fully featured modeling engine built on top of OpenStructure.
-It powers the SWISS-MODEL web server and provides advanced modeling
+[ProMod3](https://git.scicore.unibas.ch/schwede/ProMod3) is a fully featured modeling engine built on top of OpenStructure.
+It powers the [SWISS-MODEL](https://swissmodel.expasy.org) web server and provides advanced modeling
 capabilities. Learn more here:
 
 [ProMod3 Documentation](https://openstructure.org/promod3)
