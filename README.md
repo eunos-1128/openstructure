@@ -73,4 +73,3 @@ following reference:
  quaternary structure of homo- and hetero-oligomers beyond binary interactions
  by homology, Scientific Reports, 2017 
 
-================= The OpenStructure Team =======================================
