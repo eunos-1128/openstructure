@@ -3,9 +3,9 @@ Structure comparison examples
 
 OpenStructure provides "actions" for general benchmarking use cases.
 
-* compare-structures: Focuses on comparisons involving polymer entities, i.e.
+* **compare-structures**: Focuses on comparisons involving polymer entities, i.e.
   protein, DNA and RNA chains
-* compare-ligand-structures: Focuses on comparisons of interactions between
+* **compare-ligand-structures**: Focuses on comparisons of interactions between
   polymer entities and non-polymer entities, i.e. small molecule ligands
   
 The example commands here assume an OpenStructure installation
