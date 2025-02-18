@@ -14,8 +14,8 @@ Running the computations in containers provide a considerably easier setup than
 compiling OpenStructure from source. Instructions for setup and running
 equivalent computations are available for
 
-* Docker: https://git.scicore.unibas.ch/schwede/openstructure/tree/master/docker
-* Singularity: https://git.scicore.unibas.ch/schwede/openstructure/tree/master/singularity
+* [Docker](https://git.scicore.unibas.ch/schwede/openstructure/tree/master/docker)
+* [Singularity](https://git.scicore.unibas.ch/schwede/openstructure/tree/master/singularity)
 
 The command
 
