@@ -27,7 +27,7 @@ by the user. Detailed instructions can be found here:
 
 OpenStructure is developed and tested across various Linux distributions.
 You can find detailed build instructions and a list of required dependencies here:
-https://openstructure.org/docs/dev/install/
+https://openstructure.org/docs/install/
 
 ## Getting started
 
