@@ -15,19 +15,19 @@ Please do not hesitate to contact us for feedback or troubleshooting:
 
 ## OpenStructure Installation
 
-OpenStructure is developed and tested across various Linux distributions. You can find detailed build instructions and a list of required dependencies here:
-https://openstructure.org/docs/dev/install/
-
-### Prefer Not to Compile it Yourself?
-
 For a simple and portable setup, we recommend using a containerized
 solution. OpenStructure provides its own Docker container registry,
-making deployment easier.
-
-### Containerized Solutions:
+making deployment easier. Deploying a docker image just needs a
+docker pull which typically takes less than a minute. Singularity
+containers bootstrap from the docker container but must be built
+by the user. Detailed instructions can be found here:
 
 * Docker: [OpenStructure Docker Instructions](https://git.scicore.unibas.ch/schwede/openstructure/tree/master/docker)
 * Singularity: [OpenStructure Singularity Instructions](https://git.scicore.unibas.ch/schwede/openstructure/tree/master/singularity)
+
+OpenStructure is developed and tested across various Linux distributions.
+You can find detailed build instructions and a list of required dependencies here:
+https://openstructure.org/docs/dev/install/
 
 ## Getting started
 
