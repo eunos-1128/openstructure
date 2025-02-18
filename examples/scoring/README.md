@@ -34,7 +34,7 @@ default output (out.json):
 ost compare-structures -m model.pdb -r reference.cif.gz --lddt --local-lddt --qs-score
 ```
 
-Example output: [compare-structures_example_out.json]
+An example output can be found [here](compare-structures_example_out.json)
 
 By default, model-reference chains are aligned using Needleman-Wunsch.
 Many benchmarking efforts such as CASP and CAMEO assume residue numbers
@@ -53,7 +53,7 @@ We can compute LDDT-PLI and BiSyRMSD with:
 ost compare-ligand-structures -m model.pdb -r reference.cif.gz -ml *.sdf --rmsd --lddt-pli
 ```
 
-Example output: [compare-ligand-structures_example_out.json]
+An example output can be found [here](compare-ligand-structures_example_out.json)
 
 Again, it is advised to use the `-rna` flag if applicable. In this example,
 reference ligands are directly extracted from the provided mmCIF file based on
