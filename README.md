@@ -6,13 +6,12 @@ such as sequences, alignments and 3D structures.
 
 Please refer to www.openstructure.org for more information and documentation.
 
-Thank you for you interest and enjoy the straightforward way of handling protein
+Thank you for your interest and enjoy the straightforward way of handling protein
 structure data!
 
 Please do not hesitate to contact us for feedback or troubleshooting:
 
- openstructure-users@maillist.unibas.ch
-
+ <a href="mailto:&#111;&#112;&#101;&#110;&#115;&#116;&#114;&#117;&#099;&#116;&#117;&#114;&#101;&#045;&#117;&#115;&#101;&#114;&#115;&#064;&#109;&#097;&#105;&#108;&#108;&#105;&#115;&#116;&#046;&#117;&#110;&#105;&#098;&#097;&#115;&#046;&#099;&#104;">&#111;&#112;&#101;&#110;&#115;&#116;&#114;&#117;&#099;&#116;&#117;&#114;&#101;&#045;&#117;&#115;&#101;&#114;&#115;&#064;&#109;&#097;&#105;&#108;&#108;&#105;&#115;&#116;&#046;&#117;&#110;&#105;&#098;&#097;&#115;&#046;&#099;&#104;</a>
 
 ## OpenStructure Installation
 
