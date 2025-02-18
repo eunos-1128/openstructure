@@ -9,7 +9,7 @@ OpenStructure provides "actions" for general benchmarking use cases.
   polymer entities and non-polymer entities, i.e. small molecule ligands
   
 The example commands here assume an OpenStructure installation
-(compile instructions: https://openstructure.org/docs/dev/install/). 
+(compile instructions: https://openstructure.org/docs/install/). 
 Running the computations in containers provide a considerably easier setup than
 compiling OpenStructure from source. Instructions for setup and running
 equivalent computations are available for
@@ -34,7 +34,9 @@ default output (out.json):
 ost compare-structures -m model.pdb -r reference.cif.gz --lddt --local-lddt --qs-score
 ```
 
-An example output can be found [here](compare-structures_example_out.json)
+An example output can be found [here](compare-structures_example_out.json) and
+we refer to the action documentation for in-depth description of the provided
+data items.
 
 By default, model-reference chains are aligned using Needleman-Wunsch.
 Many benchmarking efforts such as CASP and CAMEO assume residue numbers
@@ -54,6 +56,8 @@ ost compare-ligand-structures -m model.pdb -r reference.cif.gz -ml *.sdf --rmsd 
 ```
 
 An example output can be found [here](compare-ligand-structures_example_out.json)
+and we refer to the action documentation for in-depth description of the provided
+data items.
 
 Again, it is advised to use the `-rna` flag if applicable. In this example,
 reference ligands are directly extracted from the provided mmCIF file based on
