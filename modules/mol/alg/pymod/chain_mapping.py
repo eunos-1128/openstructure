@@ -441,12 +441,13 @@ class ReprResult:
             elif r.GetChemType() == mol.ChemType.AMINOACIDS:
                 exp_atoms = exp_pep_atoms
             else:
-                raise RuntimeError("Something terrible happened... RUN...")
+                raise RuntimeError(f"Residue {r.qualified_name} has unexpected"
+                                   f" chem type {r.GetChemType()}")
             for aname in exp_atoms:
                 a = r.FindAtom(aname)
                 if not a.IsValid():
-                    raise RuntimeError("Something terrible happened... "
-                                       "RUN...")
+                    raise RuntimeError(f"Expected atom {aname} missing from "
+                                      f"{r.qualified_name}")
                 bb_pos.append(a.GetPos())
         return bb_pos
 
@@ -459,7 +460,8 @@ class ReprResult:
             if not at.IsValid():
                 at = r.FindAtom("C3'")
             if not at.IsValid():
-                raise RuntimeError("Something terrible happened... RUN...")
+                raise RuntimeError(f"Residue {r.qualified_name} missing "
+                                   f"expected CA/C3' atom")
             bb_pos.append(at.GetPos())
         return bb_pos
 
