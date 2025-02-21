@@ -433,7 +433,7 @@ class ReprResult:
         """ Helper to extract full backbone positions
         """
         exp_pep_atoms = ["N", "CA", "C"]
-        exp_nuc_atoms = ["\"O5'\"", "\"C5'\"", "\"C4'\"", "\"C3'\"", "\"O3'\""]
+        exp_nuc_atoms = ["O5'", "C5'", "C4'", "C3'", "O3'"]
         bb_pos = geom.Vec3List()
         for r in residues:
             if r.GetChemType() == mol.ChemType.NUCLEOTIDES:
