@@ -781,22 +781,48 @@ def _AlnToFastaStr(aln):
     s2 = aln.GetSequence(1)
     return f">reference:{s1.name}\n{str(s1)}\n>model:{s2.name}\n{str(s2)}"
 
-def _GetInconsistentResidues(alns):
+def _GetInconsistentResidues(alns, ref, mdl):
     lst = list()
     for aln in alns:
+
+        ref_ch = ref.FindChain(aln.GetSequence(0).GetName())
+        mdl_ch = mdl.FindChain(aln.GetSequence(1).GetName())
+
+        if not ref_ch.IsValid():
+            raise RuntimeError("ref lacks requested chain in _GetInconsistentResidues")
+
+        if not mdl_ch.IsValid():
+            raise RuntimeError("mdl lacks requested chain in _GetInconsistentResidues")
+
+        if len(aln.GetSequence(0).GetGaplessString()) != ref_ch.GetResidueCount():
+            raise RuntimeError("aln/chain mismatch in _GetAlignedResidues")
+        if len(aln.GetSequence(1).GetGaplessString()) != mdl_ch.GetResidueCount():
+            raise RuntimeError("aln/chain mismatch in _GetAlignedResidues")
+
+        ref_res = ref_ch.residues
+        mdl_res = mdl_ch.residues
+
+        ref_res_idx = 0
+        mdl_res_idx = 0 
+
         for col in aln:
-            r1 = col.GetResidue(0)
-            r2 = col.GetResidue(1)
-            if r1.IsValid() and r2.IsValid() and r1.GetName() != r2.GetName():
-                ch_1 = r1.GetChain().name
-                num_1 = r1.number.num
-                ins_code_1 = r1.number.ins_code.strip("\u0000")
-                id_1 = f"{ch_1}.{num_1}.{ins_code_1}"
-                ch_2 = r2.GetChain().name
-                num_2 = r2.number.num
-                ins_code_2 = r2.number.ins_code.strip("\u0000")
-                id_2 = f"{ch_2}.{num_2}.{ins_code_2}"
-                lst.append(f"{id_1}-{id_2}")
+            if col[0] != '-' and col[1] != '-':
+                r1 = ref_res[ref_res_idx]
+                r2 = mdl_res[mdl_res_idx]
+                if r1.IsValid() and r2.IsValid() and r1.GetName() != r2.GetName():
+                    ch_1 = r1.GetChain().name
+                    num_1 = r1.number.num
+                    ins_code_1 = r1.number.ins_code.strip("\u0000")
+                    id_1 = f"{ch_1}.{num_1}.{ins_code_1}"
+                    ch_2 = r2.GetChain().name
+                    num_2 = r2.number.num
+                    ins_code_2 = r2.number.ins_code.strip("\u0000")
+                    id_2 = f"{ch_2}.{num_2}.{ins_code_2}"
+                    lst.append(f"{id_1}-{id_2}")
+            if col[0] != '-':
+                ref_res_idx += 1
+            if col[1] != '-':
+                mdl_res_idx += 1
     return lst
 
 def _LocalScoresToJSONDict(score_dict):
@@ -842,29 +868,52 @@ def _PatchScoresToJSONList(interface_dict, score_dict):
             json_list.append(_RoundOrNone(item))
     return json_list
 
-def _GetAlignedResidues(aln):
+def _GetAlignedResidues(aln, ref, mdl):
     aligned_residues = list()
     for a in aln:
         mdl_lst = list()
         ref_lst = list()
+
+        ref_ch = ref.FindChain(a.GetSequence(0).GetName())
+        mdl_ch = mdl.FindChain(a.GetSequence(1).GetName())
+
+        if not ref_ch.IsValid():
+            raise RuntimeError("ref lacks requested chain in _GetAlignedResidues")
+
+        if not mdl_ch.IsValid():
+            raise RuntimeError("mdl lacks requested chain in _GetAlignedResidues")
+
+        if len(a.GetSequence(0).GetGaplessString()) != ref_ch.GetResidueCount():
+            raise RuntimeError("aln/chain mismatch in _GetAlignedResidues")
+        if len(a.GetSequence(1).GetGaplessString()) != mdl_ch.GetResidueCount():
+            raise RuntimeError("aln/chain mismatch in _GetAlignedResidues")
+
+        ref_res = ref_ch.residues
+        mdl_res = mdl_ch.residues
+
+        ref_res_idx = 0
+        mdl_res_idx = 0
+
         for c in a:
-            mdl_r = c.GetResidue(1)
-            ref_r = c.GetResidue(0)
-            if mdl_r.IsValid():
+            if c[1] != '-':
+                mdl_r = mdl_res[mdl_res_idx]
                 olc = mdl_r.one_letter_code
                 num = mdl_r.GetNumber().num
                 ins_code = mdl_r.GetNumber().ins_code.strip("\u0000")
                 mdl_lst.append({"olc": olc,
                                 "num": f"{num}.{ins_code}"})
+                mdl_res_idx += 1
             else:
                 mdl_lst.append(None)
 
-            if ref_r.IsValid():
+            if c[0] != '-':
+                ref_r = ref_res[ref_res_idx]
                 olc = ref_r.one_letter_code
                 num = ref_r.GetNumber().num
                 ins_code = ref_r.GetNumber().ins_code.strip("\u0000")
                 ref_lst.append({"olc": olc,
                                 "num": f"{num}.{ins_code}"})
+                ref_res_idx += 1
             else:
                 ref_lst.append(None)
 
@@ -901,7 +950,7 @@ def _Process(model, reference, args, model_format, reference_format):
                             mdl_map_pep_seqid_thr = args.chem_map_seqid_thresh,
                             mdl_map_nuc_seqid_thr = args.chem_map_seqid_thresh)
 
-    ir = _GetInconsistentResidues(scorer.aln)
+    ir = _GetInconsistentResidues(scorer.aln, scorer.target, scorer.model)
     if len(ir) > 0 and args.enforce_consistency:
         raise RuntimeError(f"Inconsistent residues observed: {' '.join(ir)}")
 
@@ -916,13 +965,16 @@ def _Process(model, reference, args, model_format, reference_format):
     out["inconsistent_residues"] = ir
 
     if args.dump_aligned_residues:
-        out["aligned_residues"] = _GetAlignedResidues(scorer.aln)
+        out["aligned_residues"] = _GetAlignedResidues(scorer.aln, scorer.target,
+                                                      scorer.model)
 
     if args.dump_pepnuc_alns:
         out["pepnuc_aln"] = [_AlnToFastaStr(aln) for aln in scorer.pepnuc_aln]
     
     if args.dump_pepnuc_aligned_residues:
-        out["pepnuc_aligned_residues"] = _GetAlignedResidues(scorer.pepnuc_aln)
+        out["pepnuc_aligned_residues"] = _GetAlignedResidues(scorer.pepnuc_aln,
+                                                             scorer.pepnuc_target,
+                                                             scorer.pepnuc_model)
 
     if args.lddt:
         out["lddt"] = _RoundOrNone(scorer.lddt)

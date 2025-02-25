@@ -63,15 +63,6 @@ class TestChainMapper(unittest.TestCase):
     self.assertEqual(str(mapper.polynuc_seqs[0]), str(nuc_s_one))
     self.assertEqual(str(mapper.polynuc_seqs[1]), str(nuc_s_two))
 
-    for s in mapper.polypep_seqs:
-      self.assertTrue(s.HasAttachedView())
-    for s in mapper.polynuc_seqs:
-      self.assertTrue(s.HasAttachedView())
-    self.assertTrue(_CompareViews(mapper.polypep_seqs[0].GetAttachedView(), pep_view_one))
-    self.assertTrue(_CompareViews(mapper.polypep_seqs[1].GetAttachedView(), pep_view_two))
-    self.assertTrue(_CompareViews(mapper.polynuc_seqs[0].GetAttachedView(), nuc_view_one))
-    self.assertTrue(_CompareViews(mapper.polynuc_seqs[1].GetAttachedView(), nuc_view_two))
-
     # peptide sequences should be in the same group, the nucleotides not
     self.assertEqual(len(mapper.chem_group_alignments), 3)
     self.assertEqual(len(mapper.chem_groups), 3)
@@ -89,11 +80,6 @@ class TestChainMapper(unittest.TestCase):
     self.assertEqual(str(mapper.chem_group_ref_seqs[0]), str(pep_s_one))
     self.assertEqual(str(mapper.chem_group_ref_seqs[1]), str(nuc_s_one))
     self.assertEqual(str(mapper.chem_group_ref_seqs[2]), str(nuc_s_two))
-    for s in mapper.chem_group_ref_seqs:
-      self.assertTrue(s.HasAttachedView()) 
-    self.assertTrue(_CompareViews(mapper.chem_group_ref_seqs[0].GetAttachedView(), pep_view_one))
-    self.assertTrue(_CompareViews(mapper.chem_group_ref_seqs[1].GetAttachedView(), nuc_view_one))
-    self.assertTrue(_CompareViews(mapper.chem_group_ref_seqs[2].GetAttachedView(), nuc_view_two))
 
     # check chem_group_alignments attribute
     self.assertEqual(len(mapper.chem_group_alignments), 3)
@@ -108,14 +94,6 @@ class TestChainMapper(unittest.TestCase):
     self.assertEqual(s0.GetGaplessString(), str(nuc_s_one))
     s0 = mapper.chem_group_alignments[2].GetSequence(0)
     self.assertEqual(s0.GetGaplessString(), str(nuc_s_two))
-    self.assertTrue(mapper.chem_group_alignments[0].GetSequence(0).HasAttachedView())
-    self.assertTrue(mapper.chem_group_alignments[0].GetSequence(1).HasAttachedView())
-    self.assertTrue(mapper.chem_group_alignments[1].GetSequence(0).HasAttachedView())
-    self.assertTrue(mapper.chem_group_alignments[2].GetSequence(0).HasAttachedView())
-    self.assertTrue(_CompareViews(mapper.chem_group_alignments[0].GetSequence(0).GetAttachedView(), pep_view_one))
-    self.assertTrue(_CompareViews(mapper.chem_group_alignments[0].GetSequence(1).GetAttachedView(), pep_view_two))
-    self.assertTrue(_CompareViews(mapper.chem_group_alignments[1].GetSequence(0).GetAttachedView(), nuc_view_one))
-    self.assertTrue(_CompareViews(mapper.chem_group_alignments[2].GetSequence(0).GetAttachedView(), nuc_view_two))
 
     # ensure that error is triggered if there are insertion codes
     # and resnum_alignments are enabled
@@ -217,19 +195,6 @@ class TestChainMapper(unittest.TestCase):
     self.assertEqual(alns[0][1].GetSequence(1).GetGaplessString(), str(mdl_pep_s_two))
     self.assertEqual(alns[2][0].GetSequence(0).GetGaplessString(), str(ref_nuc_s_two))
     self.assertEqual(alns[2][0].GetSequence(1).GetGaplessString(), str(mdl_nuc_s_one))
-
-    self.assertTrue(alns[0][0].GetSequence(0).HasAttachedView())
-    self.assertTrue(alns[0][0].GetSequence(1).HasAttachedView())
-    self.assertTrue(alns[0][1].GetSequence(0).HasAttachedView())
-    self.assertTrue(alns[0][1].GetSequence(1).HasAttachedView())
-    self.assertTrue(alns[2][0].GetSequence(0).HasAttachedView())
-    self.assertTrue(alns[2][0].GetSequence(1).HasAttachedView())
-    self.assertTrue(_CompareViews(alns[0][0].GetSequence(0).GetAttachedView(),ref_pep_view_one))
-    self.assertTrue(_CompareViews(alns[0][0].GetSequence(1).GetAttachedView(),mdl_pep_view_one))
-    self.assertTrue(_CompareViews(alns[0][1].GetSequence(0).GetAttachedView(),ref_pep_view_one))
-    self.assertTrue(_CompareViews(alns[0][1].GetSequence(1).GetAttachedView(),mdl_pep_view_two))
-    self.assertTrue(_CompareViews(alns[2][0].GetSequence(0).GetAttachedView(),ref_nuc_view_two))
-    self.assertTrue(_CompareViews(alns[2][0].GetSequence(1).GetAttachedView(),mdl_nuc_view_one))
 
     # test for unmapped mdl chains, i.e. chains in the mdl that are not
     # present in ref
@@ -355,7 +320,7 @@ class TestChainMapper(unittest.TestCase):
       self.assertTrue(mdl_s is not None)
       self.assertEqual(ref_s_type, mdl_s_type)
 
-      aln = mapper.Align(ref_s, mdl_s, ref_s_type)
+      aln = mapper.NWAlign(ref_s, mdl_s, ref_s_type)
       self.assertEqual(ref_aln.GetSequence(0).GetName(),
                        aln.GetSequence(0).GetName())
       self.assertEqual(ref_aln.GetSequence(1).GetName(),
@@ -414,6 +379,18 @@ class TestChainMapper(unittest.TestCase):
       repr_mapping = global_repr_result.GetFlatChainMapping()
       for ref_ch, mdl_ch in repr_mapping.items():
           self.assertEqual(mdl_ch, flat_mapping[ref_ch])
+
+  def test_resnum_aln_mapping(self):
+    ref = _LoadFile("3l1p.1.pdb")
+    mdl = _LoadFile("3l1p.1_model.pdb")
+    mapper = ChainMapper(ref, resnum_alignments=True)
+
+    # Again, no in depth testing. Its only about checking if residue number
+    # alignments run through
+
+    # lDDT based chain mappings
+    naive_lddt_res = mapper.GetlDDTMapping(mdl, strategy="naive")
+    self.assertEqual(naive_lddt_res.mapping, [['X', 'Y'],[None],['Z']])
 
   def test_misc(self):
 

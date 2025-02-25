@@ -384,7 +384,7 @@ class ContactScorerResultIPS:
 
         :type: :class:`int`
         """
-        return self._n_trg_contacts
+        return self._n_trg_int_res
 
     @property
     def n_mdl_int_res(self):
@@ -738,19 +738,29 @@ class ContactScorer:
         trg_int_r = (trg_ch2, trg_ch1)
         mdl_int_r = (mdl_ch2, mdl_ch1)
 
+        trg_contacts = None
         if trg_int in self.cent1.contacts:
-            n_trg = len(self.cent1.contacts[trg_int])
+            trg_contacts = self.cent1.contacts[trg_int]
         elif trg_int_r in self.cent1.contacts:
-            n_trg = len(self.cent1.contacts[trg_int_r])
-        else:
-            n_trg = 0
+            trg_contacts = self.cent1.contacts[trg_int_r]
 
-        if mdl_int in self.cent2.contacts:
-            n_mdl = len(self.cent2.contacts[mdl_int])
-        elif mdl_int_r in self.cent2.contacts:
-            n_mdl = len(self.cent2.contacts[mdl_int_r])
+        if trg_contacts is None:
+            n_trg = 0
         else:
+            n_trg = len(set([x[0] for x in trg_contacts]))
+            n_trg += len(set([x[1] for x in trg_contacts]))
+
+        mdl_contacts = None
+        if mdl_int in self.cent2.contacts:
+            mdl_contacts = self.cent2.contacts[mdl_int]
+        elif mdl_int_r in self.cent2.contacts:
+            mdl_contacts = self.cent2.contacts[mdl_int_r]
+
+        if mdl_contacts is None:
             n_mdl = 0
+        else:
+            n_mdl = len(set([x[0] for x in mdl_contacts]))
+            n_mdl += len(set([x[1] for x in mdl_contacts]))
 
         _, _, n_union, n_intersection = self._MappedInterfaceScores(trg_int, mdl_int)
         return ContactScorerResultIPS(n_trg, n_mdl, n_union, n_intersection)
