@@ -3006,11 +3006,6 @@ def _GetRefPos(trg, mdl, trg_msas, mdl_alns, max_pos = None):
     """ Extracts reference positions which are present in trg and mdl
     """
 
-    # select only backbone atoms, makes processing simpler later on
-    # (just select res.atoms[0].GetPos() as ref pos)
-    bb_trg = trg.Select("aname=\"CA\",\"C3'\"")
-    bb_mdl = mdl.Select("aname=\"CA\",\"C3'\"")
-
     # mdl_alns are pairwise, let's construct MSAs
     mdl_msas = list()
     for aln_list in mdl_alns:
@@ -3021,6 +3016,11 @@ def _GetRefPos(trg, mdl, trg_msas, mdl_alns, max_pos = None):
         else:
             mdl_msas.append(seq.CreateAlignment())
 
+    # fetch positions of all backbone atoms
+    bb_trg = _GetBBPos(trg)
+    bb_mdl = _GetBBPos(mdl)
+
+    # there are the actual return values
     trg_pos = list()
     mdl_pos = list()
 
@@ -3068,6 +3068,23 @@ def _GetRefPos(trg, mdl, trg_msas, mdl_alns, max_pos = None):
 
     return (trg_pos, mdl_pos)
 
+def _GetBBPos(ent):
+    """ Helper for _GetRefPos
+
+    Returns a dict with key: chain name and value: a geom.Vec3List of backbone
+    atom positions. Assumes that either CA or C3' is always there.
+    """
+    bb = dict()
+    for ch in ent.chains:
+        l = geom.Vec3List()
+        for r in ch.residues:
+            a = r.FindAtom("CA")
+            if not a.IsValid():
+                a = r.FindAtom("C3'")
+            l.append(a.GetPos())
+        bb[ch.name] = l
+    return bb
+
 def _GetFullyCoveredIndices(msa):
     """ Helper for _GetRefPos
 
@@ -3104,7 +3121,7 @@ def _RefIndicesToColumnIndices(msa, indices):
             ref_idx += 1
     return [mapping[i] for i in indices]
 
-def _ExtractMSAPos(msa, s_idx, indices, view):
+def _ExtractMSAPos(msa, s_idx, indices, bb):
     """ Helper for _GetRefPos
 
     Returns a geom.Vec3List containing positions refering to given msa sequence.
@@ -3113,15 +3130,14 @@ def _ExtractMSAPos(msa, s_idx, indices, view):
     Indices refers to column indices in msa!
     """
     s = msa.GetSequence(s_idx)
-    ch = view.FindChain(s.GetName())
+    ch_bb = bb[s.GetName()]
 
     # sanity check
-    assert(len(s.GetGaplessString()) == ch.GetResidueCount())
-
-    residues = ch.residues
+    assert(len(s.GetGaplessString()) == len(ch_bb))
 
     residue_idx = [s.GetResidueIndex(i) for i in indices]
-    return geom.Vec3List([residues[i].atoms[0].pos for i in residue_idx])
+    return geom.Vec3List([ch_bb[i] for i in residue_idx])
+
 
 def _NChemGroupMappings(ref_chains, mdl_chains):
     """ Number of mappings within one chem group
