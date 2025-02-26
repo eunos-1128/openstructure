@@ -621,9 +621,6 @@ class ChainMapper:
     def polypep_seqs(self):
         """Sequences of peptide chains in :attr:`~target`
 
-        Respective :class:`EntityView` from *target* for each sequence s are
-        available as ``s.GetAttachedView()``
-
         :type: :class:`ost.seq.SequenceList`
         """
         return self._polypep_seqs
@@ -631,9 +628,6 @@ class ChainMapper:
     @property
     def polynuc_seqs(self):
         """Sequences of nucleotide chains in :attr:`~target`
-
-        Respective :class:`EntityView` from *target* for each sequence s are
-        available as ``s.GetAttachedView()``
 
         :type: :class:`ost.seq.SequenceList`
         """
@@ -1480,7 +1474,6 @@ class ChainMapper:
         * filters view by chain lengths, see *min_pep_length* and
           *min_nuc_length* in constructor
         * Extracts atom sequences for each chain in that view
-        * Attaches corresponding :class:`ost.mol.EntityView` to each sequence
         * If residue number alignments are used, strictly increasing residue
           numbers without insertion codes are ensured in each chain
 
@@ -1489,8 +1482,7 @@ class ChainMapper:
         :returns: Tuple with 3 elements: 1) :class:`ost.mol.EntityView`
                   containing peptide and nucleotide residues 2)
                   :class:`ost.seq.SequenceList` containing ATOMSEQ sequences
-                  for each polypeptide chain in returned view, sequences have
-                  :class:`ost.mol.EntityView` of according chains attached
+                  for each polypeptide chain in returned view
                   3) same for polynucleotide chains
         """
         view = ent.CreateEmptyView()
@@ -1586,11 +1578,9 @@ class ChainMapper:
         Performs Needleman-Wunsch alignment with parameterization
         setup at ChainMapper construction
 
-        :param s1: First sequence to align - must have view attached in case
-                   of resnum_alignments
+        :param s1: First sequence to align
         :type s1: :class:`ost.seq.SequenceHandle`
-        :param s2: Second sequence to align - must have view attached in case
-                   of resnum_alignments
+        :param s2: Second sequence to align
         :type s2: :class:`ost.seq.SequenceHandle`
         :param stype: Type of sequences to align, must be in
                       [:class:`ost.mol.ChemType.AMINOACIDS`,
