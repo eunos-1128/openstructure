@@ -392,6 +392,81 @@ class TestChainMapper(unittest.TestCase):
     naive_lddt_res = mapper.GetlDDTMapping(mdl, strategy="naive")
     self.assertEqual(naive_lddt_res.mapping, [['X', 'Y'],[None],['Z']])
 
+  def test_seqres(self):
+    ref = _LoadFile("3l1p.1.pdb")
+    mdl = _LoadFile("3l1p.1_model.pdb")
+
+    seqres = seq.CreateSequenceList()
+    seqres.AddSequence(seq.CreateSequence("1", "GAMDMKALQKELEQFAKLLKQKRITLGYTQA"
+                                               "DVGLTLGVLFGKVFSQTTISRFEALQLSLKN"
+                                               "MSKLRPLLEKWVEEADNNENLQEISKSETLV"
+                                               "QARKRKRTSIENRVRWSLETMFLKSPKPSLQ"
+                                               "QITHIANQLGLEKDVVRVWFSNRRQKGKRSS"))
+    seqres.AddSequence(seq.CreateSequence("2", "TCCACATTTGAAAGGCAAATGGA"))
+    seqres.AddSequence(seq.CreateSequence("3", "ATCCATTTGCCTTTCAAATGTGG"))
+    trg_seqres_mapping = {"A": "1",
+                          "B": "1",
+                          "C": "2",
+                          "D": "3"}
+
+    mapper = ChainMapper(ref, resnum_alignments=True,
+                         seqres = seqres,
+                         trg_seqres_mapping = trg_seqres_mapping)
+
+    self.assertEqual(mapper.chem_groups, [["A","B"], ["C"], ["D"]])
+
+    # check a full chain mapping run
+    naive_lddt_res = mapper.GetlDDTMapping(mdl, strategy="naive")
+    self.assertEqual(naive_lddt_res.mapping, [['X', 'Y'],[None],['Z']])
+
+    # check if errors are raised for input checks
+    with self.assertRaises(RuntimeError):    
+        ChainMapper(ref, seqres=seqres)
+
+    with self.assertRaises(RuntimeError):
+        ChainMapper(ref, trg_seqres_mapping=trg_seqres_mapping)
+
+    with self.assertRaises(RuntimeError):
+        ChainMapper(ref, seqres=seqres,
+                    trg_seqres_mapping=trg_seqres_mapping)
+
+    seqres_duplicate = seq.CreateSequenceList()
+    seqres_duplicate.AddSequence(seq.CreateSequence("1", "GAMDMKALQKELEQFAKLLKQKRITLGYTQA"
+                                               "DVGLTLGVLFGKVFSQTTISRFEALQLSLKN"
+                                               "MSKLRPLLEKWVEEADNNENLQEISKSETLV"
+                                               "QARKRKRTSIENRVRWSLETMFLKSPKPSLQ"
+                                               "QITHIANQLGLEKDVVRVWFSNRRQKGKRSS"))
+    seqres_duplicate.AddSequence(seq.CreateSequence("2", "TCCACATTTGAAAGGCAAATGGA"))
+    seqres_duplicate.AddSequence(seq.CreateSequence("3", "ATCCATTTGCCTTTCAAATGTGG"))
+    seqres_duplicate.AddSequence(seq.CreateSequence("3", "ATCCATTTGCCTTTCAAATGTGG"))
+
+    with self.assertRaises(RuntimeError):
+        ChainMapper(ref, seqres=seqres_duplicate,
+                    trg_seqres_mapping=trg_seqres_mapping,
+                    resnum_alignments=True)
+
+    trg_seqres_mapping_incomplete = {"A": "1",
+                                     "B": "1",
+                                     "C": "2"}
+
+
+    with self.assertRaises(RuntimeError):
+        ChainMapper(ref, seqres=seqres,
+                    trg_seqres_mapping=trg_seqres_mapping_incomplete,
+                    resnum_alignments=True)
+
+
+    # check if exact matches are enforced
+    ref.residues[0].SetOneLetterCode('X')
+    mapper = ChainMapper(ref, resnum_alignments=True,
+                         seqres = seqres,
+                         trg_seqres_mapping = trg_seqres_mapping)
+
+    self.assertRaises(RuntimeError, mapper._ComputeChemGroups)
+
+
+
+
   def test_misc(self):
 
       # check for triggered error when no chain fulfills length threshold

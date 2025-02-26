@@ -488,14 +488,18 @@ class ChainMapper:
 
     Chain mapping is a three step process:
 
-    * Group chemically identical chains in *target* using pairwise
-      alignments that are either computed with Needleman-Wunsch (NW) or
-      simply derived from residue numbers (*resnum_alignments* flag).
-      In case of NW, *pep_subst_mat*, *pep_gap_open* and *pep_gap_ext*
-      and their nucleotide equivalents are relevant. Two chains are
-      considered identical if they fulfill the *pep_seqid_thr* and
-      have at least *min_pep_length* aligned residues. Same logic
-      is applied for nucleotides with respective thresholds.
+    * Group chemically identical chains in *target* into so called chem
+      groups. There are two options to achieve this:
+      1) using pairwise alignments that are either computed with
+      Needleman-Wunsch (NW) or simply derived from residue numbers
+      (*resnum_alignments* flag). In case of NW, *pep_subst_mat*, *pep_gap_open*
+      and *pep_gap_ext* and their nucleotide equivalents are relevant. Two
+      chains are considered identical if they fulfill the *pep_seqid_thr* and
+      have at least *min_pep_length* aligned residues. Same logic is applied
+      for nucleotides with respective thresholds.
+      2) specify seqres sequences and provide the mapping manually. This can
+      be useful if you're loading data from an mmCIF file where you have mmCIF
+      entity information.
 
     * Map chains in an input model to these groups. Parameters for generating
       alignments are the same as above. Model chains are mapped to the chem
@@ -567,6 +571,21 @@ class ChainMapper:
     :param mdl_map_nuc_seqid_thr: Nucleotide equivalent of
                                   *mdl_map_pep_seqid_thr*
     :type mdl_map_nuc_seqid_thr: :class:`float`
+    :param seqres: SEQRES sequences. All polymer chains in *target* will be
+                   aligned to these sequences. This only works if
+                   *resnum_alignments* is enabled and an error is raised
+                   otherwise. Additionally, you need to manually specify
+                   a mapping of the polymer chains using *trg_seqres_mapping*
+                   and an error is raised otherwise. The one letter codes in
+                   the structure must exactly match the respective characters
+                   in seqres and an error is raised if not. These seqres
+                   sequences are set as :attr:`~chem_group_ref_seqs` and will
+                   thus influence the mapping of model chains.
+    :type seqres: :class:`ost.seq.SequenceList`
+    :param trg_seqres_mapping: Maps each polymer chain in *target* to a sequence
+                               in *seqres*. It's a :class:`dict` with chain name
+                               as key and seqres sequence name as value.
+    :type trg_seqres_mapping: :class:`dict`
     """
     def __init__(self, target, resnum_alignments=False,
                  pep_seqid_thr = 95., nuc_seqid_thr = 95., 
@@ -576,8 +595,20 @@ class ChainMapper:
                  min_pep_length = 6, min_nuc_length = 4,
                  n_max_naive = 1e8,
                  mdl_map_pep_seqid_thr = 0.,
-                 mdl_map_nuc_seqid_thr = 0.):
+                 mdl_map_nuc_seqid_thr = 0.,
+                 seqres = None,
+                 trg_seqres_mapping = None):
 
+        # input parameter check
+        seqres_params_set = sum([seqres is not None,
+                                 trg_seqres_mapping is not None])
+        if seqres_params_set not in [0, 2]:
+            raise RuntimeError("Must either give both, seqres and "
+                               "trg_seqres_mapping, or none of them.")
+        if seqres_params_set == 2:
+            if not resnum_alignments:
+                raise RuntimeError("Must enable resnum_alignments if seqres "
+                                   "information is provided")
         # attributes
         self.resnum_alignments = resnum_alignments
         self.pep_seqid_thr = pep_seqid_thr
@@ -593,6 +624,9 @@ class ChainMapper:
         self.nuc_subst_mat = nuc_subst_mat
         self.nuc_gap_open = nuc_gap_open
         self.nuc_gap_ext = nuc_gap_ext
+        self.seqres = seqres
+        self.trg_seqres_mapping = trg_seqres_mapping
+        self.seqres_set = seqres_params_set == 2
 
         # lazy computed attributes
         self._chem_groups = None
@@ -603,6 +637,41 @@ class ChainMapper:
         # target structure preprocessing
         self._target, self._polypep_seqs, self._polynuc_seqs = \
         self.ProcessStructure(target)
+
+        # input parameter check
+        if self.seqres_set:
+            # check if seqres names, i.e. entity ids, are unique
+            entity_ids = set()
+            for s in self.seqres:
+                sname = s.GetName()
+                if sname in entity_ids:
+                    raise RuntimeError(f"Sequence names in seqres param must "
+                                       f"be unique and refer to entity ids. "
+                                       f"Duplicate sequence name: \"{sname}\"")
+                entity_ids.add(sname)
+            # check if entity ids in trg_seqres_mapping are all covered
+            # in seqres
+            for cname, entity_id in self.trg_seqres_mapping.items():
+                if entity_id not in entity_ids:
+                    raise RuntimeError(f"trg_seqres_mapping contains entity id "
+                                       f"for which no seqres is given: "
+                                       f"cname: \"{cname}\", entity id: "
+                                       f"\"{entity_id}\"")
+            # check if all sequences in self.polypep_seqs and self.polynuc_seqs
+            # have a mapping in trg_seqres_mapping
+            for s in self.polypep_seqs:
+                if s.GetName() not in self.trg_seqres_mapping:
+                    raise RuntimeError(f"If seqres information is provided, "
+                                       f"all polymer chains must be covered "
+                                       f"by trg_seqres_mapping. Missing "
+                                       f"mapping for chain \"{s.GetName()}\"")
+            for s in self.polynuc_seqs:
+                if s.GetName() not in self.trg_seqres_mapping:
+                    raise RuntimeError(f"If seqres information is provided, "
+                                       f"all polymer chains must be covered "
+                                       f"by trg_seqres_mapping. Missing "
+                                       f"mapping for chain \"{s.GetName()}\"")
+
 
     @property
     def target(self):
@@ -1599,6 +1668,46 @@ class ChainMapper:
             raise RuntimeError("Invalid ChemType")
         return aln
 
+    def SEQRESAlign(self, seqres, s, s_ent):
+        """ Access to internal sequence alignment functionality
+
+        Performs alignment on SEQRES. Residue numbers for *s* are
+        extracted from *s_ent*. Residue numbers start from 1, i.e.
+        1 aligns to the first element in *seqres*.
+
+        :param seqres: SEQRES sequence
+        :type seqres: :class:`ost.seq.SequenceHandle`
+        :param s: Sequence to align
+        :type s: :class:`ost.seq.SequenceHandle`
+        :param s_ent: Structure which must contain a chain of same name as *s*.
+                      This chain must have the exact same number of residues
+                      as characters in *s*.
+        :type s_ent: :class:`ost.mol.EntityView`/:class:`ost.mol.EntityHandle`
+        """
+
+        ch = s_ent.FindChain(s.name)
+
+        if not ch.IsValid():
+            raise RuntimeError("s_ent lacks required chain in SEQRESAlign")
+
+        if len(s) != ch.GetResidueCount():
+            raise RuntimeError("Sequence/structure mismatch in SEQRESAlign")
+
+        rnums = [r.GetNumber().GetNum() for r in ch.residues]
+        max_rnum = max(len(seqres), max(rnums))
+
+        # potentially add some trailing gaps
+        seqres_s = seqres.GetGaplessString() + '-'*(max_rnum-len(seqres))
+
+        olcs = ['-'] * max_rnum
+        for olc, num in zip(s, rnums):
+            olcs[num-1] = olc
+
+        aln = seq.CreateAlignment()
+        aln.AddSequence(seq.CreateSequence(seqres.GetName(), seqres_s))
+        aln.AddSequence(seq.CreateSequence(s.GetName(), ''.join(olcs)))
+        return aln
+
     def ResNumAlign(self, s1, s2, s1_ent, s2_ent):
         """ Access to internal sequence alignment functionality
 
@@ -1661,9 +1770,12 @@ class ChainMapper:
         :attr:`~chem_group_types`
         """
 
-        self._chem_group_alignments, self._chem_group_types =\
-        self._ChemGroupAlignmentsFromATOMSEQ()
-
+        if self.seqres_set:
+            self._chem_group_alignments, self._chem_group_types =\
+            self._ChemGroupAlignmentsFromSEQRES()
+        else:
+            self._chem_group_alignments, self._chem_group_types =\
+            self._ChemGroupAlignmentsFromATOMSEQ()
 
         self._chem_group_ref_seqs = seq.CreateSequenceList()
         for a in self.chem_group_alignments:
@@ -1678,6 +1790,70 @@ class ChainMapper:
                 s = a.GetSequence(s_idx)
                 group.append(s.GetName())
             self._chem_groups.append(group)
+
+
+    def _ChemGroupAlignmentsFromSEQRES(self):
+        """ Groups target sequences based on SEQRES
+
+        returns tuple that can be set as self._chem_group_alignments and
+        self._chem_group_types
+        """
+        pep_groups = self._GroupSequencesSEQRES(self.polypep_seqs)
+        nuc_groups = self._GroupSequencesSEQRES(self.polynuc_seqs)
+        group_types = [mol.ChemType.AMINOACIDS] * len(pep_groups)
+        group_types += [mol.ChemType.NUCLEOTIDES] * len(nuc_groups)
+        groups = pep_groups
+        groups.extend(nuc_groups)
+
+        return (groups, group_types)
+
+
+    def _GroupSequencesSEQRES(self, poly_seqs):
+
+        alns = dict()
+
+        for poly_seq in poly_seqs:
+            sname = poly_seq.GetName()
+            seqres_name = self.trg_seqres_mapping[sname]
+            if seqres_name not in alns:
+                aln = seq.CreateAlignment()
+                seqres = None
+                for s in self.seqres:
+                    if s.GetName() == seqres_name:
+                        seqres = s
+                        break
+                if seqres is None:
+                    # each element in self.trg_seqres_mapping is guaranteed
+                    # to have a SEQRES counterpart as checked in ChainMapper
+                    # constructor. So we should never end up here.
+                    raise RuntimeError("You should never get here - contact "
+                                       "OST developer")
+                aln.AddSequence(seqres)
+                alns[seqres_name] = aln
+            seqres = alns[seqres_name].GetSequence(0)
+            aln_length = seqres.GetLength()
+            atomseq = ['-'] * aln_length
+            trg_chain = self.target.FindChain(sname)
+            assert(trg_chain.IsValid())
+            assert(trg_chain.GetResidueCount() == len(poly_seq))
+            for olc, r in zip(poly_seq, trg_chain.residues):
+                num = r.GetNumber().GetNum()
+                if num < 1 or num > aln_length:
+                    raise RuntimeError(f"Observed residue with invalid number: "
+                                       f"\"{r}\" which cannot be aligned to "
+                                       f"seqres with id \"{seqres_name}\"")
+                if olc != seqres[num-1]:
+                    raise RuntimeError(f"Sequence mismatch of residue \"{r}\" "
+                                       f"with olc \"{olc}\" and residue number "
+                                       f"\"{num}\". Character at that location "
+                                       f"in seqres: \"{seqres[num-1]}\"."
+                                       f"Seqres name: \"{seqres_name}\"")
+                atomseq[num-1] = olc
+            atomseq = ''.join(atomseq)
+            alns[seqres_name].AddSequence(seq.CreateSequence(sname, atomseq))
+
+        return [aln for aln in alns.values()]
+
 
     def _ChemGroupAlignmentsFromATOMSEQ(self):
         """ Groups target sequences based on ATOMSEQ
@@ -1851,7 +2027,9 @@ class ChainMapper:
         scored_alns = list()
         for ref_idx, ref_seq in enumerate(ref_seqs):
             if ref_types[ref_idx] == s_type:
-                if self.resnum_alignments:
+                if self.seqres_set:
+                    aln = self.SEQRESAlign(ref_seq, s, s_ent)
+                elif self.resnum_alignments:
                     aln = self.ResNumAlign(ref_seq, s, self.target, s_ent)
                 else:
                     aln = self.NWAlign(ref_seq, s, s_type)
