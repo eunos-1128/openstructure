@@ -83,16 +83,16 @@ class TestChainMapper(unittest.TestCase):
 
     # check chem_group_alignments attribute
     self.assertEqual(len(mapper.chem_group_alignments), 3)
-    self.assertEqual(mapper.chem_group_alignments[0].GetCount(), 2)
-    self.assertEqual(mapper.chem_group_alignments[1].GetCount(), 1)
-    self.assertEqual(mapper.chem_group_alignments[2].GetCount(), 1)
-    s0 = mapper.chem_group_alignments[0].GetSequence(0)
-    s1 = mapper.chem_group_alignments[0].GetSequence(1)
+    self.assertEqual(mapper.chem_group_alignments[0].GetCount(), 3)
+    self.assertEqual(mapper.chem_group_alignments[1].GetCount(), 2)
+    self.assertEqual(mapper.chem_group_alignments[2].GetCount(), 2)
+    s0 = mapper.chem_group_alignments[0].GetSequence(1)
+    s1 = mapper.chem_group_alignments[0].GetSequence(2)
     self.assertEqual(s0.GetGaplessString(), str(pep_s_one))
     self.assertEqual(s1.GetGaplessString(), str(pep_s_two))
-    s0 = mapper.chem_group_alignments[1].GetSequence(0)
+    s0 = mapper.chem_group_alignments[1].GetSequence(1)
     self.assertEqual(s0.GetGaplessString(), str(nuc_s_one))
-    s0 = mapper.chem_group_alignments[2].GetSequence(0)
+    s0 = mapper.chem_group_alignments[2].GetSequence(1)
     self.assertEqual(s0.GetGaplessString(), str(nuc_s_two))
 
     # ensure that error is triggered if there are insertion codes
