@@ -125,11 +125,22 @@ public:
       //   * loop_ (case insensitive)
       //   * stop_ (case insensitive)
       //   * global_ (case insensitive)
+
+      bool is_multiline = false;
       bool needs_quotes = false;
+
+      // newline in string
+      for(char c: string_value) {
+        if(c == '\n') {
+          is_multiline = true;
+          break;
+        }
+      }
 
       // space in string
       for(char c: string_value) {
-        if(isspace(c)) {
+        if(isspace(c) && c != '\n') {
+          // linebreaks evaluate to true in isspace but do not require quotes
           needs_quotes = true;
           break;
         }
@@ -219,9 +230,16 @@ public:
         }
       }
 
-      if(needs_quotes) {
+      if(is_multiline && needs_quotes) {
+        value.value_ = "\n;\"" + string_value + "\"\n;\n";
+      }
+      else if(needs_quotes) {
         value.value_ = "\"" + string_value + "\"";
-      } else {
+      }
+      else if(is_multiline) {
+        value.value_ = "\n;" + string_value + "\n;\n";
+      }
+      else {
         value.value_ = string_value;
       }
     }
@@ -315,9 +333,14 @@ public:
     desc_.ToStream(s);
     int desc_size = desc_.GetSize();
     for(size_t i = 0; i < data_.size(); ++i) {
-      s << data_[i].GetValue();
+      const String& v = data_[i].GetValue();
+      s << v;
+      bool ends_with_newline = v.back() == '\n';
       if((i+1) % desc_size == 0) {
-        s << std::endl;
+        // no need for newline if the last item ended with a newline anyways
+        if(!ends_with_newline) {
+          s << std::endl;
+        }
       } else {
         s << ' ';
       }
