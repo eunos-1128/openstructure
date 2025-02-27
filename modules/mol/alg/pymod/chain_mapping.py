@@ -1183,36 +1183,36 @@ class ChainMapper:
         mapping = None
 
         if strategy.startswith("greedy"):
-          # get transforms of any mdl chain onto any trg chain in same chem
-          # group that fulfills gdtts threshold
-          initial_transforms = list()
-          initial_mappings = list()
-          for trg_pos, trg_chains, mdl_pos, mdl_chains in zip(trg_group_pos,
-                                                              self.chem_groups,
-                                                              mdl_group_pos,
-                                                              chem_mapping):
-              for t_pos, t in zip(trg_pos, trg_chains):
-                  for m_pos, m in zip(mdl_pos, mdl_chains):
-                      if len(t_pos) >= 3 and len(m_pos) >= 3:
-                          transform = _GetSuperposition(m_pos, t_pos,
-                                                        False).transformation
-                          initial_transforms.append(transform)
-                          initial_mappings.append((t,m))
+            # get transforms of any mdl chain onto any trg chain in same chem
+            # group that fulfills gdtts threshold
+            initial_transforms = list()
+            initial_mappings = list()
+            for trg_pos, trg_chains, mdl_pos, mdl_chains in zip(trg_group_pos,
+                                                                self.chem_groups,
+                                                                mdl_group_pos,
+                                                                chem_mapping):
+                for t_pos, t in zip(trg_pos, trg_chains):
+                    for m_pos, m in zip(mdl_pos, mdl_chains):
+                        if len(t_pos) >= 3 and len(m_pos) >= 3:
+                            transform = _GetSuperposition(m_pos, t_pos,
+                                                          False).transformation
+                            initial_transforms.append(transform)
+                            initial_mappings.append((t,m))
 
-          if strategy == "greedy_single":
-              mapping = _SingleRigidRMSD(initial_transforms,
-                                         initial_mappings,
-                                         self.chem_groups,
-                                         chem_mapping,
-                                         trg_group_pos,
-                                         mdl_group_pos)
+            if strategy == "greedy_single":
+                mapping = _SingleRigidRMSD(initial_transforms,
+                                           initial_mappings,
+                                           self.chem_groups,
+                                           chem_mapping,
+                                           trg_group_pos,
+                                           mdl_group_pos)
 
 
-          elif strategy == "greedy_iterative":
-              mapping = _IterativeRigidRMSD(initial_transforms,
-                                            initial_mappings,
-                                            self.chem_groups, chem_mapping,
-                                            trg_group_pos, mdl_group_pos)
+            elif strategy == "greedy_iterative":
+                mapping = _IterativeRigidRMSD(initial_transforms,
+                                              initial_mappings,
+                                              self.chem_groups, chem_mapping,
+                                              trg_group_pos, mdl_group_pos)
         elif strategy == "naive":
             mapping = _NaiveRMSD(self.chem_groups, chem_mapping,
                                  trg_group_pos, mdl_group_pos,
@@ -3155,7 +3155,7 @@ def _NaiveRMSD(chem_groups, chem_mapping, trg_group_pos, mdl_group_pos,
         for m_pos, m in zip(mdl_pos, mdl_chains):
             mdl_pos_dict[m] = m_pos
         
-    best_mapping = dict()
+    best_mapping = [[None]*len(x) for x in chem_groups]
     best_rmsd = float("inf")
 
     for mapping in _ChainMappings(chem_groups, chem_mapping, n_max_naive):
@@ -3166,10 +3166,11 @@ def _NaiveRMSD(chem_groups, chem_mapping, trg_group_pos, mdl_group_pos,
                 if trg_ch is not None and mdl_ch is not None:
                     trg_pos.extend(trg_pos_dict[trg_ch])
                     mdl_pos.extend(mdl_pos_dict[mdl_ch])
-        superpose_res = mol.alg.SuperposeSVD(mdl_pos, trg_pos)
-        if superpose_res.rmsd < best_rmsd:
-            best_rmsd = superpose_res.rmsd
-            best_mapping = mapping
+        if len(mdl_pos) >= 3:
+            superpose_res = mol.alg.SuperposeSVD(mdl_pos, trg_pos)
+            if superpose_res.rmsd < best_rmsd:
+                best_rmsd = superpose_res.rmsd
+                best_mapping = mapping
 
     # this is stupid...
     tmp = dict()
