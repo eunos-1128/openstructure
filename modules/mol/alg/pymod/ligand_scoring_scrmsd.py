@@ -369,7 +369,7 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
 
         return (self._get_repr_input[mdl_ligand.hash_code][1],
                 self._chem_group_alns,
-                self._unmapped_mdl_chains,
+                self._mdl_chains_without_chem_mapping,
                 self._get_repr_input[mdl_ligand.hash_code][0])
 
 

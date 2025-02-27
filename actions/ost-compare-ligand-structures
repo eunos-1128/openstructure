@@ -68,10 +68,10 @@ keys:
    in chain mapping. That is 1) pass the same size threshold as for chem_groups
    2) can be aligned to any of the chem groups with a sequence identity
    threshold that can be controlled by --chem-map-seqid-thresh.
- * "unmapped_mdl_chains": Model chains that could be considered in chain mapping,
-   i.e. are long enough, but could not be mapped to any chem group.
-   Depends on --chem-map-seqid-thresh. A mapping for each model chain can be
-   enforced by setting it to 0.
+ * "mdl_chains_without_chem_mapping": Model chains that could be considered in
+   chain mapping, i.e. are long enough, but could not be mapped to any chem
+   group. Depends on --chem-map-seqid-thresh. A mapping for each model chain can
+   be enforced by setting it to 0.
  * "status": SUCCESS if everything ran through. In case of failure, the only
    content of the JSON output will be \"status\" set to FAILURE and an
    additional key: "traceback".
@@ -903,7 +903,7 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
     # add info relevant for chain mapping and cleanup
     out["chem_groups"] = scorer._chain_mapper.chem_groups
     out["chem_mapping"] = scorer._chem_mapping
-    out["unmapped_mdl_chains"] = scorer._unmapped_mdl_chains
+    out["mdl_chains_without_chem_mapping"] = scorer._mdl_chains_without_chem_mapping
     out["model_cleanup_log"] = scorer.model_cleanup_log
     out["reference_cleanup_log"] = scorer.target_cleanup_log
 

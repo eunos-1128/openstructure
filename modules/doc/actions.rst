@@ -92,14 +92,14 @@ Details on the usage (output of ``ost compare-structures --help``):
      in chain mapping. That is 1) pass the same size threshold as fo chem_groups
      2) can be aligned to any of the chem groups with a sequence identity
      threshold that can be controlled by --chem-map-seqid-thresh.
-   * "unmapped_mdl_chains": Model chains that could be considered in chain mapping,
+   * "mdl_chains_without_chem_mapping": Model chains that could be considered in chain mapping,
      i.e. are long enough, but could not be mapped to any chem group.
      Depends on --chem-map-seqid-thresh. A mapping for each model chain can be
      enforced by setting it to 0.
    * "chain_mapping": A dictionary with reference chain names as keys and the
      mapped model chain names as values. Missing chains are either not mapped
      (but present in "chem_groups", "chem_mapping"), were not mapped to any chem
-     group (present in "unmapped_mdl_chains") or were not considered in
+     group (present in "mdl_chains_without_chem_mapping") or were not considered in
      chain mapping (short peptides etc.)
    * "aln": Pairwise sequence alignment for each pair of mapped chains in fasta
      format.
@@ -613,7 +613,7 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
      in chain mapping. That is 1) pass the same size threshold as for chem_groups
      2) can be aligned to any of the chem groups with a sequence identity
      threshold that can be controlled by --chem-map-seqid-thresh.
-   * "unmapped_mdl_chains": Model chains that could be considered in chain mapping,
+   * "mdl_chains_without_chem_mapping": Model chains that could be considered in chain mapping,
      i.e. are long enough, but could not be mapped to any chem group.
      Depends on --chem-map-seqid-thresh. A mapping for each model chain can be
      enforced by setting it to 0.

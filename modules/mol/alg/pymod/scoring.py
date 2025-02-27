@@ -3224,7 +3224,7 @@ class Scorer:
         LogInfo("Setting custom chain mapping")
 
         chain_mapper = self.chain_mapper
-        chem_mapping, chem_group_alns, unmapped_mdl_chains, mdl = \
+        chem_mapping, chem_group_alns, mdl_chains_without_chem_mapping, mdl = \
         chain_mapper.GetChemMapping(self.model)
 
         # now that we have a chem mapping, lets do consistency checks
@@ -3308,7 +3308,7 @@ class Scorer:
         return chain_mapping.MappingResult(chain_mapper.target, mdl,
                                            chain_mapper.chem_groups,
                                            chem_mapping,
-                                           unmapped_mdl_chains,
+                                           mdl_chains_without_chem_mapping,
                                            final_mapping, alns)
 
     def _compute_tmscore(self):

@@ -37,12 +37,12 @@ class MappingResult:
     such objects yourself.
     """
     def __init__(self, target, model, chem_groups, chem_mapping,
-                 unmapped_mdl_chains, mapping, alns, opt_score=None):
+                 mdl_chains_without_chem_mapping, mapping, alns, opt_score=None):
         self._target = target
         self._model = model
         self._chem_groups = chem_groups
         self._chem_mapping = chem_mapping
-        self._unmapped_mdl_chains = unmapped_mdl_chains
+        self._mdl_chains_without_chem_mapping = mdl_chains_without_chem_mapping
         self._mapping = mapping
         self._alns = alns
         self._opt_score = opt_score
@@ -85,14 +85,14 @@ class MappingResult:
         return self._chem_mapping
 
     @property
-    def unmapped_mdl_chains(self):
+    def mdl_chains_without_chem_mapping(self):
         """ Model chains that cannot be mapped to :attr:`chem_groups`
 
         Depends on parameterization of :class:`ChainMapper`
 
         :class:`list` of class:`str` (chain names)
         """
-        return self._unmapped_mdl_chains
+        return self._mdl_chains_without_chem_mapping
 
     @property
     def mapping(self):
@@ -776,7 +776,7 @@ class ChainMapper:
         """
         mdl, mdl_pep_seqs, mdl_nuc_seqs = self.ProcessStructure(model)
         mapping = [list() for x in self.chem_groups]
-        unmapped_mdl_chains = list()
+        mdl_chains_without_chem_mapping = list()
         alns = [seq.AlignmentList() for x in self.chem_groups]
 
         for s in mdl_pep_seqs:
@@ -786,7 +786,7 @@ class ChainMapper:
                                          seq_id_thr = self.mdl_map_pep_seqid_thr,
                                          min_aln_length = self.min_pep_length)
             if idx is None:
-                unmapped_mdl_chains.append(s.GetName())
+                mdl_chains_without_chem_mapping.append(s.GetName())
             else:
                 mapping[idx].append(s.GetName())
                 alns[idx].append(aln)
@@ -798,12 +798,12 @@ class ChainMapper:
                                          seq_id_thr = self.mdl_map_nuc_seqid_thr,
                                          min_aln_length = self.min_nuc_length)
             if idx is None:
-                unmapped_mdl_chains.append(s.GetName())
+                mdl_chains_without_chem_mapping.append(s.GetName())
             else:
                 mapping[idx].append(s.GetName())
                 alns[idx].append(aln)
 
-        return (mapping, alns, unmapped_mdl_chains, mdl)
+        return (mapping, alns, mdl_chains_without_chem_mapping, mdl)
 
 
     def GetlDDTMapping(self, model, inclusion_radius=15.0,
@@ -893,10 +893,10 @@ class ChainMapper:
             raise RuntimeError(f"Strategy must be in {strategies}")
 
         if chem_mapping_result is None:
-            chem_mapping, chem_group_alns, unmapped_mdl_chains, mdl = \
+            chem_mapping, chem_group_alns, mdl_chains_without_chem_mapping, mdl = \
             self.GetChemMapping(model)
         else:
-            chem_mapping, chem_group_alns, unmapped_mdl_chains, mdl = \
+            chem_mapping, chem_group_alns, mdl_chains_without_chem_mapping, mdl = \
             chem_mapping_result
 
         ref_mdl_alns =  _GetRefMdlAlns(self.chem_groups,
@@ -914,7 +914,7 @@ class ChainMapper:
                         aln = ref_mdl_alns[(ref_ch, mdl_ch)]
                         alns[(ref_ch, mdl_ch)] = aln
             return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
-                                 unmapped_mdl_chains, one_to_one, alns)
+                                 mdl_chains_without_chem_mapping, one_to_one, alns)
 
         if strategy == "heuristic":
             if _NMappingsWithin(self.chem_groups, chem_mapping,
@@ -956,7 +956,7 @@ class ChainMapper:
                     alns[(ref_ch, mdl_ch)] = aln
 
         return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
-                             unmapped_mdl_chains, mapping, alns,
+                             mdl_chains_without_chem_mapping, mapping, alns,
                              opt_score = opt_lddt)
 
 
@@ -1031,10 +1031,10 @@ class ChainMapper:
             raise RuntimeError(f"strategy must be {strategies}")
 
         if chem_mapping_result is None:
-            chem_mapping, chem_group_alns, unmapped_mdl_chains, mdl = \
+            chem_mapping, chem_group_alns, mdl_chains_without_chem_mapping, mdl = \
             self.GetChemMapping(model)
         else:
-            chem_mapping, chem_group_alns, unmapped_mdl_chains, mdl = \
+            chem_mapping, chem_group_alns, mdl_chains_without_chem_mapping, mdl = \
             chem_mapping_result
         ref_mdl_alns =  _GetRefMdlAlns(self.chem_groups,
                                        self.chem_group_alignments,
@@ -1050,7 +1050,7 @@ class ChainMapper:
                         aln = ref_mdl_alns[(ref_ch, mdl_ch)]
                         alns[(ref_ch, mdl_ch)] = aln
             return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
-                                 unmapped_mdl_chains, one_to_one, alns)
+                                 mdl_chains_without_chem_mapping, one_to_one, alns)
 
         if strategy == "heuristic":
             if _NMappingsWithin(self.chem_groups, chem_mapping,
@@ -1093,7 +1093,7 @@ class ChainMapper:
                     alns[(ref_ch, mdl_ch)] = aln
 
         return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
-                             unmapped_mdl_chains, mapping, alns,
+                             mdl_chains_without_chem_mapping, mapping, alns,
                              opt_score = opt_qsscore)
 
     def GetRMSDMapping(self, model, strategy = "heuristic", subsampling=50,
@@ -1146,10 +1146,10 @@ class ChainMapper:
             raise RuntimeError(f"strategy must be {strategies}")
 
         if chem_mapping_result is None:
-            chem_mapping, chem_group_alns, unmapped_mdl_chains, mdl = \
+            chem_mapping, chem_group_alns, mdl_chains_without_chem_mapping, mdl = \
             self.GetChemMapping(model)
         else:
-            chem_mapping, chem_group_alns, unmapped_mdl_chains, mdl = \
+            chem_mapping, chem_group_alns, mdl_chains_without_chem_mapping, mdl = \
             chem_mapping_result
         ref_mdl_alns =  _GetRefMdlAlns(self.chem_groups,
                                        self.chem_group_alignments,
@@ -1166,7 +1166,7 @@ class ChainMapper:
                         aln = ref_mdl_alns[(ref_ch, mdl_ch)]
                         alns[(ref_ch, mdl_ch)] = aln
             return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
-                                 unmapped_mdl_chains, one_to_one, alns)
+                                 mdl_chains_without_chem_mapping, one_to_one, alns)
 
         trg_group_pos, mdl_group_pos = _GetRefPos(self.target, mdl,
                                                   self.chem_group_alignments,
@@ -1237,7 +1237,7 @@ class ChainMapper:
                     alns[(ref_ch, mdl_ch)] = aln
 
         return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
-                             unmapped_mdl_chains, final_mapping, alns)
+                             mdl_chains_without_chem_mapping, final_mapping, alns)
 
     def GetMapping(self, model, n_max_naive = 40320):
         """ Convenience function to get mapping with currently preferred method
@@ -1365,10 +1365,10 @@ class ChainMapper:
 
         # perform mapping and alignments on full structures
         if chem_mapping_result is None:
-            chem_mapping, chem_group_alns, unmapped_mdl_chains, mdl = \
+            chem_mapping, chem_group_alns, mdl_chains_without_chem_mapping, mdl = \
             self.GetChemMapping(model)
         else:
-            chem_mapping, chem_group_alns, unmapped_mdl_chains, mdl = \
+            chem_mapping, chem_group_alns, mdl_chains_without_chem_mapping, mdl = \
             chem_mapping_result
         ref_mdl_alns =  _GetRefMdlAlns(self.chem_groups,
                                        self.chem_group_alignments,
@@ -1529,7 +1529,7 @@ class ChainMapper:
                       :attr:`chem_groups`
         :type model: :class:`ost.mol.EntityView`/:class:`ost.mol.EntityHandle`
         """
-        chem_mapping, chem_group_alns, unmapped_mdl_chains, mdl = \
+        chem_mapping, chem_group_alns, mdl_chains_without_chem_mapping, mdl = \
         self.GetChemMapping(model)
         return _NMappings(self.chem_groups, chem_mapping)
 

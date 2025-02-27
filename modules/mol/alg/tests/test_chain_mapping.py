@@ -176,7 +176,7 @@ class TestChainMapper(unittest.TestCase):
 
     mapper = ChainMapper(ref)
 
-    chem_mapping, alns, unmapped_mdl_chains, mdl_view = mapper.GetChemMapping(mdl)
+    chem_mapping, alns, mdl_chains_without_chem_mapping, mdl_view = mapper.GetChemMapping(mdl)
 
     self.assertEqual(len(mapper.chem_groups), 3)
     self.assertEqual(len(chem_mapping), len(mapper.chem_groups))
@@ -201,12 +201,12 @@ class TestChainMapper(unittest.TestCase):
     mdl = _LoadFile("mdl_different_chain_mdl.pdb")
     ref = _LoadFile("mdl_different_chain_ref.pdb")
     mapper = ChainMapper(ref)
-    chem_mapping, alns, unmapped_mdl_chains, mdl_view = mapper.GetChemMapping(mdl)
-    self.assertTrue(len(unmapped_mdl_chains)==0)
+    chem_mapping, alns, mdl_chains_without_chem_mapping, mdl_view = mapper.GetChemMapping(mdl)
+    self.assertTrue(len(mdl_chains_without_chem_mapping)==0)
 
     mapper = ChainMapper(ref, mdl_map_pep_seqid_thr=70)
-    chem_mapping, alns, unmapped_mdl_chains, mdl_view = mapper.GetChemMapping(mdl)
-    self.assertEqual(unmapped_mdl_chains, ["A"])
+    chem_mapping, alns, mdl_chains_without_chem_mapping, mdl_view = mapper.GetChemMapping(mdl)
+    self.assertEqual(mdl_chains_without_chem_mapping, ["A"])
 
   def test_chain_mapping(self):
     ref = _LoadFile("3l1p.1.pdb")

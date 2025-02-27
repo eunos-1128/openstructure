@@ -502,7 +502,7 @@ class LigandScorer:
         self.__chem_mapping = None
         self.__chem_group_alns = None
         self.__ref_mdl_alns = None
-        self.__unmapped_mdl_chains = None
+        self.__mdl_chains_without_chem_mapping = None
         self.__chain_mapping_mdl = None
 
         # keep track of states
@@ -1165,7 +1165,7 @@ class LigandScorer:
     def _chem_mapping(self):
         if self.__chem_mapping is None:
             self.__chem_mapping, self.__chem_group_alns, \
-            self.__unmapped_mdl_chains, self.__chain_mapping_mdl = \
+            self.__mdl_chains_without_chem_mapping, self.__chain_mapping_mdl = \
             self._chain_mapper.GetChemMapping(self.model)
         return self.__chem_mapping
 
@@ -1173,7 +1173,7 @@ class LigandScorer:
     def _chem_group_alns(self):
         if self.__chem_group_alns is None:   
             self.__chem_mapping, self.__chem_group_alns, \
-            self.__unmapped_mdl_chains, self.__chain_mapping_mdl = \
+            self.__mdl_chains_without_chem_mapping, self.__chain_mapping_mdl = \
             self._chain_mapper.GetChemMapping(self.model)
         return self.__chem_group_alns
 
@@ -1192,17 +1192,17 @@ class LigandScorer:
         if self.__chain_mapping_mdl is None:
             with _SinkVerbosityLevel():
                 self.__chem_mapping, self.__chem_group_alns, \
-                self.__unmapped_mdl_chains, self.__chain_mapping_mdl = \
+                self.__mdl_chains_without_chem_mapping, self.__chain_mapping_mdl = \
                 self._chain_mapper.GetChemMapping(self.model)
         return self.__chain_mapping_mdl
 
     @property
-    def _unmapped_mdl_chains(self):
-        if self.__unmapped_mdl_chains is None:
+    def _mdl_chains_without_chem_mapping(self):
+        if self.__mdl_chains_without_chem_mapping is None:
             self.__chem_mapping, self.__chem_group_alns, \
-            self.__unmapped_mdl_chains, self.__chain_mapping_mdl = \
+            self.__mdl_chains_without_chem_mapping, self.__chain_mapping_mdl = \
             self._chain_mapper.GetChemMapping(self.model)
-        return self.__unmapped_mdl_chains
+        return self.__mdl_chains_without_chem_mapping
 
     def _compute_scores(self):
         """
