@@ -263,6 +263,13 @@ class Scorer:
                                   to target chains - see 
                                   :class:`ost.mol.alg.chain_mapping.ChainMapper`
     :type mdl_map_nuc_seqid_thr: :class:`float`
+    :param seqres: Parameter that affects identification of identical chains in
+                   target - see :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type seqres: :class:`ost.seq.SequenceList`
+    :param trg_seqres_mapping: Parameter that affects identification of identical
+                               chains in target - see 
+                               :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type trg_seqres_mapping: :class:`dict`
     """
     def __init__(self, model, target, resnum_alignments=False,
                  molck_settings = None, cad_score_exec = None,
@@ -274,7 +281,9 @@ class Scorer:
                  lddt_inclusion_radius = 15.0,
                  pep_seqid_thr = 95., nuc_seqid_thr = 95.,
                  mdl_map_pep_seqid_thr = 0.,
-                 mdl_map_nuc_seqid_thr = 0.):
+                 mdl_map_nuc_seqid_thr = 0.,
+                 seqres = None,
+                 trg_seqres_mapping = None):
 
         self._target_orig = target
         self._model_orig = model
@@ -388,6 +397,8 @@ class Scorer:
         self.nuc_seqid_thr = nuc_seqid_thr
         self.mdl_map_pep_seqid_thr = mdl_map_pep_seqid_thr
         self.mdl_map_nuc_seqid_thr = mdl_map_nuc_seqid_thr
+        self.seqres = seqres
+        self.trg_seqres_mapping = trg_seqres_mapping
 
         # lazily evaluated attributes
         self._stereochecked_model = None
@@ -752,7 +763,9 @@ class Scorer:
                                                            pep_seqid_thr=self.pep_seqid_thr,
                                                            nuc_seqid_thr=self.nuc_seqid_thr,
                                                            mdl_map_pep_seqid_thr=self.mdl_map_pep_seqid_thr,
-                                                           mdl_map_nuc_seqid_thr=self.mdl_map_nuc_seqid_thr)
+                                                           mdl_map_nuc_seqid_thr=self.mdl_map_nuc_seqid_thr,
+                                                           seqres=self.seqres,
+                                                           trg_seqres_mapping=self.trg_seqres_mapping)
         return self._chain_mapper
 
     @property

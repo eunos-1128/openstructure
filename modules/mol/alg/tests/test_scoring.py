@@ -1,6 +1,6 @@
 import unittest, os, sys
 import ost
-from ost import io, mol, geom
+from ost import io, mol, geom, seq
 # check if we can import: fails if numpy or scipy not available
 try:
   from ost.mol.alg.scoring import *
@@ -233,6 +233,49 @@ class TestScorer(unittest.TestCase):
     trg = _LoadFile("1eud_ref.pdb")
     scorer = Scorer(mdl, trg)
     self.assertAlmostEqual(scorer.tm_score, 0.711, 3)
+
+  def test_scorer_seqres(self):
+    mdl = _LoadFile("1eud_mdl_partial-dimer.pdb")
+    trg = _LoadFile("1eud_ref.pdb")
+    scorer = Scorer(mdl, trg)
+    self.assertTrue(scorer.chain_mapper.seqres is None)
+    self.assertTrue(scorer.chain_mapper.trg_seqres_mapping is None)
+
+    seqres = seq.CreateSequenceList()
+    seqres.AddSequence(seq.CreateSequence("1", "MAIRHCSYTASRKHLYVDKNTKVICQGFTGK"
+                                               "QGTFHSQQALEYGTNLVGGTTPGKGGKTHLGL"
+                                               "PVFNTVKEAKEQTGATASVIYVPPPFAAAAIN"
+                                               "EAIDAEVPLVVCITEGIPQQDMVRVKHRLLRQ"
+                                               "GKTRLIGPNCPGVINPGECKIGIMPGHIHKKG"
+                                               "RIGIVSRSGTLTYEAVHQTTQVGLGQSLCVGI"
+                                               "GGDPFNGTDFTDCLEIFLNDPATEGIILIGEI"
+                                               "GGNAEENAAEFLKQHNSGPKSKPVVSFIAGLT"
+                                               "APPGRRMGHAGAIIAGGKGGAKEKITALQSAG"
+                                               "VVVSMSPAQLGTTIYKEFEKRKML"))
+    seqres.AddSequence(seq.CreateSequence("2", "MVNLQEYQSKKLMSDNGVKVQRFFVADTANEA"
+                                               "LEAAKRLNAKEIVLKAQILAGGRGKGVFSSGL"
+                                               "KGGVHLTKDPEVVGQLAKQMIGYNLATKQTPK"
+                                               "EGVKVNKVMVAEALDISRETYLAILMDRSCNG"
+                                               "PVLVGSPQGGVDIEEVAASNPELIFKEQIDII"
+                                               "EGIKDSQAQRMAENLGFLGPLQNQAADQIKKL"
+                                               "YNLFLKIDATQVEVNPFGETPEGQVVCFDAKI"
+                                               "NFDDNAEFRQKDIFAMDDKSENEPIENEAAKY"
+                                               "DLKYIGLDGNIACFVNGAGLAMATCDIIFLNG"
+                                               "GKPANFLDLGGGVKESQVYQAFKLLTADPKVE"
+                                               "AILVNIFGGIVNCAIIANGITKACRELELKVP"
+                                               "LVVRLEGTNVHEAQNILTNSGLPITSAVDLED"
+                                               "AAKKAVASVTKK"))
+
+    trg_seqres_mapping = {"A": "1",
+                          "B": "2"}
+
+    # we simply check if the parameters are propagated to the chain mapper
+    scorer = Scorer(mdl, trg, seqres=seqres,
+                    trg_seqres_mapping=trg_seqres_mapping,
+                    resnum_alignments=True)
+    self.assertFalse(scorer.chain_mapper.seqres is None)
+    self.assertFalse(scorer.chain_mapper.trg_seqres_mapping is None)
+
 
 if __name__ == "__main__":
   from ost import testutils

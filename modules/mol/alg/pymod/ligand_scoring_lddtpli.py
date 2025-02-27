@@ -120,7 +120,9 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
                  min_nuc_length = 4, pep_seqid_thr = 95.,
                  nuc_seqid_thr = 95.,
                  mdl_map_pep_seqid_thr = 0.,
-                 mdl_map_nuc_seqid_thr = 0.):
+                 mdl_map_nuc_seqid_thr = 0.,
+                 seqres=None,
+                 trg_seqres_mapping=None):
 
         super().__init__(model, target, model_ligands, target_ligands,
                          resnum_alignments = resnum_alignments,
@@ -133,7 +135,9 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
                          pep_seqid_thr = pep_seqid_thr,
                          nuc_seqid_thr = nuc_seqid_thr,
                          mdl_map_pep_seqid_thr = mdl_map_pep_seqid_thr,
-                         mdl_map_nuc_seqid_thr = mdl_map_nuc_seqid_thr)
+                         mdl_map_nuc_seqid_thr = mdl_map_nuc_seqid_thr,
+                         seqres = seqres,
+                         trg_seqres_mapping = trg_seqres_mapping)
 
         self.lddt_pli_radius = lddt_pli_radius
         self.add_mdl_contacts = add_mdl_contacts

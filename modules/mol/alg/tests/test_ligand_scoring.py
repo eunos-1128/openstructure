@@ -4,7 +4,7 @@ from functools import lru_cache
 import numpy as np
 
 import ost
-from ost import io, mol, geom, conop
+from ost import io, mol, geom, conop, seq
 # check if we can import: fails if numpy or scipy not available
 try:
     from ost.mol.alg.ligand_scoring_base import *
@@ -1003,6 +1003,70 @@ class TestLigandScoringFancy(unittest.TestCase):
         self.assertEqual(sc.model.GetAtomCount(), N)
         self.assertEqual(sc.model.GetResidueCount(), N_res)
         self.assertEqual(sc.model_cleanup_log["cleaned_atoms"]["unknown_atoms"], ["A.2..yolo"]) 
+
+    def test_seqres(self):
+        # the tested structures are absolutely irrelevant for ligands
+        # we're simply checking if the seqres info gets propagated to
+        # the chain mapper
+        mdl = _LoadPDB("1eud_mdl_partial-dimer.pdb")
+        trg = _LoadPDB("1eud_ref.pdb")
+        mdl_lig = []
+        trg_lig = []
+        fake_lig = mol.CreateEntity()
+        ed = fake_lig.EditXCS()
+        ch=ed.InsertChain("A")
+        r=ed.AppendResidue(ch, "LIG")
+        a=ed.InsertAtom(r, "A", geom.Vec3())
+        trg_lig.append(fake_lig)
+        sc = ligand_scoring_scrmsd.SCRMSDScorer(mdl, trg, mdl_lig, trg_lig)
+        self.assertTrue(sc._chain_mapper.seqres is None)
+        self.assertTrue(sc._chain_mapper.trg_seqres_mapping is None)
+        sc = ligand_scoring_lddtpli.LDDTPLIScorer(mdl, trg, mdl_lig, trg_lig)
+        self.assertTrue(sc._chain_mapper.seqres is None)
+        self.assertTrue(sc._chain_mapper.trg_seqres_mapping is None)
+
+
+        seqres = seq.CreateSequenceList()
+        seqres.AddSequence(seq.CreateSequence("1", "MAIRHCSYTASRKHLYVDKNTKVICQGFTGK"
+                                                   "QGTFHSQQALEYGTNLVGGTTPGKGGKTHLGL"
+                                                   "PVFNTVKEAKEQTGATASVIYVPPPFAAAAIN"
+                                                   "EAIDAEVPLVVCITEGIPQQDMVRVKHRLLRQ"
+                                                   "GKTRLIGPNCPGVINPGECKIGIMPGHIHKKG"
+                                                   "RIGIVSRSGTLTYEAVHQTTQVGLGQSLCVGI"
+                                                   "GGDPFNGTDFTDCLEIFLNDPATEGIILIGEI"
+                                                   "GGNAEENAAEFLKQHNSGPKSKPVVSFIAGLT"
+                                                   "APPGRRMGHAGAIIAGGKGGAKEKITALQSAG"
+                                                   "VVVSMSPAQLGTTIYKEFEKRKML"))
+        seqres.AddSequence(seq.CreateSequence("2", "MVNLQEYQSKKLMSDNGVKVQRFFVADTANEA"
+                                                   "LEAAKRLNAKEIVLKAQILAGGRGKGVFSSGL"
+                                                   "KGGVHLTKDPEVVGQLAKQMIGYNLATKQTPK"
+                                                   "EGVKVNKVMVAEALDISRETYLAILMDRSCNG"
+                                                   "PVLVGSPQGGVDIEEVAASNPELIFKEQIDII"
+                                                   "EGIKDSQAQRMAENLGFLGPLQNQAADQIKKL"
+                                                   "YNLFLKIDATQVEVNPFGETPEGQVVCFDAKI"
+                                                   "NFDDNAEFRQKDIFAMDDKSENEPIENEAAKY"
+                                                   "DLKYIGLDGNIACFVNGAGLAMATCDIIFLNG"
+                                                   "GKPANFLDLGGGVKESQVYQAFKLLTADPKVE"
+                                                   "AILVNIFGGIVNCAIIANGITKACRELELKVP"
+                                                   "LVVRLEGTNVHEAQNILTNSGLPITSAVDLED"
+                                                   "AAKKAVASVTKK"))
+
+        trg_seqres_mapping = {"A": "1",
+                              "B": "2"}
+
+        # we simply check if the parameters are propagated to the chain mapper
+        sc = ligand_scoring_scrmsd.SCRMSDScorer(mdl, trg, mdl_lig, trg_lig,
+                                                seqres=seqres,
+                                                trg_seqres_mapping=trg_seqres_mapping,
+                                                resnum_alignments=True)
+        self.assertFalse(sc._chain_mapper.seqres is None)
+        self.assertFalse(sc._chain_mapper.trg_seqres_mapping is None)
+        sc = ligand_scoring_lddtpli.LDDTPLIScorer(mdl, trg, mdl_lig, trg_lig,
+                                                  seqres=seqres,
+                                                  trg_seqres_mapping=trg_seqres_mapping,
+                                                  resnum_alignments=True)
+        self.assertFalse(sc._chain_mapper.seqres is None)
+        self.assertFalse(sc._chain_mapper.trg_seqres_mapping is None)
 
 
 if __name__ == "__main__":

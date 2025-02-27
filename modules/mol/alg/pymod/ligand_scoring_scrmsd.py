@@ -119,6 +119,10 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
     :type mdl_map_pep_seqid_thr: :class:`float`
     :param mdl_map_nuc_seqid_thr: See :class:`ost.mol.alg.ligand_scoring_base.LigandScorer`
     :type mdl_map_nuc_seqid_thr: :class:`float`
+    :param seqres: See :class:`ost.mol.alg.ligand_scoring_base.LigandScorer`
+    :type seqres: :class:`ost.seq.SequenceList`
+    :param trg_seqres_mapping: See :class:`ost.mol.alg.ligand_scoring_base.LigandScorer`
+    :type trg_seqres_mapping: :class:`dict`
     """
     def __init__(self, model, target, model_ligands, target_ligands,
                  resnum_alignments=False, rename_ligand_chain=False,
@@ -129,7 +133,9 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
                  min_nuc_length = 4, pep_seqid_thr = 95.,
                  nuc_seqid_thr = 95.,
                  mdl_map_pep_seqid_thr = 0.,
-                 mdl_map_nuc_seqid_thr = 0.):
+                 mdl_map_nuc_seqid_thr = 0.,
+                 seqres=None,
+                 trg_seqres_mapping=None):
 
         super().__init__(model, target, model_ligands, target_ligands,
                          resnum_alignments = resnum_alignments,
@@ -142,7 +148,9 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
                          pep_seqid_thr = pep_seqid_thr,
                          nuc_seqid_thr = nuc_seqid_thr,
                          mdl_map_pep_seqid_thr = mdl_map_pep_seqid_thr,
-                         mdl_map_nuc_seqid_thr = mdl_map_nuc_seqid_thr)
+                         mdl_map_nuc_seqid_thr = mdl_map_nuc_seqid_thr,
+                         seqres = seqres,
+                         trg_seqres_mapping = trg_seqres_mapping)
 
         self.bs_radius = bs_radius
         self.lddt_lp_radius = lddt_lp_radius

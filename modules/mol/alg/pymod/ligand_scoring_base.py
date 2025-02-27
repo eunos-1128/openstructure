@@ -397,6 +397,13 @@ class LigandScorer:
                                   to target chains - see 
                                   :class:`ost.mol.alg.chain_mapping.ChainMapper`
     :type mdl_map_nuc_seqid_thr: :class:`float`
+    :param seqres: Parameter that affects identification of identical chains in
+                   target - see :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type seqres: :class:`ost.seq.SequenceList`
+    :param trg_seqres_mapping: Parameter that affects identification of identical
+                               chains in target - see 
+                               :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type trg_seqres_mapping: :class:`dict`
     """
 
     def __init__(self, model, target, model_ligands, target_ligands,
@@ -406,7 +413,9 @@ class LigandScorer:
                  min_nuc_length = 4, pep_seqid_thr = 95.,
                  nuc_seqid_thr = 95.,
                  mdl_map_pep_seqid_thr = 0.,
-                 mdl_map_nuc_seqid_thr = 0.):
+                 mdl_map_nuc_seqid_thr = 0.,
+                 seqres = None,
+                 trg_seqres_mapping = None):
 
         if isinstance(model, mol.EntityView):
             self._model = mol.CreateEntityFromView(model, False)
@@ -485,6 +494,8 @@ class LigandScorer:
         self._nuc_seqid_thr = nuc_seqid_thr
         self._mdl_map_pep_seqid_thr = mdl_map_pep_seqid_thr
         self._mdl_map_nuc_seqid_thr = mdl_map_nuc_seqid_thr
+        self._seqres = seqres
+        self._trg_seqres_mapping = trg_seqres_mapping
 
         # lazily computed attributes
         self.__chain_mapper = None
@@ -642,6 +653,18 @@ class LigandScorer:
         """ Given at :class:`LigandScorer` construction
         """
         return self._mdl_map_nuc_seqid_thr
+
+    @property
+    def seqres(self):
+        """ Given at :class:`LigandScorer` construction
+        """
+        return self._seqres
+
+    @property
+    def trg_seqres_mapping(self):
+        """ Given at :class:`LigandScorer` construction
+        """
+        return self._trg_seqres_mapping
 
     @property
     def substructure_match(self):
@@ -1133,7 +1156,9 @@ class LigandScorer:
                                           pep_seqid_thr=self.pep_seqid_thr,
                                           nuc_seqid_thr=self.nuc_seqid_thr,
                                           mdl_map_pep_seqid_thr=self.mdl_map_pep_seqid_thr,
-                                          mdl_map_nuc_seqid_thr=self.mdl_map_nuc_seqid_thr)
+                                          mdl_map_nuc_seqid_thr=self.mdl_map_nuc_seqid_thr,
+                                          seqres = self.seqres,
+                                          trg_seqres_mapping = self.trg_seqres_mapping)
         return self.__chain_mapper
 
     @property
