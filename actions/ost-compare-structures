@@ -53,26 +53,9 @@ comparison:
  * "status": SUCCESS if everything ran through. In case of failure, the only
    content of the JSON output will be \"status\" set to FAILURE and an
    additional key: "traceback".
+ * "ost_version": The OpenStructure version used for computation.
 
-The following additional keys store relevant input parameters to reproduce
-results:
-
- * "model"
- * "reference"
- * "fault_tolerant"
- * "model_biounit"
- * "reference_biounit"
- * "residue_number_alignment"
- * "enforce_consistency"
- * "cad_exec"
- * "usalign_exec"
- * "lddt_no_stereochecks"
- * "min_pep_length"
- * "min_nuc_length"
- * "lddt_add_mdl_contacts"
- * "lddt_inclusion_radius"
- * "dockq_capri_peptide"
- * "ost_version"
+Additional keys represent input options.
 
 The pairwise sequence alignments are computed with Needleman-Wunsch using
 BLOSUM62 (NUC44 for nucleotides). Many benchmarking scenarios preprocess the
@@ -684,6 +667,38 @@ def _ParseArgs():
               "min-pep-length/min-nuc-length residues are aligned. The same "
               "threshold is applied to peptide and nucleotide chains.")
     )
+
+    parser.add_argument(
+        "--seqres",
+        dest="seqres",
+        type = str,
+        default = None,
+        help=("Default: None - manually define chem groups by specifying path "
+              "to a fasta file. Each sequence in that file is considered a "
+              "reference sequence of a chem group. All polymer chains "
+              "in reference will be aligned to these sequences. This only works "
+              "if -rna/--residue-number-alignment is enabled and an error is raised "
+              "otherwise. "
+              "Additionally, you need to manually specify a mapping "
+              "of the polymer chains using trg-seqres-mapping and an error "
+              "is raised otherwise. The one letter codes in the structure must "
+              "exactly match the respective characters in seqres and an error "
+              "is raised if not.")
+    )
+
+    parser.add_argument(
+        "--trg-seqres-mapping",
+        nargs="+",
+        dest="trg_seqres_mapping",
+        default=None,
+        help=("Default: None - Maps each polymer chain in reference to a "
+              "sequence in *seqres*. Each mapping is a key:value pair "
+              "where key is the chain name in reference and value is the "
+              "sequence name in seqres. So let's say you have a homo-dimer "
+              "reference with chains \"A\" and \"B\"for which you provide a "
+              "seqres file containing one sequence with name \"1\". You can "
+              "specify this mapping with: --trg-seqres-mapping A:1 B:1")
+    )
  
     return parser.parse_args()
 
@@ -932,6 +947,24 @@ def _Process(model, reference, args, model_format, reference_format):
     if args.chain_mapping is not None:
         mapping = {x.split(':')[0]: x.split(':')[1] for x in args.chain_mapping}
 
+    seqres = None
+    trg_seqres_mapping = None
+
+    if args.seqres is not None:
+        if args.trg_seqres_mapping is None:
+            raise RuntimeError("Must provide trg-seqres-mapping if seqres is "
+                               "provided")
+        if not args.residue_number_alignment:
+            raise RuntimeError("Must enable residue-number-alignment if seqres "
+                               "is provided.")
+        seqres = io.LoadSequenceList(args.seqres)
+
+    if args.trg_seqres_mapping is not None:
+        if args.seqres is None:
+            raise RuntimeError("Must provide seqres if trg-seqres-mapping is "
+                               "provided.")
+        trg_seqres_mapping = {x.split(':')[0]: x.split(':')[1] for x in args.trg_seqres_mapping}
+
     scorer = scoring.Scorer(model, reference,
                             resnum_alignments = args.residue_number_alignment,
                             cad_score_exec = args.cad_exec,
@@ -948,7 +981,9 @@ def _Process(model, reference, args, model_format, reference_format):
                             pep_seqid_thr = args.chem_group_seqid_thresh,
                             nuc_seqid_thr = args.chem_group_seqid_thresh,
                             mdl_map_pep_seqid_thr = args.chem_map_seqid_thresh,
-                            mdl_map_nuc_seqid_thr = args.chem_map_seqid_thresh)
+                            mdl_map_nuc_seqid_thr = args.chem_map_seqid_thresh,
+                            seqres = seqres,
+                            trg_seqres_mapping = trg_seqres_mapping)
 
     ir = _GetInconsistentResidues(scorer.aln, scorer.target, scorer.model)
     if len(ir) > 0 and args.enforce_consistency:
@@ -1167,6 +1202,12 @@ def _Main():
         out["lddt_add_mdl_contacts"] = args.lddt_add_mdl_contacts
         out["lddt_inclusion_radius"] = args.lddt_inclusion_radius
         out["dockq_capri_peptide"] = args.dockq_capri_peptide
+        out["seqres"] = args.seqres
+        if args.trg_seqres_mapping:
+            tmp = {x.split(':')[0]: x.split(':')[1] for x in args.trg_seqres_mapping}
+            out["trg_seqres_mapping"] = tmp
+        else:
+            out["trg_seqres_mapping"] = None
         out["ost_version"] = ost.__version__
         out["status"] = "SUCCESS"
         with open(args.output, 'w') as fh:

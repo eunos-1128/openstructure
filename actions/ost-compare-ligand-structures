@@ -454,6 +454,38 @@ def _ParseArgs():
               "threshold is applied to peptide and nucleotide chains.")
     )
 
+    parser.add_argument(
+        "--seqres",
+        dest="seqres",
+        type = str,
+        default = None,
+        help=("Default: None - manually define chem groups by specifying path "
+              "to a fasta file. Each sequence in that file is considered a "
+              "reference sequence of a chem group. All polymer chains "
+              "in reference will be aligned to these sequences. This only works "
+              "if -rna/--residue-number-alignment is enabled and an error is raised "
+              "otherwise. "
+              "Additionally, you need to manually specify a mapping "
+              "of the polymer chains using trg-seqres-mapping and an error "
+              "is raised otherwise. The one letter codes in the structure must "
+              "exactly match the respective characters in seqres and an error "
+              "is raised if not.")
+    )
+
+    parser.add_argument(
+        "--trg-seqres-mapping",
+        nargs="+",
+        dest="trg_seqres_mapping",
+        default=None,
+        help=("Default: None - Maps each polymer chain in reference to a "
+              "sequence in *seqres*. Each mapping is a key:value pair "
+              "where key is the chain name in reference and value is the "
+              "sequence name in seqres. So let's say you have a homo-dimer "
+              "reference with chains \"A\" and \"B\"for which you provide a "
+              "seqres file containing one sequence with name \"1\". You can "
+              "specify this mapping with: --trg-seqres-mapping A:1 B:1")
+    )
+
     args = parser.parse_args()
     if args.output is None:
         args.output = "out.%s" % args.output_format
@@ -570,8 +602,30 @@ def _LoadStructureData(receptor_path,
 
     return (receptor, ligands)
 
+def _SEQRESFeaturesFromArgs(args):
+    seqres = None
+    trg_seqres_mapping = None
+
+    if args.seqres is not None:
+        if args.trg_seqres_mapping is None:
+            raise RuntimeError("Must provide trg-seqres-mapping if seqres is "
+                               "provided")
+        if not args.residue_number_alignment:
+            raise RuntimeError("Must enable residue-number-alignment if seqres "
+                               "is provided.")
+        seqres = io.LoadSequenceList(args.seqres)
+
+    if args.trg_seqres_mapping is not None:
+        if args.seqres is None:
+            raise RuntimeError("Must provide seqres if trg-seqres-mapping is "
+                               "provided.")
+        trg_seqres_mapping = {x.split(':')[0]: x.split(':')[1] for x in args.trg_seqres_mapping}
+
+    return (seqres, trg_seqres_mapping)
+
 
 def _SetupLDDTPLIScorer(model, model_ligands, reference, reference_ligands, args):
+    seqres, trg_seqres_mapping = _SEQRESFeaturesFromArgs(args)
     return ligand_scoring_lddtpli.LDDTPLIScorer(model, reference,
                                                 model_ligands = model_ligands,
                                                 target_ligands = reference_ligands,
@@ -587,9 +641,12 @@ def _SetupLDDTPLIScorer(model, model_ligands, reference, reference_ligands, args
                                                 pep_seqid_thr = args.chem_group_seqid_thresh,
                                                 nuc_seqid_thr = args.chem_group_seqid_thresh,
                                                 mdl_map_pep_seqid_thr = args.chem_map_seqid_thresh,
-                                                mdl_map_nuc_seqid_thr = args.chem_map_seqid_thresh)
+                                                mdl_map_nuc_seqid_thr = args.chem_map_seqid_thresh,
+                                                seqres=seqres,
+                                                trg_seqres_mapping=trg_seqres_mapping)
 
 def _SetupSCRMSDScorer(model, model_ligands, reference, reference_ligands, args):
+    seqres, trg_seqres_mapping = _SEQRESFeaturesFromArgs(args)
     return ligand_scoring_scrmsd.SCRMSDScorer(model, reference,
                                               model_ligands = model_ligands,
                                               target_ligands = reference_ligands,
@@ -606,7 +663,9 @@ def _SetupSCRMSDScorer(model, model_ligands, reference, reference_ligands, args)
                                               pep_seqid_thr = args.chem_group_seqid_thresh,
                                               nuc_seqid_thr = args.chem_group_seqid_thresh,
                                               mdl_map_pep_seqid_thr = args.chem_map_seqid_thresh,
-                                              mdl_map_nuc_seqid_thr = args.chem_map_seqid_thresh)
+                                              mdl_map_nuc_seqid_thr = args.chem_map_seqid_thresh,
+                                              seqres=seqres,
+                                              trg_seqres_mapping=trg_seqres_mapping)
 
 def _Process(model, model_ligands, reference, reference_ligands, args):
 
@@ -963,6 +1022,12 @@ def _Main():
         out["min-nuc-length"] = args.min_nuc_length
         out["chem-group-seqid-thresh"] = args.chem_group_seqid_thresh
         out["chem-map-seqid-thresh"] = args.chem_map_seqid_thresh
+        out["seqres"] = args.seqres
+        if args.trg_seqres_mapping:
+            tmp = {x.split(':')[0]: x.split(':')[1] for x in args.trg_seqres_mapping}
+            out["trg_seqres_mapping"] = tmp
+        else:
+            out["trg_seqres_mapping"] = None
 
         # only add lddtpli if actually computed
         if args.lddt_pli:
