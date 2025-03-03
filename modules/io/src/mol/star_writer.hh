@@ -107,137 +107,11 @@ public:
     if(string_value == "") {
       value.value_ = "?";
     } else {
-      // string requires quotes if any of the following is True
-      // information from https://www.iucr.org/resources/cif/spec/version1.1/cifsyntax
-      // * space in string
-      // * any string that starts with any of the following strings
-      //   * _
-      //   * #
-      //   * $
-      //   * '
-      //   * "
-      //   * [
-      //   * ]
-      //   * ;
-      //   * data_ (case insensitive)
-      //   * save_ (case insensitive)
-      // * any string that is equal to any of the following reserved words 
-      //   * loop_ (case insensitive)
-      //   * stop_ (case insensitive)
-      //   * global_ (case insensitive)
-
-      bool is_multiline = false;
-      bool needs_quotes = false;
-
-      // newline in string
-      for(char c: string_value) {
-        if(c == '\n') {
-          is_multiline = true;
-          break;
-        }
-      }
-
-      // space in string
-      for(char c: string_value) {
-        if(isspace(c) && c != '\n') {
-          // linebreaks evaluate to true in isspace but do not require quotes
-          needs_quotes = true;
-          break;
-        }
-      }
-
-      // any string that starts with any of the special single characters
-      if(!needs_quotes) {
-        switch(string_value[0]) {
-          case '_': {
-            needs_quotes = true;
-            break;
-          }
-          case '#': {
-            needs_quotes = true;
-            break;
-          }
-          case '$': {
-            needs_quotes = true;
-            break;
-          }
-          case '\'': {
-            needs_quotes = true;
-            break;
-          }
-          case '\"': {
-            needs_quotes = true;
-            break;
-          }
-          case '[': {
-            needs_quotes = true;
-            break;
-          }
-          case ']': {
-            needs_quotes = true;
-            break;
-          }
-          case ';': {
-            needs_quotes = true;
-            break;
-          }
-        }
-      }
-
-      // any string that starts with any of the special multi character thingies
-      if(!needs_quotes && string_value.size() >= 5 && string_value[4] == '_') {
-        // need to do case insensitive checking
-        if((string_value[0] == 'd' || string_value[0] == 'D') &&
-           (string_value[1] == 'a' || string_value[1] == 'A') &&
-           (string_value[2] == 't' || string_value[2] == 'T') &&
-           (string_value[3] == 'a' || string_value[3] == 'A')) {
-            needs_quotes = true;
-        }
-        if((string_value[0] == 's' || string_value[0] == 'S') &&
-           (string_value[1] == 'a' || string_value[1] == 'A') &&
-           (string_value[2] == 'v' || string_value[2] == 'V') &&
-           (string_value[3] == 'e' || string_value[3] == 'E')) {
-            needs_quotes = true;
-        }
-      }
-
-      // any string that is exactly one of the reserved words
-      if(!needs_quotes && string_value.size() == 5 && string_value[4] == '_') {
-        // need to do case insensitive checking
-        if((string_value[0] == 'l' || string_value[0] == 'L') &&
-           (string_value[1] == 'o' || string_value[1] == 'O') &&
-           (string_value[2] == 'o' || string_value[2] == 'O') &&
-           (string_value[3] == 'p' || string_value[3] == 'P')) {
-            needs_quotes = true;
-        }
-        if((string_value[0] == 's' || string_value[0] == 'S') &&
-           (string_value[1] == 't' || string_value[1] == 'T') &&
-           (string_value[2] == 'o' || string_value[2] == 'O') &&
-           (string_value[3] == 'p' || string_value[3] == 'P')) {
-            needs_quotes = true;
-        }
-      }
-
-      if(!needs_quotes && string_value.size() == 7 && string_value[6] == '_') {
-        // need to do case insensitive checking
-        if((string_value[0] == 'g' || string_value[0] == 'G') &&
-           (string_value[1] == 'l' || string_value[1] == 'L') &&
-           (string_value[2] == 'o' || string_value[2] == 'O') &&
-           (string_value[3] == 'b' || string_value[3] == 'B') &&
-           (string_value[4] == 'a' || string_value[4] == 'A') &&
-           (string_value[5] == 'l' || string_value[5] == 'L')) {
-            needs_quotes = true;
-        }
-      }
-
-      if(is_multiline && needs_quotes) {
-        value.value_ = "\n;\"" + string_value + "\"\n;\n";
-      }
-      else if(needs_quotes) {
-        value.value_ = "\"" + string_value + "\"";
-      }
-      else if(is_multiline) {
+      if(StarWriterValue::HasNewline(string_value)) {
         value.value_ = "\n;" + string_value + "\n;\n";
+      }
+      else if(StarWriterValue::NeedsQuotes(string_value)) {
+        value.value_ = "\"" + string_value + "\"";
       }
       else {
         value.value_ = string_value;
@@ -245,6 +119,125 @@ public:
     }
     return value;
   }
+
+  static bool NeedsQuotes(const String& v) {
+
+    // string requires quotes if any of the following is True
+    // information from https://www.iucr.org/resources/cif/spec/version1.1/cifsyntax
+    // * space in string
+    // * any string that starts with any of the following strings
+    //   * _
+    //   * #
+    //   * $
+    //   * '
+    //   * "
+    //   * [
+    //   * ]
+    //   * ;
+    //   * data_ (case insensitive)
+    //   * save_ (case insensitive)
+    // * any string that is equal to any of the following reserved words 
+    //   * loop_ (case insensitive)
+    //   * stop_ (case insensitive)
+    //   * global_ (case insensitive)
+
+    // space in string
+    for(char c: v) {
+      if(isspace(c) && c != '\n') {
+        // linebreaks evaluate to true in isspace but do not need quotes
+        // they are handled with semi-colons
+        return true;
+      }
+    }
+
+    // any string that starts with any of the special single characters
+    switch(v[0]) {
+      case '_': {
+        return true;
+      }
+      case '#': {
+        return true;
+      }
+      case '$': {
+        return true;
+      }
+      case '\'': {
+        return true;
+      }
+      case '\"': {
+        return true;
+      }
+      case '[': {
+        return true;
+      }
+      case ']': {
+        return true;
+      }
+      case ';': {
+        return true;
+      }
+      default: {
+        break;
+      }
+    }
+
+    // any string that starts with any of the special multi character thingies
+    if(v.size() >= 5 && v[4] == '_') {
+      // need to do case insensitive checking
+      if((v[0] == 'd' || v[0] == 'D') &&
+         (v[1] == 'a' || v[1] == 'A') &&
+         (v[2] == 't' || v[2] == 'T') &&
+         (v[3] == 'a' || v[3] == 'A')) {
+          return true;
+      }
+      if((v[0] == 's' || v[0] == 'S') &&
+         (v[1] == 'a' || v[1] == 'A') &&
+         (v[2] == 'v' || v[2] == 'V') &&
+         (v[3] == 'e' || v[3] == 'E')) {
+          return true;
+      }
+    }
+
+    // any string that is exactly one of the reserved words
+    if(v.size() == 5 && v[4] == '_') {
+      // need to do case insensitive checking
+      if((v[0] == 'l' || v[0] == 'L') &&
+         (v[1] == 'o' || v[1] == 'O') &&
+         (v[2] == 'o' || v[2] == 'O') &&
+         (v[3] == 'p' || v[3] == 'P')) {
+          return true;
+      }
+      if((v[0] == 's' || v[0] == 'S') &&
+         (v[1] == 't' || v[1] == 'T') &&
+         (v[2] == 'o' || v[2] == 'O') &&
+         (v[3] == 'p' || v[3] == 'P')) {
+          return true;
+      }
+    }
+
+    if(v.size() == 7 && v[6] == '_') {
+      // need to do case insensitive checking
+      if((v[0] == 'g' || v[0] == 'G') &&
+         (v[1] == 'l' || v[1] == 'L') &&
+         (v[2] == 'o' || v[2] == 'O') &&
+         (v[3] == 'b' || v[3] == 'B') &&
+         (v[4] == 'a' || v[4] == 'A') &&
+         (v[5] == 'l' || v[5] == 'L')) {
+          return true;
+      }
+    }
+    return false;
+  }
+
+  static bool HasNewline(const String& v) {
+    for(char c: v) {
+      if(c == '\n') {
+        return true;
+      }
+    }
+    return false;
+  }
+
   const String& GetValue() const { return value_; }
 private:
   String value_;
