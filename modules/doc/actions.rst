@@ -543,6 +543,7 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
                                        [--chem-map-seqid-thresh CHEM_MAP_SEQID_THRESH]
                                        [--seqres SEQRES]
                                        [--trg-seqres-mapping TRG_SEQRES_MAPPING [TRG_SEQRES_MAPPING ...]]
+                                       [--allow-heuristic-conn]
 
   Evaluate model with non-polymer/small molecule ligands against reference.
 
@@ -580,10 +581,13 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
   ligands are optionally detected from a structure file if it is given in mmCIF
   format. This is based on "non-polymer" _entity.type annotation and the
   respective entries must exist in the PDB component dictionary in order to get
-  connectivity information. For example, receptor structure and ligand(s) are
-  loaded from the same mmCIF file given as '-m'/'-r'. This does not work for
-  structures provided in PDB format and an error is raised if ligands are not
-  explitely given in SDF format.
+  connectivity information. You can avoid the requirement of the PDB component
+  dictionary by enabling --allow-heuristic-conn. In this case, connectivity
+  is established through a distance based heuristic if the ligand is not found in
+  the component dictionary. Be aware that this might be an issue in ligand
+  matching.
+  If you provide structures in PDB format, an error is raised if ligands are not
+  explicitely given in SDF format.
 
   Ligands undergo gentle processing where hydrogens are removed. Connectivity
   is relevant for scoring. It is read directly from SDF input. If ligands are
@@ -613,10 +617,10 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
      in chain mapping. That is 1) pass the same size threshold as for chem_groups
      2) can be aligned to any of the chem groups with a sequence identity
      threshold that can be controlled by --chem-map-seqid-thresh.
-   * "mdl_chains_without_chem_mapping": Model chains that could be considered in chain mapping,
-     i.e. are long enough, but could not be mapped to any chem group.
-     Depends on --chem-map-seqid-thresh. A mapping for each model chain can be
-     enforced by setting it to 0.
+   * "mdl_chains_without_chem_mapping": Model chains that could be considered in
+     chain mapping, i.e. are long enough, but could not be mapped to any chem
+     group. Depends on --chem-map-seqid-thresh. A mapping for each model chain can
+     be enforced by setting it to 0.
    * "status": SUCCESS if everything ran through. In case of failure, the only
      content of the JSON output will be "status" set to FAILURE and an
      additional key: "traceback".
@@ -691,7 +695,7 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
                           Path to model ligand files.
     -r REFERENCE, --ref REFERENCE, --reference REFERENCE
                           Path to reference file.
-    -rl [REFERENCE_LIGANDS ...], --ref-ligands [REFERENCE_LIGANDS ...], --reference-ligands [  REFERENCE_LIGANDS ...]
+    -rl [REFERENCE_LIGANDS ...], --ref-ligands [REFERENCE_LIGANDS ...], --reference-ligands [REFERENCE_LIGANDS ...]
                           Path to reference ligand files.
     -o OUTPUT, --out OUTPUT, --output OUTPUT
                           Output file name. Default depends on format: out.json
@@ -810,4 +814,14 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
                           which you provide a seqres file containing one
                           sequence with name "1". You can specify this mapping
                           with: --trg-seqres-mapping A:1 B:1
+    --allow-heuristic-conn
+                          Default: False - Only relevant if ligands are
+                          extracted from ref/mdl in mmCIF format. Connectivity
+                          in these cases is based on the chemical component
+                          dictionary. If you enable this flag, connectivity can
+                          be established by a distance based heuristic if the
+                          ligand is not present in the component dictionary.
+                          This might cause issues in ligand matching, i.e. graph
+                          matching.
+
 

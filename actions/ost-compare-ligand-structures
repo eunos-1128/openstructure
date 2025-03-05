@@ -35,10 +35,13 @@ Ligands can be given as path to SDF files containing the ligand for both model
 ligands are optionally detected from a structure file if it is given in mmCIF
 format. This is based on "non-polymer" _entity.type annotation and the
 respective entries must exist in the PDB component dictionary in order to get
-connectivity information. For example, receptor structure and ligand(s) are
-loaded from the same mmCIF file given as '-m'/'-r'. This does not work for
-structures provided in PDB format and an error is raised if ligands are not
-explitely given in SDF format.
+connectivity information. You can avoid the requirement of the PDB component
+dictionary by enabling --allow-heuristic-conn. In this case, connectivity
+is established through a distance based heuristic if the ligand is not found in
+the component dictionary. Be aware that this might be an issue in ligand
+matching.
+If you provide structures in PDB format, an error is raised if ligands are not
+explicitely given in SDF format.
 
 Ligands undergo gentle processing where hydrogens are removed. Connectivity
 is relevant for scoring. It is read directly from SDF input. If ligands are
@@ -486,6 +489,19 @@ def _ParseArgs():
               "specify this mapping with: --trg-seqres-mapping A:1 B:1")
     )
 
+    parser.add_argument(
+        "--allow-heuristic-conn",
+        dest="allow_heuristic_conn",
+        default=False,
+        action="store_true",
+        help=("Default: False - Only relevant if ligands are extracted from "
+              "ref/mdl in mmCIF format. Connectivity in these cases is based "
+              "on the chemical component dictionary. If you enable this flag, "
+              "connectivity can be established by a distance based heuristic "
+              "if the ligand is not present in the component dictionary. This "
+              "might cause issues in ligand matching, i.e. graph matching.")
+    )
+
     args = parser.parse_args()
     if args.output is None:
         args.output = "out.%s" % args.output_format
@@ -564,7 +580,8 @@ def _LoadStructureData(receptor_path,
                        ligand_path,
                        sformat = None,
                        bu_id = None,
-                       fault_tolerant = False):
+                       fault_tolerant = False,
+                       allow_heuristic_conn = False):
 
     receptor = None
     ligands = None
@@ -587,7 +604,8 @@ def _LoadStructureData(receptor_path,
             receptor, ligands = ligand_scoring_base.MMCIFPrep(receptor_path,
                                                               biounit = bu_id,
                                                               extract_nonpoly = True,
-                                                              fault_tolerant = fault_tolerant)
+                                                              fault_tolerant = fault_tolerant,
+                                                              allow_heuristic_conn = allow_heuristic_conn)
         else:
             receptor = ligand_scoring_base.MMCIFPrep(receptor_path,
                                                      biounit = bu_id,
@@ -997,14 +1015,16 @@ def _Main():
                                                           args.reference_ligands,
                                                           sformat = args.reference_format,
                                                           bu_id = args.reference_biounit,
-                                                          fault_tolerant = args.fault_tolerant)
+                                                          fault_tolerant = args.fault_tolerant,
+                                                          allow_heuristic_conn = args.allow_heuristic_conn)
 
         LogInfo("Loading model data")
         model, model_ligands = _LoadStructureData(args.model,
                                                   args.model_ligands,
                                                   sformat = args.model_format,
                                                   bu_id = args.model_biounit,
-                                                  fault_tolerant = args.fault_tolerant)
+                                                  fault_tolerant = args.fault_tolerant,
+                                                  allow_heuristic_conn = args.allow_heuristic_conn)
 
         out = _Process(model, model_ligands, reference, reference_ligands, args)
 
@@ -1028,6 +1048,7 @@ def _Main():
             out["trg_seqres_mapping"] = tmp
         else:
             out["trg_seqres_mapping"] = None
+        out["allow_heuristic_conn"] = args.allow_heuristic_conn
 
         # only add lddtpli if actually computed
         if args.lddt_pli:
