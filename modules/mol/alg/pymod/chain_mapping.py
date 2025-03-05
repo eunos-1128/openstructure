@@ -790,6 +790,8 @@ class ChainMapper:
                                          seq_id_thr = self.mdl_map_pep_seqid_thr,
                                          min_aln_length = self.min_pep_length)
             if idx is None:
+                ost.LogWarning("Could not map model chain %s to any chem group"
+                               " in the target" % s.name)
                 mdl_chains_without_chem_mapping.append(s.GetName())
             else:
                 mapping[idx].append(s.GetName())
@@ -802,6 +804,8 @@ class ChainMapper:
                                          seq_id_thr = self.mdl_map_nuc_seqid_thr,
                                          min_aln_length = self.min_nuc_length)
             if idx is None:
+                ost.LogWarning("Could not map model chain %s to any chem group"
+                               " in the target" % s.name)
                 mdl_chains_without_chem_mapping.append(s.GetName())
             else:
                 mapping[idx].append(s.GetName())
@@ -1601,9 +1605,11 @@ class ChainMapper:
 
             # filter out short chains
             if n_pep > 0 and n_pep < self.min_pep_length:
+                ost.LogWarning("Skipping short peptide chain: %s" % ch.name)
                 continue
 
             if n_nuc > 0 and n_nuc < self.min_nuc_length:
+                ost.LogWarning("Skipping short nucleotide chain: %s" % ch.name)
                 continue
 
             # the superfast residue number based alignment adds some 
