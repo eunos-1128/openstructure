@@ -451,6 +451,11 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
             already_mapped = set()
             for mdl_ch in mdl_chains:
                 if mdl_ch not in lddt_chain_mapping:
+
+                    if mdl_ch in self._mdl_chains_without_chem_mapping:
+                        # this mdl chain does not map to any trg chain
+                        continue
+
                     # check which chain in trg is closest
                     chem_grp_idx = None
                     for i, m in enumerate(self._chem_mapping):
