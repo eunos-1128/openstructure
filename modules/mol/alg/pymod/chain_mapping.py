@@ -524,9 +524,10 @@ class ChainMapper:
                               alignments. Relevant for :attr:`~chem_groups` 
                               and related attributes.
     :type resnum_alignments: :class:`bool`
-    :param pep_seqid_thr: Threshold used to decide when two chains are
+    :param pep_seqid_thr: Sequence identity threshold (in percent of aligned
+                          columns) used to decide when two chains are
                           identical. 95 percent tolerates the few mutations
-                          crystallographers like to do.
+                          crystallographers like to do. Range: [0-100].
     :type pep_seqid_thr:  :class:`float`
     :param nuc_seqid_thr: Nucleotide equivalent for *pep_seqid_thr*
     :type nuc_seqid_thr:  :class:`float`
@@ -559,14 +560,17 @@ class ChainMapper:
                         :class:`RuntimeError` is raised in case of bigger
                         complexity.
     :type n_max_naive: :class:`int`
-    :param mdl_map_pep_seqid_thr: To avoid non-sensical mapping of model chains
-                                  to reference chem groups. If a value larger
-                                  than 0.0 is provided, minimal criteria for
-                                  assignment becomes a sequence identity of
+    :param mdl_map_pep_seqid_thr: Sequence identity threshold (in percent of
+                                  aligned columns) to avoid non-sensical
+                                  mapping of model chains to reference chem
+                                  groups. If a value larger than 0.0 is
+                                  provided, minimal criteria for assignment
+                                  becomes a sequence identity of
                                   *mdl_map_pep_seqid_thr* and at least
                                   *min_pep_length* aligned residues. If set to
                                   zero, it simply assigns a model chain to the
                                   chem group with highest sequence identity.
+                                  Range: [0-100].
     :type mdl_map_pep_seqid_thr: :class:`float`
     :param mdl_map_nuc_seqid_thr: Nucleotide equivalent of
                                   *mdl_map_pep_seqid_thr*
