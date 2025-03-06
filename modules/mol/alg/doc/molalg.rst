@@ -11,13 +11,14 @@ Submodules
   :maxdepth: 1
 
   chain_mapping
-  contact_score
-  dockq
-  helix_kinks
+  scoring_base
+  scoring
   ligand_scoring
   qsscore
-  scoring
+  contact_score
+  dockq
   stereochemistry
+  helix_kinks
   structure_analysis
   trajectory_analysis
 
