@@ -499,7 +499,10 @@ class ChainMapper:
       for nucleotides with respective thresholds.
       2) specify seqres sequences and provide the mapping manually. This can
       be useful if you're loading data from an mmCIF file where you have mmCIF
-      entity information.
+      entity information. Alignments are performed based on residue numbers
+      in this case and don't consider the *resnum_alignments* flag. Any
+      mismatch of one letter code in the structure and the respective SEQRES
+      raises an error.
 
     * Map chains in an input model to these groups. Parameters for generating
       alignments are the same as above. Model chains are mapped to the chem
@@ -522,7 +525,7 @@ class ChainMapper:
     :param resnum_alignments: Use residue numbers instead of
                               Needleman-Wunsch to compute pairwise
                               alignments. Relevant for :attr:`~chem_groups` 
-                              and related attributes.
+                              if *seqres* is not specified explicitely.
     :type resnum_alignments: :class:`bool`
     :param pep_seqid_thr: Sequence identity threshold (in percent of aligned
                           columns) used to decide when two chains are
@@ -576,11 +579,12 @@ class ChainMapper:
                                   *mdl_map_pep_seqid_thr*
     :type mdl_map_nuc_seqid_thr: :class:`float`
     :param seqres: SEQRES sequences. All polymer chains in *target* will be
-                   aligned to these sequences. This only works if
-                   *resnum_alignments* is enabled and an error is raised
-                   otherwise. Additionally, you need to manually specify
-                   a mapping of the polymer chains using *trg_seqres_mapping*
-                   and an error is raised otherwise. The one letter codes in
+                   aligned to these sequences using a residue number based
+                   alignment, effectively ignoring *resnum_alignments* in
+                   the chem grouping step. Additionally, you need to
+                   manually specify a mapping of the polymer chains using
+                   *trg_seqres_mapping* and an error is raised otherwise.
+                   The one letter codes in
                    the structure must exactly match the respective characters
                    in seqres and an error is raised if not. These seqres
                    sequences are set as :attr:`~chem_group_ref_seqs` and will
@@ -609,10 +613,6 @@ class ChainMapper:
         if seqres_params_set not in [0, 2]:
             raise RuntimeError("Must either give both, seqres and "
                                "trg_seqres_mapping, or none of them.")
-        if seqres_params_set == 2:
-            if not resnum_alignments:
-                raise RuntimeError("Must enable resnum_alignments if seqres "
-                                   "information is provided")
         # attributes
         self.resnum_alignments = resnum_alignments
         self.pep_seqid_thr = pep_seqid_thr

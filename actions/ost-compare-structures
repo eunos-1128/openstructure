@@ -23,14 +23,21 @@ comparison:
  * "reference_chains": Chain names of reference
  * "model_chains": Chain names of model
  * "chem_groups": Groups of polypeptides/polynucleotides from reference that
-   are considered chemically equivalent, i.e. pass a pairwise sequence identity
-   threshold that can be controlled with --chem-group-seqid-thresh.
+   are considered chemically equivalent. Predefined if the reference is an mmCIF
+   file or if "seqres"/"trg-seqres-mapping" are provided manually. Alignments
+   of structure to SEQRES are established using residue numbers in these cases
+   and matching structure one letter codes and SEQRES are enforced.
+   In case of a PDB reference without predefined SEQRES, groups are established
+   using clustering based on pairwise alignments. Chains within
+   "chem_group_seqid_thresh" are considered equivalent and alignments are
+   established using residue numbers or Needleman-Wunsch
+   (see "residue-number-alignments" flag)
    You can derive stoichiometry from this. Contains only chains that are
    considered in chain mapping, i.e. pass a size threshold (defaults: 6 for
    peptides, 4 for nucleotides).
  * "chem_mapping": List of same length as "chem_groups". Assigns model chains to
    the respective chem group. Again, only contains chains that are considered
-   in chain mapping. That is 1) pass the same size threshold as fo chem_groups
+   in chain mapping. That is 1) pass the same size threshold as for chem_groups
    2) can be aligned to any of the chem groups with a sequence identity
    threshold that can be controlled by --chem-map-seqid-thresh.
  * "mdl_chains_without_chem_mapping": Model chains that could be considered in
@@ -755,13 +762,22 @@ def _LoadStructure(structure_path, sformat, fault_tolerant, bu_id):
     The returned structure has structure_path attached as structure name
     """
 
+    # thats the return variables
+    # the last two are only set in case of an mmCIF file
+    entity = None
+    seqres = None
+    trg_seqres_mapping = None
+
     # increase loglevel, as we would pollute the info log with weird stuff
     ost.PushVerbosityLevel(ost.LogLevel.Error)
     # Load the structure
     if sformat == "mmcif":
-        entity = scoring_base.MMCIFPrep(structure_path,
-                                        fault_tolerant=fault_tolerant,
-                                        biounit=bu_id)
+        # from mmCIF we can get seqres and trg_seqres_mapping
+        entity, seqres, trg_seqres_mapping = \
+        scoring_base.MMCIFPrep(structure_path,
+                               fault_tolerant=fault_tolerant,
+                               biounit=bu_id,
+                               extract_seqres_mapping=True)
         if len(entity.residues) == 0:
             raise Exception(f"No residues found in file: {structure_path}")
     else:
@@ -772,7 +788,7 @@ def _LoadStructure(structure_path, sformat, fault_tolerant, bu_id):
     # restore old loglevel and return
     ost.PopVerbosityLevel()
     entity.SetName(structure_path)
-    return entity
+    return (entity, seqres, trg_seqres_mapping)
 
 def _DumpStructure(entity, structure_path, sformat):
     if sformat == "mmcif":
@@ -932,29 +948,29 @@ def _GetAlignedResidues(aln, ref, mdl):
                                  "reference": ref_dct})
     return aligned_residues
 
-def _Process(model, reference, args, model_format, reference_format):
+def _Process(model, reference, args, model_format, reference_format,
+             seqres=None, trg_seqres_mapping=None):
 
     mapping = None
     if args.chain_mapping is not None:
         mapping = {x.split(':')[0]: x.split(':')[1] for x in args.chain_mapping}
 
-    seqres = None
-    trg_seqres_mapping = None
-
+    # see if seqres/trg-seqres-mapping are set in args
+    # if yes, they're prioritized even if we have these values from
+    # the mmCIF file
     if args.seqres is not None:
         if args.trg_seqres_mapping is None:
-            raise RuntimeError("Must provide trg-seqres-mapping if seqres is "
-                               "provided")
-        if not args.residue_number_alignment:
-            raise RuntimeError("Must enable residue-number-alignment if seqres "
+            raise RuntimeError("Must provide trg-seqres-mapping if seqres "
                                "is provided.")
-        seqres = io.LoadSequenceList(args.seqres)
 
     if args.trg_seqres_mapping is not None:
         if args.seqres is None:
-            raise RuntimeError("Must provide seqres if trg-seqres-mapping is "
-                               "provided.")
-        trg_seqres_mapping = {x.split(':')[0]: x.split(':')[1] for x in args.trg_seqres_mapping}
+            raise RuntimeError("Must provide seqres if trg-seqres-mapping "
+                               "is provided.")
+
+    if args.seqres is not None and args.trg_seqres_mapping is not None:
+        seqres = io.LoadSequenceList(args.seqres)
+        trg_seqres_mapping = {x.split(':')[0]: x.split(':')[1] for x in args.chain_mapping}
 
     scorer = scoring.Scorer(model, reference,
                             resnum_alignments = args.residue_number_alignment,
@@ -1166,17 +1182,19 @@ def _Main():
                                "this is the case.")
         reference_format = _GetStructureFormat(args.reference,
                                                sformat=args.reference_format)
-        reference = _LoadStructure(args.reference,
-                                   sformat=reference_format,
-                                   bu_id=args.reference_biounit,
-                                   fault_tolerant = args.fault_tolerant)
+        reference, seqres, trg_seqres_mapping = _LoadStructure(args.reference,
+                                                               sformat=reference_format,
+                                                               bu_id=args.reference_biounit,
+                                                               fault_tolerant = args.fault_tolerant)
         model_format = _GetStructureFormat(args.model,
                                            sformat=args.model_format)
-        model = _LoadStructure(args.model,
-                               sformat=model_format,
-                               bu_id=args.model_biounit,
-                               fault_tolerant = args.fault_tolerant)
-        out = _Process(model, reference, args, model_format, reference_format)
+        model,_,_ = _LoadStructure(args.model,
+                                   sformat=model_format,
+                                   bu_id=args.model_biounit,
+                                   fault_tolerant = args.fault_tolerant)
+
+        out = _Process(model, reference, args, model_format, reference_format,
+                       seqres=seqres, trg_seqres_mapping=trg_seqres_mapping)
 
         # append input arguments
         out["model"] = args.model

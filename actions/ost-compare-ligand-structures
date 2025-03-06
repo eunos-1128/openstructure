@@ -61,8 +61,15 @@ keys:
    number and insertion code of the ligand, separated by a dot.
  * "reference_ligands": Same for reference ligands.
  * "chem_groups": Groups of polypeptides/polynucleotides from reference that
-   are considered chemically equivalent, i.e. pass a pairwise sequence identity
-   threshold that can be controlled with --chem-group-seqid-thresh.
+   are considered chemically equivalent. Predefined if the reference is an mmCIF
+   file or if "seqres"/"trg-seqres-mapping" are provided manually. Alignments
+   of structure to SEQRES are established using residue numbers in these cases
+   and matching structure one letter codes and SEQRES are enforced.
+   In case of a PDB reference without predefined SEQRES, groups are established
+   using clustering based on pairwise alignments. Chains within
+   "chem_group_seqid_thresh" are considered equivalent and alignments are
+   established using residue numbers or Needleman-Wunsch
+   (see "residue-number-alignments" flag)
    You can derive stoichiometry from this. Contains only chains that are
    considered in chain mapping, i.e. pass a size threshold (defaults: 6 for
    peptides, 4 for nucleotides).
@@ -153,6 +160,7 @@ import traceback
 
 import ost
 from ost import io
+from ost.mol.alg import scoring_base
 from ost.mol.alg import ligand_scoring_base
 from ost.mol.alg import ligand_scoring_lddtpli
 from ost.mol.alg import ligand_scoring_scrmsd
@@ -583,8 +591,13 @@ def _LoadStructureData(receptor_path,
                        fault_tolerant = False,
                        allow_heuristic_conn = False):
 
+    # thats the return variables
+    # the last two are only set in case of an mmCIF file
     receptor = None
     ligands = None
+    seqres = None
+    trg_seqres_mapping = None
+
     receptor_format = _GetStructureFormat(receptor_path, sformat = sformat)
 
     if receptor_format == "pdb":
@@ -595,22 +608,26 @@ def _LoadStructureData(receptor_path,
         if bu_id is not None:
             raise RuntimeError(f"Cannot specify biounit ({bu_id}) for receptor "
                                f"in PDB format ({receptor_path})")
-        receptor = ligand_scoring_base.PDBPrep(receptor_path,
-                                               fault_tolerant=fault_tolerant)
+        receptor = scoring_base.PDBPrep(receptor_path,
+                                        fault_tolerant=fault_tolerant)
         ligands = _LoadLigands(ligand_path)
 
     elif receptor_format == "mmcif":
         if ligand_path is None:
-            receptor, ligands = ligand_scoring_base.MMCIFPrep(receptor_path,
-                                                              biounit = bu_id,
-                                                              extract_nonpoly = True,
-                                                              fault_tolerant = fault_tolerant,
-                                                              allow_heuristic_conn = allow_heuristic_conn)
+            receptor, ligands, seqres, trg_seqres_mapping = \
+            scoring_base.MMCIFPrep(receptor_path,
+                                   biounit = bu_id,
+                                   extract_nonpoly = True,
+                                   fault_tolerant = fault_tolerant,
+                                   allow_heuristic_conn = allow_heuristic_conn,
+                                   extract_seqres_mapping=True)
         else:
-            receptor = ligand_scoring_base.MMCIFPrep(receptor_path,
-                                                     biounit = bu_id,
-                                                     extract_nonpoly = False,
-                                                     fault_tolerant = fault_tolerant)
+            receptor, seqres, trg_seqres_mapping = \
+            scoring_base.MMCIFPrep(receptor_path,
+                                   biounit = bu_id,
+                                   extract_nonpoly = False,
+                                   fault_tolerant = fault_tolerant,
+                                   extract_seqres_mapping=True)
             ligands = _LoadLigands(ligand_path)
     else:
         raise RuntimeError("This should never happen")
@@ -618,32 +635,10 @@ def _LoadStructureData(receptor_path,
     # assign filename as name to receptor
     receptor.SetName(receptor_path)
 
-    return (receptor, ligands)
+    return (receptor, ligands, seqres, trg_seqres_mapping)
 
-def _SEQRESFeaturesFromArgs(args):
-    seqres = None
-    trg_seqres_mapping = None
-
-    if args.seqres is not None:
-        if args.trg_seqres_mapping is None:
-            raise RuntimeError("Must provide trg-seqres-mapping if seqres is "
-                               "provided")
-        if not args.residue_number_alignment:
-            raise RuntimeError("Must enable residue-number-alignment if seqres "
-                               "is provided.")
-        seqres = io.LoadSequenceList(args.seqres)
-
-    if args.trg_seqres_mapping is not None:
-        if args.seqres is None:
-            raise RuntimeError("Must provide seqres if trg-seqres-mapping is "
-                               "provided.")
-        trg_seqres_mapping = {x.split(':')[0]: x.split(':')[1] for x in args.trg_seqres_mapping}
-
-    return (seqres, trg_seqres_mapping)
-
-
-def _SetupLDDTPLIScorer(model, model_ligands, reference, reference_ligands, args):
-    seqres, trg_seqres_mapping = _SEQRESFeaturesFromArgs(args)
+def _SetupLDDTPLIScorer(model, model_ligands, reference, reference_ligands, args,
+                        seqres=None, trg_seqres_mapping=None):
     return ligand_scoring_lddtpli.LDDTPLIScorer(model, reference,
                                                 model_ligands = model_ligands,
                                                 target_ligands = reference_ligands,
@@ -663,8 +658,8 @@ def _SetupLDDTPLIScorer(model, model_ligands, reference, reference_ligands, args
                                                 seqres=seqres,
                                                 trg_seqres_mapping=trg_seqres_mapping)
 
-def _SetupSCRMSDScorer(model, model_ligands, reference, reference_ligands, args):
-    seqres, trg_seqres_mapping = _SEQRESFeaturesFromArgs(args)
+def _SetupSCRMSDScorer(model, model_ligands, reference, reference_ligands, args,
+                       seqres=None, trg_seqres_mapping=None):
     return ligand_scoring_scrmsd.SCRMSDScorer(model, reference,
                                               model_ligands = model_ligands,
                                               target_ligands = reference_ligands,
@@ -685,7 +680,26 @@ def _SetupSCRMSDScorer(model, model_ligands, reference, reference_ligands, args)
                                               seqres=seqres,
                                               trg_seqres_mapping=trg_seqres_mapping)
 
-def _Process(model, model_ligands, reference, reference_ligands, args):
+def _Process(model, model_ligands, reference, reference_ligands, args,
+             seqres = None, trg_seqres_mapping = None):
+
+    # see if seqres/trg-seqres-mapping are set in args
+    # if yes, they're prioritized even if we have these values from
+    # the mmCIF file
+    if args.seqres is not None:
+        if args.trg_seqres_mapping is None:
+            raise RuntimeError("Must provide trg-seqres-mapping if seqres "
+                               "is provided.")
+
+    if args.trg_seqres_mapping is not None:
+        if args.seqres is None:
+            raise RuntimeError("Must provide seqres if trg-seqres-mapping "
+                               "is provided.")
+
+    if args.seqres is not None and args.trg_seqres_mapping is not None:
+        seqres = io.LoadSequenceList(args.seqres)
+        trg_seqres_mapping = {x.split(':')[0]: x.split(':')[1] for x in args.chain_mapping}
+
 
     out = dict()
 
@@ -699,12 +713,14 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
     if args.lddt_pli:
         lddtpli_scorer = _SetupLDDTPLIScorer(model, model_ligands,
                                              reference, reference_ligands,
-                                             args)
+                                             args, seqres=seqres,
+                                             trg_seqres_mapping=trg_seqres_mapping)
 
     if args.rmsd:
         scrmsd_scorer = _SetupSCRMSDScorer(model, model_ligands,
                                            reference, reference_ligands,
-                                           args)
+                                           args, seqres=seqres,
+                                           trg_seqres_mapping=trg_seqres_mapping)
 
     # basic info on ligands only requires baseclass functionality
     # doesn't matter which scorer we use
@@ -718,7 +734,8 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
         # just create SCRMSD scorer to fill basic ligand info
         scorer = _SetupSCRMSDScorer(model, model_ligands,
                                     reference, reference_ligands,
-                                    args)
+                                    args, seqres=seqres,
+                                    trg_seqres_mapping=trg_seqres_mapping)
 
     ####################################
     # Extract / Map ligand information #
@@ -1011,22 +1028,24 @@ def _Main():
         # Load structures
         LogScript("Loading data")
         LogInfo("Loading reference data")
-        reference, reference_ligands = _LoadStructureData(args.reference,
-                                                          args.reference_ligands,
-                                                          sformat = args.reference_format,
-                                                          bu_id = args.reference_biounit,
-                                                          fault_tolerant = args.fault_tolerant,
-                                                          allow_heuristic_conn = args.allow_heuristic_conn)
+        reference, reference_ligands, seqres, trg_seqres_mapping = \
+        _LoadStructureData(args.reference,
+                           args.reference_ligands,
+                           sformat = args.reference_format,
+                           bu_id = args.reference_biounit,
+                           fault_tolerant = args.fault_tolerant,
+                           allow_heuristic_conn = args.allow_heuristic_conn)
 
         LogInfo("Loading model data")
-        model, model_ligands = _LoadStructureData(args.model,
-                                                  args.model_ligands,
-                                                  sformat = args.model_format,
-                                                  bu_id = args.model_biounit,
-                                                  fault_tolerant = args.fault_tolerant,
-                                                  allow_heuristic_conn = args.allow_heuristic_conn)
+        model, model_ligands, _, _ = _LoadStructureData(args.model,
+                                                        args.model_ligands,
+                                                        sformat = args.model_format,
+                                                        bu_id = args.model_biounit,
+                                                        fault_tolerant = args.fault_tolerant,
+                                                        allow_heuristic_conn = args.allow_heuristic_conn)
 
-        out = _Process(model, model_ligands, reference, reference_ligands, args)
+        out = _Process(model, model_ligands, reference, reference_ligands, args,
+                       seqres = seqres, trg_seqres_mapping = trg_seqres_mapping)
 
         # append input arguments
         out["model"] = args.model
