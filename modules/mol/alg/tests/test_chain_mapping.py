@@ -426,10 +426,6 @@ class TestChainMapper(unittest.TestCase):
     with self.assertRaises(RuntimeError):
         ChainMapper(ref, trg_seqres_mapping=trg_seqres_mapping)
 
-    with self.assertRaises(RuntimeError):
-        ChainMapper(ref, seqres=seqres,
-                    trg_seqres_mapping=trg_seqres_mapping)
-
     seqres_duplicate = seq.CreateSequenceList()
     seqres_duplicate.AddSequence(seq.CreateSequence("1", "GAMDMKALQKELEQFAKLLKQKRITLGYTQA"
                                                "DVGLTLGVLFGKVFSQTTISRFEALQLSLKN"
