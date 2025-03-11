@@ -67,6 +67,10 @@ namespace{
     return boost::python::make_tuple(VecToList(rnums), pos);
   }
 
+  boost::python::list wrap_get_rnums(OMFPtr omf, const String& cname) {
+    const std::vector<int>& rnums = omf->GetRNums(cname);
+    return VecToList<int>(rnums);
+  }
 }
 
 void export_omf_io() {
@@ -97,6 +101,7 @@ void export_omf_io() {
     .def("GetAvgBFactors", &OMF::GetAvgBFactors,(arg("cname")))
     .def("GetOccupancies", &OMF::GetOccupancies, return_value_policy<reference_existing_object>(),(arg("cname")))
     .def("GetSequence", &OMF::GetSequence, (arg("cname")))
+    .def("GetRNums", &wrap_get_rnums, (arg("cname")))
     .def("ToAssembly", &wrap_to_assembly, (arg("bu_info")))
     .def("Trace", &wrap_trace, (arg("cname"), arg("aname")))
   ;

@@ -5677,4 +5677,12 @@ String OMF::GetSequence(const String& cname) const {
   return sequence;
 }
 
+const std::vector<int>& OMF::GetRNums(const String& cname) const {
+  auto it = chain_data_.find(cname);
+  if(it == chain_data_.end()) {
+    throw ost::Error("Provided chain name not in OMF structure");
+  }
+  return it->second->rnums;
+}
+
 }} //ns

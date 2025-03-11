@@ -242,6 +242,8 @@ public:
 
   String GetSequence(const String& cname) const;
 
+  const std::vector<int>& GetRNums(const String& cname) const;
+
   // raw data access - pros only...
   const std::vector<ResidueDefinition>& GetResidueDefinitions() const {
     return residue_definitions_;
