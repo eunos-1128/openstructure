@@ -146,8 +146,11 @@ struct RevRegionRangeIter {
     }
     --e_;
     AlignedColumn col=*e_;
-
     return col;
+  }
+
+  RevRegionRangeIter& iter() {
+    return *this;
   }
 private:
   AlignedColumnIterator b_;
@@ -165,9 +168,14 @@ struct RegionRangeIter {
     if (b_==e_) {
       boost::python::objects::stop_iteration_error();
     }
+
     AlignedColumn col=*b_;
     ++b_;
     return col;
+  }
+
+  RegionRangeIter& iter() {
+    return *this;
   }
 private:
   AlignedColumnIterator b_;
@@ -188,6 +196,11 @@ struct ConstSeqListIter {
     ++b_;
     return s;
   }
+
+  ConstSeqListIter& iter()
+  {
+    return *this;
+  }
 private:
   ConstSequenceList           l_;
   ConstSequenceList::iterator b_;
@@ -207,6 +220,11 @@ struct SeqListIter {
     SequenceHandle s=*b_;
     ++b_;
     return s;
+  }
+
+  SeqListIter& iter()
+  {
+    return *this;
   }
 private:
   SequenceList           l_;
@@ -329,18 +347,26 @@ void export_sequence()
   class_<RegionRangeIter>("RegionRangeIter", no_init)
     .def("next", &RegionRangeIter::next)
     .def("__next__", &RegionRangeIter::next)
+    .def("iter", &RegionRangeIter::iter, return_value_policy<copy_non_const_reference>())
+    .def("__iter__", &RegionRangeIter::iter, return_value_policy<copy_non_const_reference>())
   ;
-    class_<RevRegionRangeIter>("RevRegionRangeIter", no_init)
+  class_<RevRegionRangeIter>("RevRegionRangeIter", no_init)
     .def("next", &RevRegionRangeIter::next)
     .def("__next__", &RevRegionRangeIter::next)
+    .def("iter", &RevRegionRangeIter::iter, return_value_policy<copy_non_const_reference>())
+    .def("__iter__", &RevRegionRangeIter::iter, return_value_policy<copy_non_const_reference>())
   ;
   class_<ConstSeqListIter>("ConstSeqListIter", no_init)
     .def("next", &ConstSeqListIter::next)
     .def("__next__", &ConstSeqListIter::next)
+    .def("iter", &ConstSeqListIter::iter, return_value_policy<copy_non_const_reference>())
+    .def("__iter__", &ConstSeqListIter::iter, return_value_policy<copy_non_const_reference>())
   ;
   class_<SeqListIter>("SeqListIter", no_init)
     .def("next", &SeqListIter::next)
     .def("__next__", &SeqListIter::next)
+    .def("iter", &SeqListIter::iter, return_value_policy<copy_non_const_reference>())
+    .def("__iter__", &SeqListIter::iter, return_value_policy<copy_non_const_reference>())
   ;
   class_<AlignmentHandle>("AlignmentHandle", init<>())
     .def("GetCount", &AlignmentHandle::GetCount)
