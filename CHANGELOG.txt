@@ -1,3 +1,9 @@
+Changes in Release 2.9.3
+--------------------------------------------------------------------------------
+ * Bugfix release to enable OpenStructure in Python 3.13
+ * tags in Docker/Singularity remain deliberately on 2.9.2
+
+
 Changes in Release 2.9.2
 --------------------------------------------------------------------------------
  * Examples for comparing macromolecular complexes
