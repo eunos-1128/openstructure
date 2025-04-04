@@ -2225,10 +2225,6 @@ class Scorer:
         flat_mapping = self.mapping.GetFlatMapping(mdl_as_key=True)
 
         # make alignments accessible by mdl seq name
-        stereochecked_alns = dict()
-        for aln in self.stereochecked_aln:
-            mdl_seq = aln.GetSequence(1)
-            stereochecked_alns[mdl_seq.name] = aln
         alns = dict()
         for aln in self.aln:
             mdl_seq = aln.GetSequence(1)
@@ -2284,10 +2280,25 @@ class Scorer:
 
 
         else:
+            # keep track what chains we have in the stereochecked model
+            # there might be really wild cases where a full model
+            # chain is removed in the stereochemistry checks.
+            # We need to adapt lddt chain mapping in these cases
+            mdl_chains = set([ch.name for ch in self.stereochecked_model.chains])
+
+            # make alignments accessible by mdl seq name
+            stereochecked_alns = dict()
+            for aln in self.stereochecked_aln:
+                mdl_seq = aln.GetSequence(1)
+                if mdl_seq.GetName() in mdl_chains:
+                    stereochecked_alns[mdl_seq.name] = aln
+
             lddt_chain_mapping = dict()
             for mdl_ch, trg_ch in flat_mapping.items():
                 if mdl_ch in stereochecked_alns:
                     lddt_chain_mapping[mdl_ch] = trg_ch
+
+
             lddt_score = self.lddt_scorer.lDDT(self.stereochecked_model,
                                                chain_mapping = lddt_chain_mapping,
                                                residue_mapping = stereochecked_alns,
