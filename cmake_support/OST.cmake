@@ -122,7 +122,6 @@ macro(copy_if_different FROM_DIR TO_DIR FILES TARGETS TARGET)
       endif()
       file(MAKE_DIRECTORY  ${TO_DIR})
       add_custom_command(TARGET "${TARGET}" PRE_BUILD
-          DEPENDS ${FROM}
           COMMAND ${CMAKE_COMMAND} -E copy_if_different ${FROM} ${TO})
   endforeach()
 endmacro()
