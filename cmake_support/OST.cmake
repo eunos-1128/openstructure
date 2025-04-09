@@ -484,10 +484,9 @@ macro(compile_py_files module out_dir compiled_files_name)
     list(APPEND ${compiled_files_name} ${_out_file})
     get_filename_component(_in_name ${input_file} NAME)
     file(MAKE_DIRECTORY  ${out_dir})
-    add_custom_command(TARGET ${module}
+    add_custom_command(TARGET ${module} POST_BUILD
                        COMMAND ${Python_EXECUTABLE} -c "import py_compile;py_compile.compile(\"${_in_file}\",\"${_out_file}\",\"${_in_name}\",doraise=True)"
-                       VERBATIM DEPENDS ${input_file}
-                       )
+                       VERBATIM)
   endforeach()
 endmacro()
 
