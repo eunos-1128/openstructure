@@ -11,6 +11,17 @@ cmake_minimum_required(VERSION 3.12.1 FATAL_ERROR)
 # manually forced CMake to the new scheme.
 cmake_policy(SET CMP0060 NEW)
 
+if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.31.0")
+  # See CMP0177 for more information
+  # To summarize: all paths given to the install command are normalized starting
+  # from cmake version 3.31. Starting from 3.31 you'll start to see warnings if
+  # you use the OLD behaviour but some paths would need normalization.
+  # The problem with ost: some of the paths that we give install look like:
+  # xyz/./bla. So its actually a good thing to run them through normalization
+  # which would give xyz/bla
+  cmake_policy(SET CMP0177 NEW)
+endif()
+
 project(OpenStructure CXX C)
 set (CMAKE_EXPORT_COMPILE_COMMANDS 1)
 set (OST_VERSION_MAJOR 2)
