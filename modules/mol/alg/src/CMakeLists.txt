@@ -66,7 +66,7 @@ module(NAME mol_alg SOURCES ${OST_MOL_ALG_SOURCES}
        HEADERS ${OST_MOL_ALG_HEADERS}
        HEADER_OUTPUT_DIR ost/mol/alg
        DEPENDS_ON ${MOL_ALG_DEPS}
-       LINK ${BOOST_PROGRAM_OPTIONS} ${BOOST_THREAD})
+       LINK Boost::program_options Boost::thread)
 
 copy_if_different("${CMAKE_CURRENT_SOURCE_DIR}" "${STAGE_DIR}/share/openstructure"
                   "atom_scattering_properties.txt" "ATOM_SCATTERING_PROPS"

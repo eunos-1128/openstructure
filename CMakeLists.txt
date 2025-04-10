@@ -2,7 +2,7 @@
 # Author: Marco Biasini
 #-------------------------------------------------------------------------------
 
-cmake_minimum_required(VERSION 3.12.1 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.25 FATAL_ERROR)
 
 # Set CMake policies
 # Behaviour of target_link_libraries, always link by full path. CMP0060 can
@@ -20,6 +20,15 @@ if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.31.0")
   # xyz/./bla. So its actually a good thing to run them through normalization
   # which would give xyz/bla
   cmake_policy(SET CMP0177 NEW)
+endif()
+
+if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.30.0")
+  # See CMP0167 for more information
+  # to summarize: Starting from boost 1.70, boost comes with a package
+  # configuration file BoostConfig.cmake. Starting from cmake 3.30,
+  # this is the way to go and users get warned if the old FindBoost module
+  # gets used.
+  cmake_policy(SET CMP0167 NEW)
 endif()
 
 project(OpenStructure CXX C)
@@ -194,11 +203,22 @@ find_package(Python 3.6 REQUIRED COMPONENTS Interpreter Development)
 # where Python modules live
 set(PYTHON_MODULE_PATH "python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/")
 
+set(_BOOST_MIN_VERSION 1.70)
+
 if(BOOST_VERSION)
   message(STATUS "forcing boost to version ${BOOST_VERSION}")
   set(_BOOST_MIN_VERSION ${BOOST_VERSION})
 endif()
-setup_boost()
+find_package(Boost ${_BOOST_MIN_VERSION} 
+             COMPONENTS unit_test_framework
+                        filesystem
+                        system
+                        iostreams
+                        program_options
+                        regex
+                        thread
+                        python
+             REQUIRED)
 if (WIN32)
    ADD_DEFINITIONS("-DBOOST_ALL_NO_LIB")
 endif()

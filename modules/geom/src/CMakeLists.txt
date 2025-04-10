@@ -54,7 +54,6 @@ vector.hh
 
 module(NAME geom
        HEADERS ${OST_GEOM_EXPORT_HELPERS} IN_DIR export_helper ${OST_GEOM_HEADERS}
-       SOURCES ${OST_GEOM_SOURCES}
-       LINK ${BOOST_LIBRARIES})
+       SOURCES ${OST_GEOM_SOURCES})
 add_dependencies(ost_geom ost_config)
 
