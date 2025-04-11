@@ -2,7 +2,7 @@
 # Author: Marco Biasini
 #-------------------------------------------------------------------------------
 
-cmake_minimum_required(VERSION 3.25 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.22 FATAL_ERROR)
 
 # Set CMake policies
 # Behaviour of target_link_libraries, always link by full path. CMP0060 can
