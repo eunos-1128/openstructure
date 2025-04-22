@@ -48,7 +48,7 @@ module(NAME mol_mm SOURCES ${OST_MOL_MM_SOURCES}
        HEADERS ${OST_MOL_MM_HEADERS}
        HEADER_OUTPUT_DIR ost/mol/mm
        DEPENDS_ON ${MOL_MM_DEPS}
-       LINK ${BOOST_PROGRAM_OPTIONS})
+       LINK Boost::program_options)
 
 target_link_libraries(ost_mol_mm ${OPEN_MM_LIBRARIES})
 

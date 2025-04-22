@@ -542,7 +542,7 @@ macro(pymod)
       set(_PARENT_LIB_NAME "${_PARENT_NAME}")
     endif()
     target_link_libraries("_${_LIB_NAME}" ${_PARENT_LIB_NAME} 
-                          ${Python_LIBRARIES} ${BOOST_PYTHON_LIBRARIES})
+                          ${Python_LIBRARIES} Boost::python)
 
     set_target_properties("_${_LIB_NAME}"
                           PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${PYMOD_STAGE_DIR})
@@ -657,7 +657,7 @@ macro(ost_unittest)
       set_target_properties(${_test_name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/tests"  )
       set_target_properties(${_test_name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/tests"  )
 
-      target_link_libraries(${_test_name} ${BOOST_UNIT_TEST_LIBRARIES} "${_ARG_PREFIX}_${_ARG_MODULE}")
+      target_link_libraries(${_test_name} Boost::unit_test_framework "${_ARG_PREFIX}_${_ARG_MODULE}")
       if (WIN32)
         set(TEST_COMMAND ${CMAKE_CURRENT_BINARY_DIR}/${_test_name}.exe || echo)
         message(${TEST_COMMAND})
@@ -794,7 +794,7 @@ macro(ost_match_boost_python_version)
   # this variable may either be a simple library path or list that contains
   # different libraries for different build-options. For example:
   # optimized;<lib1>;debug;<lib2>
-  set(_BOOST_PYTHON_LIBRARY ${BOOST_PYTHON_LIBRARIES})
+  set(_BOOST_PYTHON_LIBRARY Boost::python)
   list(LENGTH _BOOST_PYTHON_LIBRARY _BP_LENGTH)
   if (_BP_LENGTH GREATER 1)
     list(FIND _BOOST_PYTHON_LIBRARY optimized _OPTIMIZED_INDEX)
@@ -903,58 +903,6 @@ macro(setup_compiler_flags)
     endif()
   endif()
 endmacro()
-set(_BOOST_MIN_VERSION 1.31)
-
-macro(setup_boost)
-  #set (Boost_NO_BOOST_CMAKE TRUE)
-  # starting with CMake 3.11 we could use the following instead of the foreach
-  # find_package(Boost ${_BOOST_MIN_VERSION} COMPONENTS
-  #              python${Python_VERSION_MAJOR}${Python_VERSION_MINOR} REQUIRED)
-  # set(BOOST_PYTHON_LIBRARIES ${Boost_LIBRARIES})
-  # see https://cmake.org/cmake/help/v3.11/module/FindBoost.html
-  foreach(_python_lib_name python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}
-                           python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}
-                           python${Python_VERSION_MAJOR}
-                           python)
-    find_package(Boost ${_BOOST_MIN_VERSION} COMPONENTS ${_python_lib_name} QUIET)
-    if(Boost_FOUND)
-      message(STATUS "Found Boost package: " ${_python_lib_name})
-      set(BOOST_PYTHON_LIBRARIES ${Boost_LIBRARIES})
-      break()
-    else()
-      message(STATUS "Boost package not found: " ${_python_lib_name}
-                     ". Trying alternative names!")
-    endif()
-  endforeach(_python_lib_name)
-  if(NOT BOOST_PYTHON_LIBRARIES)
-    message(FATAL_ERROR "Failed to find any Boost Python library!")
-  endif()
-  set(Boost_LIBRARIES)
-  find_package(Boost ${_BOOST_MIN_VERSION}
-               COMPONENTS unit_test_framework REQUIRED)
-  set(BOOST_UNIT_TEST_LIBRARIES ${Boost_LIBRARIES})
-  set(Boost_LIBRARIES)
-  if (ENABLE_STATIC)
-    set(Boost_USE_STATIC_LIBS ON)
-  endif()
-  find_package(Boost ${_BOOST_MIN_VERSION}
-               COMPONENTS filesystem system REQUIRED)
-  set(BOOST_LIBRARIES ${Boost_LIBRARIES})
-  set(Boost_LIBRARIES)
-  find_package(Boost ${_BOOST_MIN_VERSION} COMPONENTS iostreams REQUIRED)
-  set(BOOST_IOSTREAM_LIBRARIES ${Boost_LIBRARIES})
-  set(Boost_LIBRARIES)
-  find_package(Boost ${_BOOST_MIN_VERSION} COMPONENTS program_options REQUIRED)
-  set(BOOST_PROGRAM_OPTIONS ${Boost_LIBRARIES})
-  set(Boost_LIBRARIES)
-  find_package(Boost ${_BOOST_MIN_VERSION} COMPONENTS regex REQUIRED)
-  set(BOOST_REGEX_LIBRARIES ${Boost_LIBRARIES})
-  set(Boost_LIBRARIES)
-  find_package(Boost ${_BOOST_MIN_VERSION} COMPONENTS thread REQUIRED)
-  set(BOOST_THREAD ${Boost_LIBRARIES})
-  set(Boost_LIBRARIES)
-endmacro()
-
 
 #-------------------------------------------------------------------------------
 # Synopsis:
