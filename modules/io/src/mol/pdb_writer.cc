@@ -392,10 +392,10 @@ PDBWriter::PDBWriter(const boost::filesystem::path& filename,
   charmm_style_(profile.dialect=="CHARMM"), is_pqr_(false),
   profile_(profile), filename_("")
 {
-  if (boost::iequals(".pqr", boost::filesystem::extension(filename))) {
+  if (boost::iequals(".pqr", filename.extension().string())) {
     is_pqr_=true;
   }
-  if (boost::iequals(".gz", boost::filesystem::extension(filename))) {
+  if (boost::iequals(".gz", filename.extension().string())) {
     out_.push(boost::iostreams::gzip_compressor());
   }
   out_.push(outstream_);
@@ -411,10 +411,10 @@ PDBWriter::PDBWriter(const String& filename, const IOProfile& profile):
                       std::string(strerror(errno)) +
                       ": '" + filename + "'");
   }
-  if (boost::iequals(".pqr", boost::filesystem::extension(filename))) {
+  if (boost::iequals(".pqr", boost::filesystem::path(filename).extension().string())) {
     is_pqr_=true;
   }
-  if (boost::iequals(".gz", boost::filesystem::extension(filename))) {
+  if (boost::iequals(".gz", boost::filesystem::path(filename).extension().string())) {
     out_.push(boost::iostreams::gzip_compressor());
   }
   out_.push(outstream_);

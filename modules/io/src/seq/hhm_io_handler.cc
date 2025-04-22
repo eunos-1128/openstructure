@@ -130,7 +130,7 @@ void HhmIOHandler::Import(seq::ProfileHandle& prof,
     throw IOException("Could not open " + loc.string());
   }
   // add unzip if necessary
-  if (boost::iequals(".gz", boost::filesystem::extension(loc))) {
+  if (boost::iequals(".gz", loc.extension().string())) {
     in.push(boost::iostreams::gzip_decompressor());
   }
   in.push(stream);
