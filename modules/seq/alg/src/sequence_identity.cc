@@ -30,8 +30,8 @@ Real SequenceIdentity(const AlignmentHandle& aln, RefMode::Type ref_mode,
 {
   int non_gap_count=0;
   int identical_count=0;
-  const String& sa=aln.GetSequence(seq_a).GetString();
-  const String& sb=aln.GetSequence(seq_b).GetString();  
+  String sa=aln.GetSequence(seq_a).GetString();
+  String sb=aln.GetSequence(seq_b).GetString();  
   for (String::const_iterator 
        i=sa.begin(), e=sa.end(), j=sb.begin(); i!=e; ++i, ++j) {
     if (!((*i)== '-' || (*j)=='-')) {
