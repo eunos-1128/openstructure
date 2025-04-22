@@ -880,6 +880,9 @@ endmacro()
 
 
 macro(setup_compiler_flags)
+
+  set(CMAKE_CXX_STANDARD 17)
+
   if (WIN32)
      # add_definitions(-DBOOST_TEST_INCLUDED)
 
@@ -894,13 +897,8 @@ macro(setup_compiler_flags)
     #add_definitions(-NODEFAULTLIB:LIBCMTD.lib)
   endif()
 
-
   if (CMAKE_COMPILER_IS_GNUCXX)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall" )
-    if ("${CMAKE_CXX_COMPILER_VERSION}" VERSION_LESS "6.0")
-      # for older compilers we need to enable C++11 for Qt5
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-    endif()
   endif()
 endmacro()
 
