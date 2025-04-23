@@ -33,8 +33,11 @@ namespace {
 
 std::pair<bf::path,bf::path> detect_files(const bf::path& loc)
 {
-  return std::make_pair(bf::change_extension(loc, ".vert"),
-                        bf::change_extension(loc, ".face"));
+  bf::path vert_loc = loc;
+  bf::path face_loc = loc;
+  vert_loc.replace_extension(".vert");
+  face_loc.replace_extension(".face");
+  return std::make_pair(vert_loc, face_loc);
 }
 
 }
