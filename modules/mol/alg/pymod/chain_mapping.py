@@ -1247,6 +1247,219 @@ class ChainMapper:
         return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
                              mdl_chains_without_chem_mapping, final_mapping, alns)
 
+
+    def GetAFMMapping(self, model, chem_mapping_result = None):
+        """Identify chain mapping as in AlphaFold-Multimer (AFM)
+
+        Described in section 7.3 of
+
+        Richard Evans, Michael O’Neill, Alexander Pritzel, Natasha Antropova,
+        Andrew Senior, Tim Green, Augustin Žídek, Russ Bates, Sam Blackwell,
+        Jason Yim, et al. Protein complex prediction with AlphaFold-Multimer.
+        bioRxiv preprint bioRxiv:10.1101/2021.10.04.463034, 2021.
+
+        To summarize (largely follows the description in the AF-Multimer paper):
+        One anchor chain in the ground truth (reference) is selected. If the
+        reference has stoichiometry A3B2, an arbitary chain in B is selected
+        as it has smaller ambiguity. In a tie, for example A2B2, the longest
+        chain in A, B is selected.
+
+        Given a model chain with same sequence as the reference anchor chain,
+        a CA-RMSD (C3' for nucleotides) based superposition is performed. Chains
+        are then greedily assigned by minimum distance of their geometric
+        centers. This procedure is repeated for every model chain with same
+        sequence and the assignment with minimal RMSD of the geometric centers
+        is returned.
+
+        A modification of this algorithm allows to deal with different
+        stoichiometries in reference and model. In the anchor selection, this
+        function ensures that there is at least one model chain that can be
+        mapped to this anchor. If the logic above does not identify a mappable
+        chain pair for the smallest group, it continues with the second smallest
+        group etc.
+
+        :param model: Model to map
+        :type model: :class:`ost.mol.EntityView`/:class:`ost.mol.EntityHandle`
+        :param chem_mapping_result: Pro param. The result of
+                                    :func:`~GetChemMapping` where you provided
+                                    *model*. If set, *model* parameter is not
+                                    used.
+        :type chem_mapping_result: :class:`tuple`
+        :returns: A :class:`MappingResult`
+        """
+        if chem_mapping_result is None:
+            chem_mapping, chem_group_alns, mdl_chains_without_chem_mapping, mdl = \
+            self.GetChemMapping(model)
+        else:
+            chem_mapping, chem_group_alns, mdl_chains_without_chem_mapping, mdl = \
+            chem_mapping_result
+        ref_mdl_alns =  _GetRefMdlAlns(self.chem_groups,
+                                       self.chem_group_alignments,
+                                       chem_mapping,
+                                       chem_group_alns)
+
+        # check for the simplest case
+        one_to_one = _CheckOneToOneMapping(self.chem_groups, chem_mapping)
+        if one_to_one is not None:
+            alns = dict()
+            for ref_group, mdl_group in zip(self.chem_groups, one_to_one):
+                for ref_ch, mdl_ch in zip(ref_group, mdl_group):
+                    if ref_ch is not None and mdl_ch is not None:
+                        aln = ref_mdl_alns[(ref_ch, mdl_ch)]
+                        alns[(ref_ch, mdl_ch)] = aln
+            return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
+                                 mdl_chains_without_chem_mapping, one_to_one, alns)
+
+        # Select anchor chain in reference
+        ref_group_idx = None
+        ref_ch = None
+
+        chem_group_sizes = [len(g) for g in self.chem_groups]
+        chem_group_sizes.sort()
+
+        for min_size in chem_group_sizes:
+            min_chem_groups = list()
+            for chem_group_idx, chem_group in enumerate(self.chem_groups):
+                if len(chem_group) == min_size:
+                    min_chem_groups.append(chem_group_idx)
+            if len(min_chem_groups) == 1:
+                if len(chem_mapping[min_chem_groups[0]]) > 0:
+                    # Unique smallest chem group that has at least one
+                    # model chain for mapping
+                    # => select arbitrary chain
+                    ref_group_idx = min_chem_groups[0]
+                    ref_ch = self.chem_groups[min_chem_groups[0]][0]
+            else:
+                # No unique smallest chem group
+                # => select the largest chain from any of these chem groups
+                #    that has at least one model chain for mapping
+                n_max = 0
+                for i in min_chem_groups:
+                    if len(chem_mapping[i]) > 0:
+                        for ch in self.chem_groups[i]:
+                            n = self.target.FindChain(ch).GetResidueCount()
+                            if n > n_max:
+                                n_max = n
+                                ref_group_idx = i
+                                ref_ch = ch
+            if ref_group_idx is not None and ref_ch is not None:
+                break
+
+        # One transformation for each model chain that can be mapped to this one
+        # anchor in the reference
+        ref_bb_pos = _GetBBPos(self.target)
+        mdl_bb_pos = _GetBBPos(mdl)
+        transformations = list()
+        for mdl_ch in chem_mapping[ref_group_idx]:
+            aln = ref_mdl_alns[(ref_ch, mdl_ch)]
+            # assertion can be removed after some testing
+            l1 = len(ref_bb_pos[ref_ch])
+            l2 = len(aln.GetSequence(0).GetGaplessString())
+            assert(l1 == l2)
+            l1 = len(mdl_bb_pos[mdl_ch])
+            l2 = len(aln.GetSequence(1).GetGaplessString())
+            assert(l1 == l2)
+            # extract aligned positions
+            ref_idx = 0
+            mdl_idx = 0
+            ref_pos = geom.Vec3List()
+            mdl_pos = geom.Vec3List()
+            for col in aln:
+                if col[0] != '-' and col[1] != '-':
+                    ref_pos.append(ref_bb_pos[ref_ch][ref_idx])
+                    mdl_pos.append(mdl_bb_pos[mdl_ch][mdl_idx])
+                if col[0] != '-':
+                    ref_idx += 1
+                if col[1] != '-':
+                    mdl_idx += 1
+            t = _GetSuperposition(mdl_pos, ref_pos, False).transformation
+            transformations.append(t)
+
+        ref_centers = {k: v.center for k,v in ref_bb_pos.items()}
+        mdl_chains = list()
+        mdl_centers = list()
+        for k,v in mdl_bb_pos.items():
+            mdl_chains.append(k)
+            mdl_centers.append(v.center)
+        mdl_centers = geom.Vec3List(mdl_centers)
+
+        best_rmsd = float("inf") 
+        best_mapping = None # k: ref_ch, v: mdl_ch
+
+        for t in transformations:
+            tmp = geom.Vec3List(mdl_centers)
+            tmp.ApplyTransform(t)
+            # somehow the Vec3List did not really work in a dict comprehension
+            t_mdl_centers = dict()
+            for i in range(len(tmp)):
+                t_mdl_centers[mdl_chains[i]] = tmp[i]
+
+            # one entry for each possible assignment
+            # (<distance>, <ref_ch>, <mdl_ch>)
+            tmp = list()
+            for chem_group, chem_mapping in zip(self.chem_groups, chem_mapping):
+                for ref_ch in chem_group:
+                    for mdl_ch in chem_mapping:
+                        d = geom.Length2(ref_centers[ref_ch]-t_mdl_centers[mdl_ch])
+                        tmp.append((d, ref_ch, mdl_ch))
+            tmp.sort()
+
+            mapping = dict()
+            mapped_mdl_chains = set()
+            for item in tmp:
+                if item[1] not in mapping and item[2] not in mapped_mdl_chains:
+                    mapping[item[1]] = item[2]
+                    mapped_mdl_chains.add(item[2])
+       
+            if len(mapping) == 0:
+                raise RuntimeError("Empty mapping in GetAFMMapping")
+            elif len(mapping) == 1:
+                # by definition zero
+                rmsd = 0.0
+            elif len(mapping) == 2:
+                # no superposition possible with two positions
+                # derive rmsd from the distance difference between
+                # the centroid pairs in reference and model
+                ref_p = [ref_centers[k] for k in mapping.keys()]
+                mdl_p = [mdl_centers[v] for v in mapping.values()]
+                ref_d = geom.Distance(ref_p[0], ref_p[1])
+                mdl_d = geom.Distance(mdl_p[0], mdl_p[1])
+                rmsd = abs(ref_d - mdl_d)/2
+            else:
+                # go for classic Kabsch superposition
+                mapped_ref_centers = geom.Vec3List()
+                mapped_mdl_centers = geom.Vec3List()
+                for ref_ch, mdl_ch in mapping.items():
+                    mapped_ref_centers.append(ref_centers[ref_ch])
+                    mapped_mdl_centers.append(t_mdl_centers[mdl_ch])
+                rmsd = _GetSuperposition(mapped_ref_centers,
+                                         mapped_mdl_centers, False).rmsd
+            if rmsd < best_rmsd:
+                best_rmsd = rmsd
+                best_mapping = mapping
+
+        # translate mapping format and return
+        final_mapping = list()
+        for ref_chains in self.chem_groups:
+            mapped_mdl_chains = list()
+            for ref_ch in ref_chains:
+                if ref_ch in best_mapping:
+                    mapped_mdl_chains.append(best_mapping[ref_ch])
+                else:
+                    mapped_mdl_chains.append(None)
+            final_mapping.append(mapped_mdl_chains)
+
+        alns = dict()
+        for ref_group, mdl_group in zip(self.chem_groups, final_mapping):
+            for ref_ch, mdl_ch in zip(ref_group, mdl_group):
+                if ref_ch is not None and mdl_ch is not None:
+                    aln = ref_mdl_alns[(ref_ch, mdl_ch)]
+                    alns[(ref_ch, mdl_ch)] = aln
+
+        return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
+                             mdl_chains_without_chem_mapping, final_mapping, alns)
+
+
     def GetMapping(self, model, n_max_naive = 40320):
         """ Convenience function to get mapping with currently preferred method
 

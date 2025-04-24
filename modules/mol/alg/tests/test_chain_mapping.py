@@ -264,6 +264,11 @@ class TestChainMapper(unittest.TestCase):
     heuristic_rigid_res = mapper.GetRMSDMapping(mdl, strategy="heuristic")
     self.assertEqual(heuristic_rigid_res.mapping, [['X', 'Y'],[None],['Z']])
 
+
+    # alphafold multimer mapping
+    afm_res = mapper.GetAFMMapping(mdl)
+    self.assertEqual(afm_res.mapping, [['X', 'Y'],[None],['Z']])
+
     # the default chain mapping
     default_res = mapper.GetMapping(mdl)
 
