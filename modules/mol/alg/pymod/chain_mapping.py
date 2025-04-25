@@ -1314,7 +1314,7 @@ class ChainMapper:
         ref_group_idx = None
         ref_ch = None
 
-        chem_group_sizes = [len(g) for g in self.chem_groups]
+        chem_group_sizes = list(set([len(g) for g in self.chem_groups]))
         chem_group_sizes.sort()
 
         for min_size in chem_group_sizes:
@@ -1334,13 +1334,13 @@ class ChainMapper:
                 # => select the largest chain from any of these chem groups
                 #    that has at least one model chain for mapping
                 n_max = 0
-                for i in min_chem_groups:
-                    if len(chem_mapping[i]) > 0:
-                        for ch in self.chem_groups[i]:
+                for chem_group_idx in min_chem_groups:
+                    if len(chem_mapping[chem_group_idx]) > 0:
+                        for ch in self.chem_groups[chem_group_idx]:
                             n = self.target.FindChain(ch).GetResidueCount()
                             if n > n_max:
                                 n_max = n
-                                ref_group_idx = i
+                                ref_group_idx = chem_group_idx
                                 ref_ch = ch
             if ref_group_idx is not None and ref_ch is not None:
                 break
@@ -1424,7 +1424,13 @@ class ChainMapper:
                 mdl_p = [mdl_centers[v] for v in mapping.values()]
                 ref_d = geom.Distance(ref_p[0], ref_p[1])
                 mdl_d = geom.Distance(mdl_p[0], mdl_p[1])
-                rmsd = abs(ref_d - mdl_d)/2
+                # compute RMSD when placing pair of coordinates with smaller
+                # distance in the middle of pair of cooridnates with larger
+                # distance
+                dd = abs(ref_d-mdl_d) # distance difference
+                # rmsd = sqrt(1/2 * ((dd/2)**2 + (dd/2)**2))
+                # => rmsd = dd/2
+                rmsd = dd/2
             else:
                 # go for classic Kabsch superposition
                 mapped_ref_centers = geom.Vec3List()
