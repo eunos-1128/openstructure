@@ -1421,7 +1421,7 @@ class ChainMapper:
                 # derive rmsd from the distance difference between
                 # the centroid pairs in reference and model
                 ref_p = [ref_centers[k] for k in mapping.keys()]
-                mdl_p = [mdl_centers[v] for v in mapping.values()]
+                mdl_p = [t_mdl_centers[v] for v in mapping.values()]
                 ref_d = geom.Distance(ref_p[0], ref_p[1])
                 mdl_d = geom.Distance(mdl_p[0], mdl_p[1])
                 # compute RMSD when placing pair of coordinates with smaller
