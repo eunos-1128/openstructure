@@ -2398,10 +2398,11 @@ def _GetRefMdlAlns(ref_chem_groups, ref_chem_group_msas, mdl_chem_groups,
 def _CheckOneToOneMapping(ref_chains, mdl_chains):
     """ Checks whether we already have a perfect one to one mapping
 
-    That means each list in *ref_chains* has exactly one element and each
-    list in *mdl_chains* has either one element (it's mapped) or is empty
-    (ref chain has no mapped mdl chain). Returns None if no such mapping
-    can be found.
+    That means each list in *ref_chains* has either exactly one element
+    and the respective list in *mdl_chains* has also one element or
+    it has several elements and the respective list in *mdl_chains* is
+    empty (ref chain(s) has no mapped mdl chain). Returns None if no such
+    mapping can be found.
 
     :param ref_chains: corresponds to :attr:`ChainMapper.chem_groups`
     :type ref_chains: :class:`list` of :class:`list` of :class:`str`
@@ -2416,8 +2417,8 @@ def _CheckOneToOneMapping(ref_chains, mdl_chains):
     for ref, mdl in zip(ref_chains, mdl_chains):
         if len(ref) == 1 and len(mdl) == 1:
             one_to_one.append(mdl)
-        elif len(ref) == 1 and len(mdl) == 0:
-            one_to_one.append([None])
+        elif len(ref) >= 1 and len(mdl) == 0:
+            one_to_one.append(len(ref)*[None])
         else:
             only_one_to_one = False
             break
