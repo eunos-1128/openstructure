@@ -1395,11 +1395,11 @@ class ChainMapper:
                 t_mdl_centers[mdl_chains[i]] = tmp[i]
 
             # one entry for each possible assignment
-            # (<distance>, <ref_ch>, <mdl_ch>)
+            # (<squared_distance>, <ref_ch>, <mdl_ch>)
             tmp = list()
-            for chem_group, chem_mapping in zip(self.chem_groups, chem_mapping):
-                for ref_ch in chem_group:
-                    for mdl_ch in chem_mapping:
+            for ref_chains, mdl_chains in zip(self.chem_groups, chem_mapping):
+                for ref_ch in ref_chains:
+                    for mdl_ch in mdl_chains:
                         d = geom.Length2(ref_centers[ref_ch]-t_mdl_centers[mdl_ch])
                         tmp.append((d, ref_ch, mdl_ch))
             tmp.sort()
