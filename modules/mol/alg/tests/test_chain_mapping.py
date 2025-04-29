@@ -220,10 +220,6 @@ class TestChainMapper(unittest.TestCase):
     naive_lddt_res = mapper.GetlDDTMapping(mdl, strategy="naive")
     self.assertEqual(naive_lddt_res.mapping, [['X', 'Y'],[None],['Z']])
 
-    # the "fast" strategy produces actually a suboptimal mapping in this case...
-    greedy_lddt_res = mapper.GetlDDTMapping(mdl, strategy="greedy_fast")
-    self.assertEqual(greedy_lddt_res.mapping, [['Y', 'X'],[None],['Z']])
-
     greedy_lddt_res = mapper.GetlDDTMapping(mdl, strategy="greedy_full")
     self.assertEqual(greedy_lddt_res.mapping, [['X', 'Y'],[None],['Z']])
 
@@ -236,9 +232,6 @@ class TestChainMapper(unittest.TestCase):
 
     # QS score based chain mappings
     naive_qsscore_res = mapper.GetQSScoreMapping(mdl, strategy="naive")
-    self.assertEqual(naive_qsscore_res.mapping, [['X', 'Y'],[None],['Z']])
-
-    greedy_qsscore_res = mapper.GetQSScoreMapping(mdl, strategy="greedy_fast")
     self.assertEqual(naive_qsscore_res.mapping, [['X', 'Y'],[None],['Z']])
 
     greedy_qsscore_res = mapper.GetQSScoreMapping(mdl, strategy="greedy_full")

@@ -839,10 +839,6 @@ class ChainMapper:
 
         * **naive**: Enumerates all possible mappings and returns best        
 
-        * **greedy_fast**: perform all vs. all single chain lDDTs within the
-          respective ref/mdl chem groups. The mapping with highest number of
-          conserved contacts is selected as seed for greedy extension
-
         * **greedy_full**: try multiple seeds for greedy extension, i.e. try
           all ref/mdl chain combinations within the respective chem groups and
           retain the mapping leading to the best lDDT.
@@ -868,7 +864,7 @@ class ChainMapper:
         :param thresholds: Thresholds for lDDT
         :type thresholds: :class:`list` of :class:`float`
         :param strategy: Strategy to find mapping. Must be in ["naive",
-                         "greedy_fast", "greedy_full", "greedy_block"]
+                         "greedy_full", "greedy_block"]
         :type strategy: :class:`str`
         :param steep_opt_rate: Only relevant for greedy strategies.
                                If set, every *steep_opt_rate* mappings, a simple
@@ -895,8 +891,7 @@ class ChainMapper:
         :returns: A :class:`MappingResult`
         """
 
-        strategies = ["naive", "greedy_fast", "greedy_full", "greedy_block",
-                      "heuristic"]
+        strategies = ["naive", "greedy_full", "greedy_block", "heuristic"]
         if strategy not in strategies:
             raise RuntimeError(f"Strategy must be in {strategies}")
 
@@ -946,9 +941,7 @@ class ChainMapper:
                                             inclusion_radius=inclusion_radius,
                                             thresholds=thresholds,
                                             steep_opt_rate=steep_opt_rate)
-            if strategy == "greedy_fast":
-                mapping = _lDDTGreedyFast(the_greed)
-            elif strategy == "greedy_full":
+            if strategy == "greedy_full":
                 mapping = _lDDTGreedyFull(the_greed)
             elif strategy == "greedy_block":
                 mapping = _lDDTGreedyBlock(the_greed, block_seed_size,
@@ -984,11 +977,6 @@ class ChainMapper:
         * **naive**: Naively iterate all possible mappings and return best based
                      on QS score.
 
-        * **greedy_fast**: perform all vs. all single chain lDDTs within the
-          respective ref/mdl chem groups. The mapping with highest number of
-          conserved contacts is selected as seed for greedy extension.
-          Extension is based on QS-score.
-
         * **greedy_full**: try multiple seeds for greedy extension, i.e. try
           all ref/mdl chain combinations within the respective chem groups and
           retain the mapping leading to the best QS-score. 
@@ -1013,7 +1001,7 @@ class ChainMapper:
                           contact in qs scoring
         :type contact_d: :class:`float` 
         :param strategy: Strategy for sampling, must be in ["naive",
-                         "greedy_fast", "greedy_full", "greedy_block"]
+                         greedy_full", "greedy_block"]
         :type strategy: :class:`str`
         :param chem_mapping_result: Pro param. The result of
                                     :func:`~GetChemMapping` where you provided
@@ -1034,7 +1022,7 @@ class ChainMapper:
         :returns: A :class:`MappingResult`
         """
 
-        strategies = ["naive", "greedy_fast", "greedy_full", "greedy_block", "heuristic"]
+        strategies = ["naive", "greedy_full", "greedy_block", "heuristic"]
         if strategy not in strategies:
             raise RuntimeError(f"strategy must be {strategies}")
 
@@ -1083,9 +1071,7 @@ class ChainMapper:
                                                contact_d = contact_d,
                                                steep_opt_rate=steep_opt_rate,
                                                greedy_prune_contact_map = greedy_prune_contact_map)
-            if strategy == "greedy_fast":
-                mapping = _QSScoreGreedyFast(the_greed)
-            elif strategy == "greedy_full":
+            if strategy == "greedy_full":
                 mapping = _QSScoreGreedyFull(the_greed)
             elif strategy == "greedy_block":
                 mapping = _QSScoreGreedyBlock(the_greed, block_seed_size,
@@ -2626,47 +2612,6 @@ def _GetSeeds(ref_chem_groups, mdl_chem_groups, mapped_ref_chains = set(),
                         seeds.append((ref_ch, mdl_ch))
     return seeds
 
-
-def _lDDTGreedyFast(the_greed):
-
-    something_happened = True
-    mapping = dict()
-
-    while something_happened:
-        something_happened = False
-        seeds = _GetSeeds(the_greed.ref_chem_groups,
-                          the_greed.mdl_chem_groups,
-                          mapped_ref_chains = set(mapping.keys()),
-                          mapped_mdl_chains = set(mapping.values()))
-        # search for best scoring starting point
-        n_best = 0
-        best_seed = None
-        for seed in seeds:
-            n = the_greed._NSCConserved(seed[0], seed[1]).sum()
-            if n > n_best:
-                n_best = n
-                best_seed = seed
-        if n_best == 0:
-            break # no proper seed found anymore...
-        # add seed to mapping and start the greed
-        mapping[best_seed[0]] = best_seed[1]
-        mapping = the_greed.ExtendMapping(mapping)
-        something_happened = True
-
-    # translate mapping format and return
-    final_mapping = list()
-    for ref_chains in the_greed.ref_chem_groups:
-        mapped_mdl_chains = list()
-        for ref_ch in ref_chains:
-            if ref_ch in mapping:
-                mapped_mdl_chains.append(mapping[ref_ch])
-            else:
-                mapped_mdl_chains.append(None)
-        final_mapping.append(mapped_mdl_chains)
-
-    return final_mapping
-
-
 def _lDDTGreedyFull(the_greed):
     """ Uses each reference chain as starting point for expansion
     """
@@ -3052,46 +2997,6 @@ def _QSScoreNaive(trg, mdl, chem_groups, chem_mapping, ref_mdl_alns, contact_d,
             best_mapping = mapping
             best_score = score_result.QS_global
     return (best_mapping, best_score)
-
-
-def _QSScoreGreedyFast(the_greed):
-
-    something_happened = True
-    mapping = dict()
-    while something_happened:
-        something_happened = False
-        # search for best scoring starting point, we're using lDDT here
-        n_best = 0
-        best_seed = None
-        seeds = _GetSeeds(the_greed.ref_chem_groups,
-                          the_greed.mdl_chem_groups,
-                          mapped_ref_chains = set(mapping.keys()),
-                          mapped_mdl_chains = set(mapping.values()))
-        for seed in seeds:
-            n = the_greed.SCCounts(seed[0], seed[1])
-            if n > n_best:
-                n_best = n
-                best_seed = seed
-        if n_best == 0:
-            break # no proper seed found anymore...
-        # add seed to mapping and start the greed
-        mapping[best_seed[0]] = best_seed[1]
-        mapping = the_greed.ExtendMapping(mapping)
-        something_happened = True
-
-    # translate mapping format and return
-    final_mapping = list()
-    for ref_chains in the_greed.ref_chem_groups:
-        mapped_mdl_chains = list()
-        for ref_ch in ref_chains:
-            if ref_ch in mapping:
-                mapped_mdl_chains.append(mapping[ref_ch])
-            else:
-                mapped_mdl_chains.append(None)
-        final_mapping.append(mapped_mdl_chains)
-
-    return final_mapping
-
 
 def _QSScoreGreedyFull(the_greed):
     """ Uses each reference chain as starting point for expansion
