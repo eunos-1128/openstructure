@@ -1109,6 +1109,14 @@ class ChainMapper:
           with lowest RMSD until a full mapping is achieved. The mapping with
           lowest RMSD is returned.
 
+        * **greedy_single_centroid**: Same as *greedy_single* but iteratively
+          adds model/target chain pairs with lowest centroid distance. The
+          mapping with the lowest centroid RMSD is returned. This is mainly for
+          evaluation purposes. One known failure mode is that intertwined
+          structures may have multiple centroids sitting on top of each other.
+          RMSD and thus *greedy_single* are better able to disentangle this
+          situation.
+
         * **greedy_iterative**: Same as greedy_single_rmsd exept that the
           transformation gets updated with each added chain pair.
 
@@ -1134,7 +1142,8 @@ class ChainMapper:
         :returns: A :class:`MappingResult`
         """
 
-        strategies = ["naive", "greedy_single", "greedy_iterative", "heuristic"]
+        strategies = ["naive", "greedy_single", "greedy_single_centroid",
+                      "greedy_iterative", "heuristic"]
 
         if strategy not in strategies:
             raise RuntimeError(f"strategy must be {strategies}")
@@ -1201,6 +1210,13 @@ class ChainMapper:
                                            trg_group_pos,
                                            mdl_group_pos)
 
+            elif strategy == "greedy_single_centroid":
+                mapping = _SingleRigidCentroid(initial_transforms,
+                                               initial_mappings,
+                                               self.chem_groups,
+                                               chem_mapping,
+                                               trg_group_pos,
+                                               mdl_group_pos)
 
             elif strategy == "greedy_iterative":
                 mapping = _IterativeRigidRMSD(initial_transforms,
@@ -3191,6 +3207,90 @@ def _SingleRigidRMSD(initial_transforms, initial_mappings, chem_groups,
             best_mapping = mapping
 
     return best_mapping
+
+
+def _SingleRigidCentroid(initial_transforms, initial_mappings, chem_groups,
+                         chem_mapping, trg_group_pos, mdl_group_pos):
+    """
+    Takes initial transforms and sequentially adds chain pairs with lowest
+    centroid distance.
+    The mapping from the transform that leads to lowest overall RMSD of
+    the centroids is returned.
+    """
+    best_mapping = dict()
+    best_rmsd = float("inf")
+
+    trg_group_centroids = list()
+    mdl_group_centroids = list()
+
+    for trg_pos, mdl_pos, in zip(trg_group_pos, mdl_group_pos):
+        trg_group_centroids.append(geom.Vec3List([p.center for p in trg_pos]))
+        mdl_group_centroids.append(geom.Vec3List([p.center for p in mdl_pos]))
+
+    for transform in initial_transforms:
+        mapping = dict()
+        mapped_mdl_chains = set()
+        mapped_trg_centroids = list()
+        mapped_mdl_centroids = list()
+        for trg_chains, mdl_chains, trg_centroids, mdl_centroids, in zip(chem_groups,
+                                                                         chem_mapping,
+                                                                         trg_group_centroids,
+                                                                         mdl_group_centroids):
+            if len(trg_centroids) == 0 or len(mdl_centroids) == 0:
+                continue # cannot compute valid rmsd
+            distances = list()
+            t_mdl_centroids = geom.Vec3List(mdl_centroids)
+            t_mdl_centroids.ApplyTransform(transform)
+
+            for trg_idx in range(len(trg_chains)):
+                for mdl_idx in range(len(mdl_chains)):
+                    distances.append((geom.Length2(trg_centroids[trg_idx]-t_mdl_centroids[mdl_idx]),
+                                     (trg_chains[trg_idx], mdl_chains[mdl_idx]),
+                                     (trg_centroids[trg_idx], t_mdl_centroids[mdl_idx])))
+
+            distances.sort()
+            for item in distances:
+                p = item[1]
+                if p[0] not in mapping and p[1] not in mapped_mdl_chains:
+                    mapping[p[0]] = p[1]
+                    mapped_mdl_chains.add(p[1])
+                    mapped_trg_centroids.append(item[2][0])
+                    mapped_mdl_centroids.append(item[2][1])
+
+
+        if len(mapping) == 0:
+            raise RuntimeError("Empty mapping in _SingleRigidCentroid")
+        elif len(mapping) == 1:
+            # by definition zero
+            rmsd = 0.0
+        elif len(mapping) == 2:
+            # no superposition possible with two positions
+            # derive rmsd from the distance difference between
+            # the centroid pairs in reference and model
+            ref_d = geom.Distance(mapped_trg_centroids[0],
+                                  mapped_trg_centroids[1])
+            mdl_d = geom.Distance(mapped_mdl_centroids[0],
+                                  mapped_mdl_centroids[1])
+            # compute RMSD when placing pair of coordinates with smaller
+            # distance in the middle of pair of cooridnates with larger
+            # distance
+            dd = abs(ref_d-mdl_d) # distance difference
+            # rmsd = sqrt(1/2 * ((dd/2)**2 + (dd/2)**2))
+            # => rmsd = dd/2
+            rmsd = dd/2
+        else:
+            # go for classic Kabsch superposition
+            mapped_trg_centroids = geom.Vec3List(mapped_trg_centroids)
+            mapped_mdl_centroids = geom.Vec3List(mapped_mdl_centroids)
+            rmsd = _GetSuperposition(mapped_trg_centroids,
+                                     mapped_mdl_centroids, False).rmsd
+
+        if rmsd < best_rmsd:
+            best_rmsd = rmsd
+            best_mapping = mapping
+
+    return best_mapping
+
 
 def _IterativeRigidRMSD(initial_transforms, initial_mappings, chem_groups,
                         chem_mapping, trg_group_pos, mdl_group_pos):

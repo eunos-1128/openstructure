@@ -254,6 +254,9 @@ class TestChainMapper(unittest.TestCase):
     greedy_rigid_res = mapper.GetRMSDMapping(mdl, strategy="greedy_single")
     self.assertEqual(greedy_rigid_res.mapping, [['X', 'Y'],[None],['Z']])
 
+    greedy_rigid_res = mapper.GetRMSDMapping(mdl, strategy="greedy_single_centroid")
+    self.assertEqual(greedy_rigid_res.mapping, [['X', 'Y'],[None],['Z']])
+
     heuristic_rigid_res = mapper.GetRMSDMapping(mdl, strategy="heuristic")
     self.assertEqual(heuristic_rigid_res.mapping, [['X', 'Y'],[None],['Z']])
 
