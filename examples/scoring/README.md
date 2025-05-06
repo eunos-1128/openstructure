@@ -14,8 +14,8 @@ Running the computations in containers provide a considerably easier setup than
 compiling OpenStructure from source. Instructions for setup and running
 equivalent computations are available for
 
-* [Docker](https://git.scicore.unibas.ch/schwede/openstructure/tree/master/docker)
-* [Singularity](https://git.scicore.unibas.ch/schwede/openstructure/tree/master/singularity)
+* [Docker](#Docker)
+* [Singularity](#Singularity)
 
 A detailed list of options can be found in the
 [action documentation](https://openstructure.org/docs/actions/).
@@ -71,4 +71,43 @@ latest dictionary, i.e. "Compound Library".
 You can override automatic extraction by providing SDF files with ligand
 coordinates and connectivity information. If the receptor is provided in
 PDB format, ligands must be provided in SDF format.
+
+# Docker
+
+For complete documentation on using Docker with OpenStructure, 
+[click here](https://git.scicore.unibas.ch/schwede/openstructure/tree/master/docker).
+This section provides a quick-start guide to help you get up and running with scoring using Docker.
+Most docker installations require you to add `sudo` in front of the following commands.
+
+Get the latest Docker image from the OpenStructure registry:
+
+```
+docker pull registry.scicore.unibas.ch/schwede/openstructure:latest
+```
+
+run one of the scoring examples, other examples need to be adapted accordingly:
+
+```
+docker run --rm -v $(pwd):/home registry.scicore.unibas.ch/schwede/openstructure:latest compare-structures -m model.pdb -r reference.cif.gz --lddt --local-lddt --qs-score
+```
+
+# Singularity
+
+For complete documentation on using Docker with OpenStructure, 
+[click here](https://git.scicore.unibas.ch/schwede/openstructure/tree/master/singularity).
+his section provides a quick-start guide to help you get up and running with scoring using Singularity.
+
+Building the singularity container requires root permissions:
+
+```
+cd <OST_ROOT>/singularity
+sudo singularity build ost.img Singularity
+```
+
+run one of the scoring examples, other examples need to be adapted accordingly:
+
+```
+singularity run --app OST ost.img compare-structures  -m model.pdb -r reference.cif.gz --lddt --local-lddt --qs-score
+```
+
 
