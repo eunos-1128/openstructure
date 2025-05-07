@@ -13,11 +13,6 @@ void Checker::CheckForCompleteness(bool require_hydrogens)
     String anames="";
     CompoundPtr compound=lib_->FindCompound(res.GetName(),Compound::PDB);
     if (!compound) {
-      if (checked_unk_res_) {
-        continue;
-      }
-      diags_.AddDiag(DIAG_UNK_RESIDUE, "unknown residue %0")
-            .AddResidue(res);
       continue;
     }
     int missing_atoms=0;
@@ -45,7 +40,6 @@ void Checker::CheckForCompleteness(bool require_hydrogens)
             .AddString(anames);
     }
   }
-  checked_unk_res_=true;
 }
 
 mol::AtomHandleList Checker::GetHydrogens()
@@ -92,22 +86,11 @@ void Checker::CheckForNonStandard()
 {
   for (ResidueHandleList::const_iterator i=residues_.begin(), 
        e = residues_.end(); i!=e; ++i) {
-    ResidueHandle res=*i;
-    CompoundPtr compound=lib_->FindCompound(res.GetName(),Compound::PDB);
-    if (!compound) {
-      if (checked_unk_res_) {
-        continue;
-      }
-      diags_.AddDiag(DIAG_UNK_RESIDUE, "unknown residue %0")            
-            .AddResidue(res);
-      continue;
-    }
-    if (ResidueToAminoAcid(res)==XXX) {
+    if (ResidueToAminoAcid(*i)==XXX) {
       diags_.AddDiag(DIAG_NONSTD_RESIDUE, "%0 is not a standard amino acid")            
-            .AddResidue(res);
+            .AddResidue(*i);
     }
   }
-  checked_unk_res_=true;
 }
 
 void Checker::CheckForUnknownAtoms()
@@ -118,11 +101,18 @@ void Checker::CheckForUnknownAtoms()
     String anames="";
     CompoundPtr compound=lib_->FindCompound(res.GetName(),Compound::PDB);
     if (!compound) {
-      if (checked_unk_res_) {
-        continue;
-      }
       diags_.AddDiag(DIAG_UNK_RESIDUE, "unknown residue %0")            
             .AddResidue(res);
+      // If the residue is unknown, all atoms are unknown too.
+      // This is relevant for molck as it only checks for these properties at
+      // the atom level.
+      AtomHandleList atoms=res.GetAtomList();
+      for (AtomHandleList::const_iterator
+         j=atoms.begin(), e2=atoms.end(); j!=e2; ++j) {
+        diags_.AddDiag(DIAG_UNK_ATOM, "residue %0 contains unknown atom %1")
+              .AddResidue(res)
+              .AddAtom(*j);
+      }
       continue;
     }
     AtomHandleList atoms=res.GetAtomList();
@@ -144,6 +134,5 @@ void Checker::CheckForUnknownAtoms()
       }
     }
   }
-  checked_unk_res_=true;
 }
 }} /* ost::conop */
