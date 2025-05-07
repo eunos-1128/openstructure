@@ -14,8 +14,8 @@ Running the computations in containers provide a considerably easier setup than
 compiling OpenStructure from source. Instructions for setup and running
 equivalent computations are available for
 
-* [Docker](#Docker)
-* [Singularity](#Singularity)
+* [Docker](#docker)
+* [Singularity](#singularity)
 
 A detailed list of options can be found in the
 [action documentation](https://openstructure.org/docs/actions/).
@@ -93,7 +93,7 @@ docker run --rm -v $(pwd):/home registry.scicore.unibas.ch/schwede/openstructure
 
 # Singularity
 
-For complete documentation on using Docker with OpenStructure, 
+For complete documentation on using Singularity with OpenStructure, 
 [click here](https://git.scicore.unibas.ch/schwede/openstructure/tree/master/singularity).
 his section provides a quick-start guide to help you get up and running with scoring using Singularity.
 
