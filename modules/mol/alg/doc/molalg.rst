@@ -1260,7 +1260,10 @@ API
 
   .. attribute:: rm_unk_atoms
 
-    Remove unknown and atoms not following the nomenclature.
+    Remove unknown atoms. That is 1) any atom from residues that are not
+    present in the chemical component dictionary (provided at Molck call)
+    2) any atom with a name that is not present in the respective entries
+    of the chemical component dictionary.
     
     :type: :class:`bool`
 
@@ -1272,7 +1275,11 @@ API
 
   .. attribute:: rm_hyd_atoms
 
-    Remove hydrogen atoms
+    Remove hydrogen atoms. That's all atoms with element specified as H or D
+    in the respective entries of the chemical component dictionary
+    (provided at Molck call). Unknown atoms (see :attr:`rm_unk_atoms`) are
+    not removed by this flag. If you really want to get rid of every hydrogen,
+    you need to combine it with :attr:`rm_unk_atoms`.
     
     :type: :class:`bool`
 
@@ -1303,7 +1310,11 @@ API
 
   .. attribute:: assign_elem
 
-    Clean up element column
+    Clean up element column - assigns elements as defined in the respective
+    entries of the chemical component dictionary (provided at Molck call).
+    For unknown atoms (see definition in :attr:`rm_unk_atoms`),
+    the element is set to an empty string. To avoid empty strings as elements,
+    this property should be applied in combination with :attr:`rm_unk_atoms`.
     
     :type: :class:`bool`
 
