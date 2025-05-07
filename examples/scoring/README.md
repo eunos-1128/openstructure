@@ -95,7 +95,7 @@ docker run --rm -v $(pwd):/home registry.scicore.unibas.ch/schwede/openstructure
 
 For complete documentation on using Singularity with OpenStructure, 
 [click here](https://git.scicore.unibas.ch/schwede/openstructure/tree/master/singularity).
-his section provides a quick-start guide to help you get up and running with scoring using Singularity.
+This section provides a quick-start guide to help you get up and running with scoring using Singularity.
 
 Building the singularity container requires root permissions:
 
