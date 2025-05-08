@@ -45,7 +45,7 @@ struct MolckSettings{
   bool map_nonstd_res;
   bool assign_elem;
 
-  MolckSettings(bool init_rm_unk_atoms=false,
+  MolckSettings(bool init_rm_unk_atoms=true,
                 bool init_rm_non_std=false,
                 bool init_rm_hyd_atoms=true,
                 bool init_rm_oxt_atoms=false,

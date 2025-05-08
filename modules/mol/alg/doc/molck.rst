@@ -107,7 +107,7 @@ It can also be split into subsequent commands for greater controll:
 API
 ###
 
-.. class:: MolckSettings(rm_unk_atoms=False, rm_non_std=False, \
+.. class:: MolckSettings(rm_unk_atoms=True, rm_non_std=False, \
                          rm_hyd_atoms=True, rm_oxt_atoms=False, \
                          rm_zero_occ_atoms=False, colored=False, \
                          map_nonstd_res=True, assign_elem=True)
