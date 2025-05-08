@@ -65,7 +65,6 @@ struct MolckSettings{
   public:
     std::string ToString(){
       std::string rep = "MolckSettings(rm_unk_atoms=" + BoolToString(rm_unk_atoms) +
-        ", rm_unk_atoms=" + BoolToString(rm_unk_atoms) +
         ", rm_non_std=" + BoolToString(rm_non_std) +
         ", rm_hyd_atoms=" + BoolToString(rm_hyd_atoms) +
         ", rm_oxt_atoms=" + BoolToString(rm_oxt_atoms) +
