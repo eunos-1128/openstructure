@@ -1,3 +1,11 @@
+Changes in Release 2.10.0
+--------------------------------------------------------------------------------
+ * Fixed a bug in Molck where atoms in unknown residues would not be cleaned up
+   with rm_unk_atoms=True.
+ * Changed default MolckSettings so that rm_unk_atoms defaults to True.
+ * Added details in documentation for Molck.
+
+
 Changes in Release 2.9.3
 --------------------------------------------------------------------------------
  * Bugfix release to enable OpenStructure in Python 3.13
