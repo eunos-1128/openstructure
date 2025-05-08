@@ -3,8 +3,19 @@
 Molecular Checker (Molck)
 --------------------------------------------------------------------------------
 
-The Molecular Checker (Molck) is a tool for cleaning up molecular structures and
-making them conform to the :doc:`compound library  <../../conop/compoundlib>`.
+The Molecular Checker (Molck) is a tool for cleaning up molecular structures 
+and making them conform to the :doc:`compound library  <../../conop/compoundlib>`.
+
+Molck removes any residues and atoms that are not defined in the compound
+library. This means that if the structure contains residues or atoms that 
+are not part of the compound library, they will be removed during the cleaning
+process.
+
+..caution::
+  Do not use Molck if you need to preserve residues or atoms that are not
+  defined in the compound library. For example, if your structure contains
+  ligands or other custom molecules that are not in the compound library,
+  using Molck would not preserve these components.
 
 Programmatic usage
 ##################
@@ -114,10 +125,10 @@ API
 
   .. attribute:: rm_unk_atoms
 
-    .. note::
+    .. tip::
 
-      This flag should **always** be set to True. Other flags are likely to
-      behave in unexpected manners otherwise.
+      This flag should **always** be set to True. Other flags will behave
+      unexpectedly otherwise.
 
     Remove unknown atoms. That is 1) any atom from residues that are not
     present in the compound library (provided at Molck call) and 2) any atom
