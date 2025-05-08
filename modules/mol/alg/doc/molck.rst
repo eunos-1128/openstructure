@@ -184,7 +184,7 @@ API
 
   .. attribute:: assign_elem
 
-    Assigns elements as defined in the respective entries of the coupound 
+    Assigns elements as defined in the respective entries of the compound 
     library (provided at Molck call). For unknown atoms (see definition in
     :attr:`rm_unk_atoms`), the element is set to an empty string.
     To avoid empty strings as elements, this property should only be applied
