@@ -75,3 +75,4 @@ modules/gui/src/dngr.qrc.depends
 /modules/bindings/tests/formatdb.log
 /modules/mol/mm/src/settings.hh
 *.img
+build
