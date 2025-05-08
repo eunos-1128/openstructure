@@ -1152,6 +1152,9 @@ to standard amino acids.
 Molecular Checker (Molck)
 --------------------------------------------------------------------------------
 
+The Molecular Checker (Molck) is a tool for cleaning up molecular structures and
+making them conform to the :doc:`compound library  <../../conop/compoundlib>`.
+
 Programmatic usage
 ##################
 
@@ -1166,7 +1169,7 @@ function:
 
 
   This is an exemplary procedure on how to run Molck using Python API which is
-  equivalent to the command line:
+  equivalent to the deprecated command line:
 
   molck <PDB PATH> --rm=hyd,oxt,nonstd,unk \
                    --fix-ele --out=<OUTPUT PATH> \
@@ -1205,7 +1208,7 @@ It can also be split into subsequent commands for greater controll:
 
 
   This is an exemplary procedure on how to run Molck using Python API which is
-  equivalent to the command line:
+  equivalent to the deprecated command line:
 
   molck <PDB PATH> --rm=hyd,oxt,nonstd,unk \
                    --fix-ele --out=<OUTPUT PATH> \
@@ -1260,64 +1263,72 @@ API
 
   .. attribute:: rm_unk_atoms
 
+    .. note::
+
+      This flag should **always** be set to True. Other flags are likely to
+      behave in unexpected manners otherwise.
+
     Remove unknown atoms. That is 1) any atom from residues that are not
-    present in the chemical component dictionary (provided at Molck call)
-    2) any atom with a name that is not present in the respective entries
-    of the chemical component dictionary.
+    present in the compound library (provided at Molck call) and 2) any atom
+    with a name that is not present in the respective entries of the compound
+    library.
     
     :type: :class:`bool`
 
   .. attribute:: rm_non_std
 
-    Remove all residues not one of the 20 standard amino acids
+    Remove all residues not one of the 20 standard amino acids.
+    This removes all other residues including unknown residues, ligands,
+    saccharides and nucleotides (including the 4 standard nucleotides).
     
     :type: :class:`bool`
 
   .. attribute:: rm_hyd_atoms
 
     Remove hydrogen atoms. That's all atoms with element specified as H or D
-    in the respective entries of the chemical component dictionary
-    (provided at Molck call). Unknown atoms (see :attr:`rm_unk_atoms`) are
-    not removed by this flag. If you really want to get rid of every hydrogen,
-    you need to combine it with :attr:`rm_unk_atoms`.
+    in the respective entries of the compound library (provided at Molck call).
+    Unknown atoms (see :attr:`rm_unk_atoms`) are not removed by this flag. If you
+    really want to get rid of every hydrogen, you need to combine it with
+    :attr:`rm_unk_atoms`.
     
     :type: :class:`bool`
 
   .. attribute:: rm_oxt_atoms
 
-    Remove terminal oxygens
+    Remove all atoms with name "OXT". That's typically terminal oxygens in protein
+    chains, but this might remove arbitrary atoms in other molecules. You should
+    only use this flag in combination with :attr:`rm_non_std`.
     
     :type: :class:`bool`
 
   .. attribute:: rm_zero_occ_atoms
 
-    Remove atoms with zero occupancy
+    Remove atoms with zero occupancy.
     
     :type: :class:`bool`
 
   .. attribute:: colored
 
-    Whether output should be colored
+    Whether output should be colored.
     
     :type: :class:`bool`
 
   .. attribute:: map_nonstd_res
 
     Maps modified residues back to the parent amino acid, for example
-    MSE -> MET, SEP -> SER
+    MSE -> MET, SEP -> SER.
     
     :type: :class:`bool`
 
   .. attribute:: assign_elem
 
-    Clean up element column - assigns elements as defined in the respective
-    entries of the chemical component dictionary (provided at Molck call).
-    For unknown atoms (see definition in :attr:`rm_unk_atoms`),
-    the element is set to an empty string. To avoid empty strings as elements,
-    this property should be applied in combination with :attr:`rm_unk_atoms`.
+    Assigns elements as defined in the respective entries of the coupound 
+    library (provided at Molck call). For unknown atoms (see definition in
+    :attr:`rm_unk_atoms`), the element is set to an empty string.
+    To avoid empty strings as elements, this property should only be applied
+    in combination with :attr:`rm_unk_atoms`.
     
     :type: :class:`bool`
-
 
   .. method:: ToString()
 
@@ -1384,7 +1395,9 @@ API
 
 .. function:: CleanUpElementColumn(ent, lib)
 
-  Clean up element column.
+  Assigns elements as defined in the respective entries of the compound library
+  as described in :attr:`MolckSettings.assign_elem`. This should only be called
+  after :func:`RemoveAtoms` with :attr:`rm_unk_atoms` set to True.
 
   :param ent: Structure to check
   :type ent: :class:`~ost.mol.EntityHandle`

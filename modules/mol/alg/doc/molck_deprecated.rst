@@ -6,6 +6,11 @@
 Molck - the Molecular Checker binary (deprecated)
 =================================================
 
+.. warning::
+
+  The molck binary is deprecated. Consider using the API in
+  :class:`ost.mol.alg.Molck <ost.mol.alg.Molck>` instead.
+
 --------------------------------------
 Where can I find the Molck executable? 
 --------------------------------------
