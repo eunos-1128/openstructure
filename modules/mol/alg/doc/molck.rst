@@ -11,7 +11,7 @@ library. This means that if the structure contains residues or atoms that
 are not part of the compound library, they will be removed during the cleaning
 process.
 
-..caution::
+.. caution::
   Do not use Molck if you need to preserve residues or atoms that are not
   defined in the compound library. For example, if your structure contains
   ligands or other custom molecules that are not in the compound library,
