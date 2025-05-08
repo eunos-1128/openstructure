@@ -3,13 +3,12 @@
 ..  Note on large code blocks: keep max. width to 100 or it will look bad
                                on webpage!
 
-Molck - the Molecular Checker binary (deprecated)
+Molck - the Molecular Checker binary
 =================================================
 
-.. warning::
+.. tip::
 
-  The molck binary is deprecated. Consider using the API in
-  :ref:`ost.mol.alg.Molck<molck>` instead.
+  Consider using the Python API in :ref:`ost.mol.alg.Molck<molck>` instead.
 
 --------------------------------------
 Where can I find the Molck executable? 

@@ -20,7 +20,7 @@ function:
 
 
   This is an exemplary procedure on how to run Molck using Python API which is
-  equivalent to the deprecated command line:
+  equivalent to the command line:
 
   molck <PDB PATH> --rm=hyd,oxt,nonstd,unk \
                    --fix-ele --out=<OUTPUT PATH> \
@@ -59,7 +59,7 @@ It can also be split into subsequent commands for greater controll:
 
 
   This is an exemplary procedure on how to run Molck using Python API which is
-  equivalent to the deprecated command line:
+  equivalent to the command line:
 
   molck <PDB PATH> --rm=hyd,oxt,nonstd,unk \
                    --fix-ele --out=<OUTPUT PATH> \
