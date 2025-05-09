@@ -1,23 +1,23 @@
-Local Distance Test scores (lDDT, DRMSD)
+Local Distance Difference Test (LDDT)
 ================================================================================
 
 .. note::
 
-  This is a new implementation of lDDT, introduced in OpenStructure 2.4 with
+  This is a new implementation of LDDT, introduced in OpenStructure 2.4 with
   focus on supporting quaternary structure and compounds beyond the 20
   standard proteinogenic amino acids.
-  The :doc:`previous lDDT code <lddt_deprecated>` that comes with
+  The :doc:`previous LDDT code <lddt_deprecated>` that comes with
   `Mariani et al. <https://dx.doi.org/10.1093/bioinformatics/btt473>`_ is
   considered deprecated.
 
 .. note::
 
-  :class:`lddt.lDDTScorer` provides the raw Python API to compute lDDT but
+  :class:`lddt.lDDTScorer` provides the raw Python API to compute LDDT but
   stereochemistry checks as described in
   `Mariani et al. <https://dx.doi.org/10.1093/bioinformatics/btt473>`_
   must be done seperately. You may want to check out the
   ``compare-structures`` action (:ref:`ost compare structures`) to
-  compute lDDT with pre-processing and support for quaternary structures.
+  compute LDDT with pre-processing and support for quaternary structures.
 
 
 .. autoclass:: ost.mol.alg.lddt.lDDTScorer
@@ -36,7 +36,7 @@ Local Distance Test scores (lDDT, DRMSD)
                         cutoffs=(0.5, 1.0, 2.0, 4.0), \
                         label="locallddt")
 
-  Object containing the settings used for lDDT calculations.
+  Object containing the settings used for LDDT calculations.
 
   :param radius: Sets :attr:`radius`.
   :param sequence_separation: Sets :attr:`sequence_separation`.
