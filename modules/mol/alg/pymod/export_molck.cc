@@ -125,7 +125,7 @@ void export_Molck()
 
   def("RemoveAtoms", &RemoveAtoms, (arg("ent"),
                                     arg("lib"),
-                                    arg("rm_unk_atoms")=false,
+                                    arg("rm_unk_atoms")=true,
                                     arg("rm_non_std")=false,
                                     arg("rm_hyd_atoms")=true,
                                     arg("rm_oxt_atoms")=false,

@@ -232,7 +232,7 @@ API
                     If set to False, you'll have no connectivity etc. after
                     calling this function.
 
-.. function:: RemoveAtoms(ent, lib, rm_unk_atoms=False, rm_non_std=False, \
+.. function:: RemoveAtoms(ent, lib, rm_unk_atoms=True, rm_non_std=False, \
                           rm_hyd_atoms=True, rm_oxt_atoms=False, \
                           rm_zero_occ_atoms=False, colored=False,
                           reprocess=True)
