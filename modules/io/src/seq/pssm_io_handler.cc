@@ -24,7 +24,7 @@
 #include "pssm_io_handler.hh"
 
 #include <boost/algorithm/string/predicate.hpp>
-#include <boost/filesystem/convenience.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
 #include <boost/iostreams/filtering_stream.hpp>
@@ -44,7 +44,7 @@ void PssmIOHandler::Import(seq::ProfileHandle& prof,
     throw IOException("Could not open " + loc.string());
   }
   // add unzip if necessary
-  if (boost::iequals(".gz", boost::filesystem::extension(loc))) {
+  if (boost::iequals(".gz", boost::filesystem::path(loc).extension().string())) {
     in.push(boost::iostreams::gzip_decompressor());
   }
   in.push(stream);

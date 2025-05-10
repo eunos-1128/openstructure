@@ -28,7 +28,7 @@
 #include <ctype.h>
 
 #include <boost/iostreams/filter/gzip.hpp>
-#include <boost/filesystem/convenience.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
 #include <boost/regex.hpp>
@@ -57,7 +57,7 @@ MAEReader::MAEReader(const boost::filesystem::path& loc):
   infile_(loc),
   in_()
 {
-  if (boost::iequals(".gz", boost::filesystem::extension(loc))) {
+  if (boost::iequals(".gz", boost::filesystem::path(loc).extension().string())) {
     in_.push(boost::iostreams::gzip_decompressor());    
   }
   in_.push(infile_);  

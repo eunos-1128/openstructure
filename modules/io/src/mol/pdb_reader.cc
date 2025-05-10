@@ -17,7 +17,7 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 //------------------------------------------------------------------------------
 #include <boost/iostreams/filter/gzip.hpp>
-#include <boost/filesystem/convenience.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/trim.hpp>
 
@@ -88,7 +88,7 @@ void PDBReader::Init(const boost::filesystem::path& loc)
   warned_rule_based_=false;
   charmm_style_=profile_.dialect=="CHARMM";
   num_model_records_=0;
-  if (boost::iequals(".gz", boost::filesystem::extension(loc))) {
+  if (boost::iequals(".gz", boost::filesystem::path(loc).extension().string())) {
     in_.push(boost::iostreams::gzip_decompressor());
   }
   in_.push(instream_);
@@ -96,7 +96,7 @@ void PDBReader::Init(const boost::filesystem::path& loc)
                      std::string(strerror(errno)) +
                      ": '" + loc.string() + "'");
   line_num_=0;
-  if(boost::iequals(boost::filesystem::extension(loc), ".pqr")) {
+  if(boost::iequals(boost::filesystem::path(loc).extension().string(), ".pqr")) {
     is_pqr_=true;
   } else {
     is_pqr_=false;

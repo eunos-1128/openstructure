@@ -5,7 +5,7 @@
 #include <ost/platform.hh>
 #include "local_dist_diff_test.hh"
 #include <boost/concept_check.hpp>
-#include <boost/filesystem/convenience.hpp>
+#include <boost/filesystem.hpp>
 #include <ost/mol/alg/consistency_checks.hh>
 
 namespace ost { namespace mol { namespace alg {

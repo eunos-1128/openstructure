@@ -24,7 +24,7 @@
 
 #include <ost/message.hh>
 #include <boost/filesystem/fstream.hpp>
-#include <boost/filesystem/convenience.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
 #include <boost/algorithm/string/erase.hpp>

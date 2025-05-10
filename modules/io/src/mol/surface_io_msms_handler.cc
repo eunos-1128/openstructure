@@ -22,7 +22,7 @@
 #include <sstream>
 
 #include <ost/log.hh>
-#include <boost/filesystem/convenience.hpp>
+#include <boost/filesystem.hpp>
 #include "surface_io_msms_handler.hh"
 
 namespace bf = boost::filesystem;
@@ -33,8 +33,11 @@ namespace {
 
 std::pair<bf::path,bf::path> detect_files(const bf::path& loc)
 {
-  return std::make_pair(bf::change_extension(loc, ".vert"),
-                        bf::change_extension(loc, ".face"));
+  bf::path v = loc;
+  v.replace_extension(".vert");
+  bf::path f = loc;
+  f.replace_extension(".face");
+  return std::make_pair(v, f);
 }
 
 }

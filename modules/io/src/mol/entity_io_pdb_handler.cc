@@ -24,7 +24,7 @@
 #include <iomanip>
 
 #include <boost/algorithm/string.hpp>
-#include <boost/filesystem/convenience.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
 
@@ -49,7 +49,7 @@ void EntityIOPDBHandler::Export(const mol::EntityView& ent,
                                 const boost::filesystem::path& loc) const 
 {
   PDBWriter writer(loc, IOProfileRegistry::Instance().GetDefault());
-  if (boost::iequals(boost::filesystem::extension(loc), ".pqr")) {
+  if (boost::iequals(boost::filesystem::path(loc).extension().string(), ".pqr")) {
     writer.SetIsPQR(true);
   }
   writer.Write(ent);

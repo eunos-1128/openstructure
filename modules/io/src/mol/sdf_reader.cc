@@ -21,7 +21,7 @@
  */
 
 #include <boost/algorithm/string.hpp>
-#include <boost/filesystem/convenience.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/format.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
 #include <boost/lexical_cast.hpp>
@@ -122,7 +122,7 @@ void SDFReader::Import(mol::EntityHandle& ent)
 
 void SDFReader::ClearState(const boost::filesystem::path& loc)
 {
-  if (boost::iequals(".gz", boost::filesystem::extension(loc))) {
+  if (boost::iequals(".gz", boost::filesystem::path(loc).extension().string())) {
     in_.push(boost::iostreams::gzip_decompressor());
   }
   in_.push(instream_);
