@@ -234,7 +234,7 @@ class TestlDDT(unittest.TestCase):
         # this value is just blindly copied in without checking whether it makes
         # any sense... it's sole purpose is to trigger the respective flag
         # in lDDT computation
-        self.assertEqual(lDDT, 0.6171511842396518)
+        self.assertAlmostEqual(lDDT, 0.6171511842396518, places=5)
 
     def test_drmsd(self):
         model = _LoadFile("7SGN_C_model.pdb")
@@ -245,7 +245,7 @@ class TestlDDT(unittest.TestCase):
 
         # this value is just blindly copied in without checking whether it makes
         # any sense... it's sole purpose is to trigger DRMSD computation
-        self.assertEqual(drmsd, 1.895447711911706)
+        self.assertAlmostEqual(drmsd, 1.895447711911706, places=5)
 
 class TestlDDTBS(unittest.TestCase):
 
