@@ -1330,7 +1330,7 @@ class lDDTScorer:
                 # nothing to do...
                 continue
 
-            pos = np.vstack(pos_list, dtype=np.float32)
+            pos = np.vstack(pos_list)
             atom_indices = np.asarray(atom_indices, dtype=np.int32)
 
             if atom_indices.shape[0] > 20000:
