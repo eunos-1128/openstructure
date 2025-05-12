@@ -236,7 +236,16 @@ class TestlDDT(unittest.TestCase):
         # in lDDT computation
         self.assertEqual(lDDT, 0.6171511842396518)
 
+    def test_drmsd(self):
+        model = _LoadFile("7SGN_C_model.pdb")
+        target = _LoadFile("7SGN_C_target.pdb")
 
+        lddt_scorer = lDDTScorer(target)
+        drmsd, per_res_drmsd = lddt_scorer.DRMSD(model)
+
+        # this value is just blindly copied in without checking whether it makes
+        # any sense... it's sole purpose is to trigger DRMSD computation
+        self.assertEqual(drmsd, 1.895447711911706)
 
 class TestlDDTBS(unittest.TestCase):
 

@@ -436,7 +436,7 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
             pos, _, _, _, _, _, lddt_symmetries = \
             scorer._ProcessModel(mdl_bs, lddt_chain_mapping,
                                  residue_mapping = lddt_alns,
-                                 thresholds = self.lddt_pli_thresholds,
+                                 nirvana_dist = self.lddt_pli_radius + max(self.lddt_pli_thresholds),
                                  check_resnames = False)
 
             # estimate a penalty for unsatisfied model contacts from chains
@@ -668,7 +668,7 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
             pos, _, _, _, _, _, lddt_symmetries = \
             scorer._ProcessModel(mdl_bs, lddt_chain_mapping,
                                  residue_mapping = lddt_alns,
-                                 thresholds = self.lddt_pli_thresholds,
+                                 nirvana_dist = self.lddt_pli_radius + max(self.lddt_pli_thresholds),
                                  check_resnames = False)
 
             for (trg_sym, mdl_sym) in symmetries:
