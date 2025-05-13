@@ -245,7 +245,7 @@ class TestlDDT(unittest.TestCase):
 
         # this value is just blindly copied in without checking whether it makes
         # any sense... it's sole purpose is to trigger DRMSD computation
-        self.assertAlmostEqual(drmsd, 1.895447711911706, places=5)
+        self.assertAlmostEqual(drmsd, 1.9765632785024412, places=5)
 
 class TestlDDTBS(unittest.TestCase):
 

@@ -892,17 +892,26 @@ class lDDTScorer:
         per_res_drmsd = [None] * model.GetResidueCount()
         for r_idx in range(len(res_atom_indices)):
             end_idx = start_idx + len(res_atom_indices[r_idx])
-            n_exp = per_res_exp[r_idx]
-            if n_exp > 0:
+            n_tot = per_res_exp[r_idx]
+            if n_tot > 0:
                 ssd = np.sum(per_atom_ssd[start_idx:end_idx])
-                per_res_drmsd[res_indices[r_idx]] = np.sqrt(ssd/n_exp)
+                # add penalties from distances involving atoms that are not
+                # present in the model
+                n_missing = n_tot - np.sum(per_atom_exp[start_idx:end_idx])
+                ssd += n_missing*dist_cap*dist_cap
+                per_res_drmsd[res_indices[r_idx]] = np.sqrt(ssd/n_tot)
             start_idx = end_idx
 
         # do full model score
         drmsd = None
-        n_exp = np.sum(per_atom_exp)
-        if n_exp > 0:
-            drmsd = np.sqrt(np.sum(per_atom_ssd)/n_exp)
+        n_tot = sum([len(x) for x in ref_indices])
+        if n_tot > 0:
+            ssd = np.sum(per_atom_ssd)
+            # add penalties from distances involving atoms that are not
+            # present in the model
+            n_missing = n_tot - np.sum(per_atom_exp)
+            ssd += (dist_cap*dist_cap*n_missing)
+            drmsd = np.sqrt(ssd/n_tot)
 
         return drmsd, per_res_drmsd
 
