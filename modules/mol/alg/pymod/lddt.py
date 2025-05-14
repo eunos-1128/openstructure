@@ -739,7 +739,7 @@ class lDDTScorer:
               no_intrachain=False, residue_mapping=None,
               check_resnames=True, add_mdl_contacts=False,
               interaction_data=None):
-        """ EXPERIMENTAL DRMSD of *model* - globally and per-residue
+        """ DRMSD of *model* - globally and per-residue
 
         Very similar to LDDT as we operate on distance differences for all
         interatomic distances within the same inclusion radius as in LDDT.
