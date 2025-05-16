@@ -100,7 +100,7 @@ This section provides a quick-start guide to help you get up and running with sc
 Building the singularity container requires root permissions:
 
 ```
-cd <OST_ROOT>/singularity
+wget https://git.scicore.unibas.ch/schwede/openstructure/-/raw/master/singularity/Singularity
 sudo singularity build ost.img Singularity
 ```
 
