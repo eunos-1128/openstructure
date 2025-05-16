@@ -21,10 +21,48 @@ making deployment easier. Deploying a docker image just needs a
 docker pull which typically finishes in about a minute depending
 on your local hardware and internet connection. Singularity
 containers bootstrap from the docker container but must be built
-by the user. Detailed instructions can be found here:
+by the user. 
 
-* Docker: [OpenStructure Docker Instructions](https://git.scicore.unibas.ch/schwede/openstructure/tree/master/docker)
-* Singularity: [OpenStructure Singularity Instructions](https://git.scicore.unibas.ch/schwede/openstructure/tree/master/singularity)
+### Docker
+
+For complete documentation on using Docker with OpenStructure, 
+[click here](https://git.scicore.unibas.ch/schwede/openstructure/tree/master/docker).
+This section provides a quick-start guide to help you get OpenStructure up and running using Docker.
+Most docker installations require you to add `sudo` in front of the docker commands.
+
+Get the latest Docker image from the OpenStructure registry:
+
+```
+docker pull registry.scicore.unibas.ch/schwede/openstructure:latest
+```
+
+And run a test script:
+
+```
+echo print\(\"Hello OST\"\) > test.py
+docker run --rm -v $(pwd):/home registry.scicore.unibas.ch/schwede/openstructure:latest test.py
+```
+### Singularity
+
+For complete documentation on using Singularity with OpenStructure, 
+[click here](https://git.scicore.unibas.ch/schwede/openstructure/tree/master/singularity).
+This section provides a quick-start guide to help you get OpenStructure up and running using Singularity.
+
+Building the singularity container requires root permissions:
+
+```
+wget https://git.scicore.unibas.ch/schwede/openstructure/-/raw/master/singularity/Singularity
+sudo singularity build ost.img Singularity
+```
+
+And run a test script:
+
+```
+echo print\(\"Hello OST\"\) > test.py
+singularity run --app OST ost.img test.py
+```
+
+### Build from source
 
 OpenStructure is developed and tested across various Linux distributions.
 You can find detailed build instructions and a list of required dependencies here:
