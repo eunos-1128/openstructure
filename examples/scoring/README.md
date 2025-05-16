@@ -19,10 +19,11 @@ equivalent computations are available for
 
 A detailed list of options can be found in the
 [action documentation](https://openstructure.org/docs/actions/).
-Alternatively, the command
+Alternatively, the commands
 
 ```
-ost <ACTION> -h
+ost compare-structures -h
+ost compare-ligand-structures -h
 ```
 
 will list all available options of the respective action. Both actions compute
