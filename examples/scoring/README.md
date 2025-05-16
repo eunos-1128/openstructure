@@ -8,6 +8,16 @@ OpenStructure provides "actions" for general benchmarking use cases.
 * **compare-ligand-structures**: Focuses on comparisons of interactions between
   polymer entities and non-polymer entities, i.e. small molecule ligands
   
+# Before doing any scoring
+Pull example data from the repository:
+
+```
+wget https://git.scicore.unibas.ch/schwede/openstructure/-/archive/master/openstructure-master.zip?path=examples/scoring -O example.zip
+unzip -j example.zip
+```
+
+# Run the examples
+
 The example commands here assume an OpenStructure installation
 (compile instructions: https://openstructure.org/docs/install/). 
 Running the computations in containers provide a considerably easier setup than
