@@ -65,14 +65,15 @@ singularity run --app OST ost.img test.py
 ### Build from source
 
 OpenStructure is developed and tested across various Linux distributions.
-You can find detailed build instructions and a list of required dependencies here:
-https://openstructure.org/docs/install/
+You can find [detailed build instructions and a list of required dependencies
+in the online documentation](https://openstructure.org/docs/install/).
 
 ## Getting started
 
-The installation and container instructions will help you set up
-OpenStructure for scripting. Additionally, here are some advanced
-use cases worth highlighting.
+Once you have OpenStructure installed, check out the [online
+documentation](https://openstructure.org/docs/).
+
+Additionally, here are some advanced use cases worth highlighting.
 
 ### Benchmarking and Scoring
 
