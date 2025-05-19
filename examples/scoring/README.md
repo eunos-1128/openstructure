@@ -19,10 +19,10 @@ unzip -j example.zip
 # Run the examples
 
 The example commands here assume an OpenStructure installation
-(compile instructions: https://openstructure.org/docs/install/). 
+([compile instructions](https://openstructure.org/docs/install/)).
 Running the computations in containers provide a considerably easier setup than
 compiling OpenStructure from source. Instructions for setup and running
-equivalent computations are available for
+equivalent computations are available below for
 
 * [Docker](#docker)
 * [Singularity](#singularity)
@@ -45,9 +45,9 @@ default output (out.json):
 ost compare-structures -m model.pdb -r reference.cif.gz --lddt --local-lddt --qs-score
 ```
 
-Results should be computed within seconds and example output can be found
-[here](compare-structures_example_out.json). We refer to the action
-documentation for in-depth description of the provided data items.
+Results should be computed within seconds and saved in the `out.json` file
+([see example output](compare-structures_example_out.json)). We refer to the
+action documentation for in-depth description of the provided data items.
 
 By default, model-reference chains are aligned using Needleman-Wunsch.
 Many benchmarking efforts such as CASP and CAMEO assume residue numbers
@@ -66,9 +66,10 @@ We can compute LDDT-PLI and BiSyRMSD with:
 ost compare-ligand-structures -m model.pdb -r reference.cif.gz -ml *.sdf --rmsd --lddt-pli
 ```
 
-Results should be computed within seconds and example output can be found
-[here](compare-ligand-structures_example_out.json). We refer to the action
-documentation for in-depth description of the provided data items.
+Results should be computed within seconds and saved in the `out.json` file
+([See example output ](compare-ligand-structures_example_out.json)). We refer
+to the action documentation for in-depth description of the provided data
+items.
 
 Again, it is advised to use the `-rna` flag if applicable. In this example,
 reference ligands are directly extracted from the provided mmCIF file based on
