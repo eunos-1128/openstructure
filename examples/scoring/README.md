@@ -47,7 +47,9 @@ ost compare-structures -m model.pdb -r reference.cif.gz --lddt --local-lddt --qs
 
 Results should be computed within seconds and saved in the `out.json` file
 ([see example output](compare-structures_example_out.json)). We refer to the
-action documentation for in-depth description of the provided data items.
+[action documentation](https://openstructure.org/docs/actions/) for in-depth
+description of the provided data items and description of optional flags that
+compute additional scores.
 
 By default, model-reference chains are aligned using Needleman-Wunsch.
 Many benchmarking efforts such as CASP and CAMEO assume residue numbers
@@ -78,8 +80,9 @@ This only works in case of mmCIF input AND if the respective ligand is in the
 PDB component dictionary which defines connectivity (matching based on compound
 name).
 Container solutions come with such a dictionary which has been created at build
-time. Check the Docker/Singularity instructions linked above on how to set the
-latest dictionary, i.e. "Compound Library".
+time. Check the detailed
+[Docker](https://git.scicore.unibas.ch/schwede/openstructure/tree/master/docker)/[Singularity](https://git.scicore.unibas.ch/schwede/openstructure/tree/master/singularity)
+instructions on how to set the latest dictionary, i.e. "Compound Library".
 You can override automatic extraction by providing SDF files with ligand
 coordinates and connectivity information. If the receptor is provided in
 PDB format, ligands must be provided in SDF format.
