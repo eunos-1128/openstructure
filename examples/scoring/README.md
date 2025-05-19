@@ -124,5 +124,3 @@ run one of the scoring examples, other examples need to be adapted accordingly:
 ```
 singularity run --app OST ost.img compare-structures  -m model.pdb -r reference.cif.gz --lddt --local-lddt --qs-score
 ```
-
-
