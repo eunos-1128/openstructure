@@ -24,6 +24,7 @@
 #include <ost/mol/entity_handle.hh>
 #include <ost/conop/compound_lib.hh>
 
+#include <ost/io/mol/omf.hh>
 #include <ost/io/mol/mmcif_info.hh>
 #include <ost/io/mol/io_profile.hh>
 #include <ost/io/mol/star_writer.hh>
@@ -122,6 +123,10 @@ public:
                     const std::vector<MMCifWriterEntity>& entity_info=std::vector<MMCifWriterEntity>());
 
   void SetStructure(const ost::mol::EntityView& ent, conop::CompoundLibPtr compound_lib,
+                    bool mmcif_conform=true,
+                    const std::vector<MMCifWriterEntity>& entity_info=std::vector<MMCifWriterEntity>());
+
+  void SetStructure(const ost::io::OMF& ent, conop::CompoundLibPtr compound_lib,
                     bool mmcif_conform=true,
                     const std::vector<MMCifWriterEntity>& entity_info=std::vector<MMCifWriterEntity>());
 

@@ -40,5 +40,5 @@ endif()
 module(NAME seq SOURCES ${OST_SEQ_SOURCES} 
          HEADERS ${OST_SEQ_IMPL_HEADERS} IN_DIR impl
                  ${OST_SEQ_HEADERS}
-         LINK ${BOOST_IOSTREAM_LIBRARIES}
+         LINK Boost::iostreams
          DEPENDS_ON ost_mol ${INFO_DEPS})

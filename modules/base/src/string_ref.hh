@@ -114,7 +114,7 @@ public:
   /// \brief strip space characters on the right
   StringRef rtrim() const {
     const char* s=end_;
-    while(--s>begin_ && isspace(*s)) {
+    while(--s>=begin_ && isspace(*s)) {
     }
     return StringRef(begin_, s+1-begin_);
   }

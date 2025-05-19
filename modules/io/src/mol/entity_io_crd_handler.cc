@@ -60,7 +60,7 @@ CRDReader::CRDReader(const boost::filesystem::path& loc):
   infile_(loc),
   in_()
 {
-  if (boost::iequals(".gz", boost::filesystem::extension(loc))) {
+  if (boost::iequals(".gz", loc.extension().string())) {
     in_.push(boost::iostreams::gzip_decompressor());    
   }
   in_.push(infile_);  

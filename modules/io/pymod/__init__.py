@@ -476,7 +476,7 @@ def SaveMMCIF(ent, filename, compound_lib = conop.GetDefaultLib(),
                         If *mmcif_conform* is set to False, heuristics kick in
                         to identify and separate mmCIF entities based on
                         :class:`ost.mol.ChemClass` of the residues in a chain.
-  :type ent: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
+  :type ent: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`/:class:`ost.io.OMF`
   :param entity_info: Advanced usage - description in :ref:`MMCif writing`
   :type filename: :class:`str`
   :type compound_lib: :class:`ost.conop.CompoundLib`

@@ -36,12 +36,13 @@ class MappingResult:
     Constructor is directly called within the functions, no need to construct
     such objects yourself.
     """
-    def __init__(self, target, model, chem_groups, chem_mapping, mapping, alns,
-                 opt_score=None):
+    def __init__(self, target, model, chem_groups, chem_mapping,
+                 mdl_chains_without_chem_mapping, mapping, alns, opt_score=None):
         self._target = target
         self._model = model
         self._chem_groups = chem_groups
         self._chem_mapping = chem_mapping
+        self._mdl_chains_without_chem_mapping = mdl_chains_without_chem_mapping
         self._mapping = mapping
         self._alns = alns
         self._opt_score = opt_score
@@ -84,6 +85,16 @@ class MappingResult:
         return self._chem_mapping
 
     @property
+    def mdl_chains_without_chem_mapping(self):
+        """ Model chains that cannot be mapped to :attr:`chem_groups`
+
+        Depends on parameterization of :class:`ChainMapper`
+
+        :class:`list` of class:`str` (chain names)
+        """
+        return self._mdl_chains_without_chem_mapping
+
+    @property
     def mapping(self):
         """ Mapping of :attr:`~model` chains onto :attr:`~target`
 
@@ -102,8 +113,7 @@ class MappingResult:
 
         Each alignment is accessible with ``alns[(t_chain,m_chain)]``. First
         sequence is the sequence of :attr:`target` chain, second sequence the
-        one from :attr:`~model`. The respective :class:`ost.mol.EntityView` are
-        attached with :func:`ost.seq.ConstSequenceHandle.AttachView`.
+        one from :attr:`~model`.
 
         :type: :class:`dict` with key: :class:`tuple` of :class:`str`, value:
                :class:`ost.seq.AlignmentHandle`
@@ -422,7 +432,7 @@ class ReprResult:
         """ Helper to extract full backbone positions
         """
         exp_pep_atoms = ["N", "CA", "C"]
-        exp_nuc_atoms = ["\"O5'\"", "\"C5'\"", "\"C4'\"", "\"C3'\"", "\"O3'\""]
+        exp_nuc_atoms = ["O5'", "C5'", "C4'", "C3'", "O3'"]
         bb_pos = geom.Vec3List()
         for r in residues:
             if r.GetChemType() == mol.ChemType.NUCLEOTIDES:
@@ -430,12 +440,13 @@ class ReprResult:
             elif r.GetChemType() == mol.ChemType.AMINOACIDS:
                 exp_atoms = exp_pep_atoms
             else:
-                raise RuntimeError("Something terrible happened... RUN...")
+                raise RuntimeError(f"Residue {r.qualified_name} has unexpected"
+                                   f" chem type {r.GetChemType()}")
             for aname in exp_atoms:
                 a = r.FindAtom(aname)
                 if not a.IsValid():
-                    raise RuntimeError("Something terrible happened... "
-                                       "RUN...")
+                    raise RuntimeError(f"Expected atom {aname} missing from "
+                                      f"{r.qualified_name}")
                 bb_pos.append(a.GetPos())
         return bb_pos
 
@@ -448,7 +459,8 @@ class ReprResult:
             if not at.IsValid():
                 at = r.FindAtom("C3'")
             if not at.IsValid():
-                raise RuntimeError("Something terrible happened... RUN...")
+                raise RuntimeError(f"Residue {r.qualified_name} missing "
+                                   f"expected CA/C3' atom")
             bb_pos.append(at.GetPos())
         return bb_pos
 
@@ -476,17 +488,27 @@ class ChainMapper:
 
     Chain mapping is a three step process:
 
-    * Group chemically identical chains in *target* using pairwise
-      alignments that are either computed with Needleman-Wunsch (NW) or
-      simply derived from residue numbers (*resnum_alignments* flag).
-      In case of NW, *pep_subst_mat*, *pep_gap_open* and *pep_gap_ext*
-      and their nucleotide equivalents are relevant. Two chains are
-      considered identical if they fulfill the *pep_seqid_thr* and
-      have at least *min_pep_length* aligned residues. Same logic
-      is applied for nucleotides with respective thresholds.
+    * Group chemically identical chains in *target* into so called chem
+      groups. There are two options to achieve this:
+      1) using pairwise alignments that are either computed with
+      Needleman-Wunsch (NW) or simply derived from residue numbers
+      (*resnum_alignments* flag). In case of NW, *pep_subst_mat*, *pep_gap_open*
+      and *pep_gap_ext* and their nucleotide equivalents are relevant. Two
+      chains are considered identical if they fulfill the *pep_seqid_thr* and
+      have at least *min_pep_length* aligned residues. Same logic is applied
+      for nucleotides with respective thresholds.
+      2) specify seqres sequences and provide the mapping manually. This can
+      be useful if you're loading data from an mmCIF file where you have mmCIF
+      entity information. Alignments are performed based on residue numbers
+      in this case and don't consider the *resnum_alignments* flag. Any
+      mismatch of one letter code in the structure and the respective SEQRES
+      raises an error.
 
-    * Map chains in an input model to these groups. Generating alignments
-      and the similarity criteria are the same as above. You can either
+    * Map chains in an input model to these groups. Parameters for generating
+      alignments are the same as above. Model chains are mapped to the chem
+      group with highest sequence identity. Optionally, you can set a minimum
+      sequence identity threshold with *mdl_map_pep_seqid_thr*/
+      *mdl_map_nuc_seqid_thr* to avoid nonsensical mappings. You can either
       get the group mapping with :func:`GetChemMapping` or directly call
       one of the full fletched one-to-one chain mapping functions which
       execute that step internally.
@@ -503,11 +525,12 @@ class ChainMapper:
     :param resnum_alignments: Use residue numbers instead of
                               Needleman-Wunsch to compute pairwise
                               alignments. Relevant for :attr:`~chem_groups` 
-                              and related attributes.
+                              if *seqres* is not specified explicitely.
     :type resnum_alignments: :class:`bool`
-    :param pep_seqid_thr: Threshold used to decide when two chains are
+    :param pep_seqid_thr: Sequence identity threshold (in percent of aligned
+                          columns) used to decide when two chains are
                           identical. 95 percent tolerates the few mutations
-                          crystallographers like to do.
+                          crystallographers like to do. Range: [0-100].
     :type pep_seqid_thr:  :class:`float`
     :param nuc_seqid_thr: Nucleotide equivalent for *pep_seqid_thr*
     :type nuc_seqid_thr:  :class:`float`
@@ -540,6 +563,37 @@ class ChainMapper:
                         :class:`RuntimeError` is raised in case of bigger
                         complexity.
     :type n_max_naive: :class:`int`
+    :param mdl_map_pep_seqid_thr: Sequence identity threshold (in percent of
+                                  aligned columns) to avoid non-sensical
+                                  mapping of model chains to reference chem
+                                  groups. If a value larger than 0.0 is
+                                  provided, minimal criteria for assignment
+                                  becomes a sequence identity of
+                                  *mdl_map_pep_seqid_thr* and at least
+                                  *min_pep_length* aligned residues. If set to
+                                  zero, it simply assigns a model chain to the
+                                  chem group with highest sequence identity.
+                                  Range: [0-100].
+    :type mdl_map_pep_seqid_thr: :class:`float`
+    :param mdl_map_nuc_seqid_thr: Nucleotide equivalent of
+                                  *mdl_map_pep_seqid_thr*
+    :type mdl_map_nuc_seqid_thr: :class:`float`
+    :param seqres: SEQRES sequences. All polymer chains in *target* will be
+                   aligned to these sequences using a residue number based
+                   alignment, effectively ignoring *resnum_alignments* in
+                   the chem grouping step. Additionally, you need to
+                   manually specify a mapping of the polymer chains using
+                   *trg_seqres_mapping* and an error is raised otherwise.
+                   The one letter codes in
+                   the structure must exactly match the respective characters
+                   in seqres and an error is raised if not. These seqres
+                   sequences are set as :attr:`~chem_group_ref_seqs` and will
+                   thus influence the mapping of model chains.
+    :type seqres: :class:`ost.seq.SequenceList`
+    :param trg_seqres_mapping: Maps each polymer chain in *target* to a sequence
+                               in *seqres*. It's a :class:`dict` with chain name
+                               as key and seqres sequence name as value.
+    :type trg_seqres_mapping: :class:`dict`
     """
     def __init__(self, target, resnum_alignments=False,
                  pep_seqid_thr = 95., nuc_seqid_thr = 95., 
@@ -547,8 +601,18 @@ class ChainMapper:
                  pep_gap_ext = -1, nuc_subst_mat = seq.alg.NUC44,
                  nuc_gap_open = -4, nuc_gap_ext = -4,
                  min_pep_length = 6, min_nuc_length = 4,
-                 n_max_naive = 1e8):
+                 n_max_naive = 1e8,
+                 mdl_map_pep_seqid_thr = 0.,
+                 mdl_map_nuc_seqid_thr = 0.,
+                 seqres = None,
+                 trg_seqres_mapping = None):
 
+        # input parameter check
+        seqres_params_set = sum([seqres is not None,
+                                 trg_seqres_mapping is not None])
+        if seqres_params_set not in [0, 2]:
+            raise RuntimeError("Must either give both, seqres and "
+                               "trg_seqres_mapping, or none of them.")
         # attributes
         self.resnum_alignments = resnum_alignments
         self.pep_seqid_thr = pep_seqid_thr
@@ -556,6 +620,17 @@ class ChainMapper:
         self.min_pep_length = min_pep_length
         self.min_nuc_length = min_nuc_length
         self.n_max_naive = n_max_naive
+        self.mdl_map_pep_seqid_thr = mdl_map_pep_seqid_thr
+        self.mdl_map_nuc_seqid_thr = mdl_map_nuc_seqid_thr
+        self.pep_subst_mat = pep_subst_mat
+        self.pep_gap_open = pep_gap_open
+        self.pep_gap_ext = pep_gap_ext
+        self.nuc_subst_mat = nuc_subst_mat
+        self.nuc_gap_open = nuc_gap_open
+        self.nuc_gap_ext = nuc_gap_ext
+        self.seqres = seqres
+        self.trg_seqres_mapping = trg_seqres_mapping
+        self.seqres_set = seqres_params_set == 2
 
         # lazy computed attributes
         self._chem_groups = None
@@ -563,18 +638,44 @@ class ChainMapper:
         self._chem_group_ref_seqs = None
         self._chem_group_types = None
 
-        # helper class to generate pairwise alignments
-        self.aligner = _Aligner(resnum_aln = resnum_alignments,
-                                pep_subst_mat = pep_subst_mat,
-                                pep_gap_open = pep_gap_open,
-                                pep_gap_ext = pep_gap_ext,
-                                nuc_subst_mat = nuc_subst_mat,
-                                nuc_gap_open = nuc_gap_open,
-                                nuc_gap_ext = nuc_gap_ext)
-
         # target structure preprocessing
         self._target, self._polypep_seqs, self._polynuc_seqs = \
         self.ProcessStructure(target)
+
+        # input parameter check
+        if self.seqres_set:
+            # check if seqres names, i.e. entity ids, are unique
+            entity_ids = set()
+            for s in self.seqres:
+                sname = s.GetName()
+                if sname in entity_ids:
+                    raise RuntimeError(f"Sequence names in seqres param must "
+                                       f"be unique and refer to entity ids. "
+                                       f"Duplicate sequence name: \"{sname}\"")
+                entity_ids.add(sname)
+            # check if entity ids in trg_seqres_mapping are all covered
+            # in seqres
+            for cname, entity_id in self.trg_seqres_mapping.items():
+                if entity_id not in entity_ids:
+                    raise RuntimeError(f"trg_seqres_mapping contains entity id "
+                                       f"for which no seqres is given: "
+                                       f"cname: \"{cname}\", entity id: "
+                                       f"\"{entity_id}\"")
+            # check if all sequences in self.polypep_seqs and self.polynuc_seqs
+            # have a mapping in trg_seqres_mapping
+            for s in self.polypep_seqs:
+                if s.GetName() not in self.trg_seqres_mapping:
+                    raise RuntimeError(f"If seqres information is provided, "
+                                       f"all polymer chains must be covered "
+                                       f"by trg_seqres_mapping. Missing "
+                                       f"mapping for chain \"{s.GetName()}\"")
+            for s in self.polynuc_seqs:
+                if s.GetName() not in self.trg_seqres_mapping:
+                    raise RuntimeError(f"If seqres information is provided, "
+                                       f"all polymer chains must be covered "
+                                       f"by trg_seqres_mapping. Missing "
+                                       f"mapping for chain \"{s.GetName()}\"")
+
 
     @property
     def target(self):
@@ -593,9 +694,6 @@ class ChainMapper:
     def polypep_seqs(self):
         """Sequences of peptide chains in :attr:`~target`
 
-        Respective :class:`EntityView` from *target* for each sequence s are
-        available as ``s.GetAttachedView()``
-
         :type: :class:`ost.seq.SequenceList`
         """
         return self._polypep_seqs
@@ -603,9 +701,6 @@ class ChainMapper:
     @property
     def polynuc_seqs(self):
         """Sequences of nucleotide chains in :attr:`~target`
-
-        Respective :class:`EntityView` from *target* for each sequence s are
-        available as ``s.GetAttachedView()``
 
         :type: :class:`ost.seq.SequenceList`
         """
@@ -621,49 +716,33 @@ class ChainMapper:
         :type: :class:`list` of :class:`list` of :class:`str` (chain names)
         """
         if self._chem_groups is None:
-            self._chem_groups = list()
-            for a in self.chem_group_alignments:
-                self._chem_groups.append([s.GetName() for s in a.sequences])
+            self._ComputeChemGroups()
         return self._chem_groups
     
     @property
     def chem_group_alignments(self):
         """MSA for each group in :attr:`~chem_groups`
 
-        Sequences in MSAs exhibit same order as in :attr:`~chem_groups` and
-        have the respective :class:`ost.mol.EntityView` from *target* attached.
+        The first sequence is the reference sequence.
+        The subsequent sequences represent the ATOMSEQ sequences in
+        :attr:`~target` in same order as in :attr:`~chem_groups`.
 
         :getter: Computed on first use (cached)
         :type: :class:`ost.seq.AlignmentList`
         """
         if self._chem_group_alignments is None:
-            self._chem_group_alignments, self._chem_group_types = \
-            _GetChemGroupAlignments(self.polypep_seqs, self.polynuc_seqs,
-                                    self.aligner,
-                                    pep_seqid_thr=self.pep_seqid_thr,
-                                    min_pep_length=self.min_pep_length,
-                                    nuc_seqid_thr=self.nuc_seqid_thr,
-                                    min_nuc_length=self.min_nuc_length)
-
+            self._ComputeChemGroups()
         return self._chem_group_alignments
 
     @property
     def chem_group_ref_seqs(self):
-        """Reference (longest) sequence for each group in :attr:`~chem_groups`
-
-        Respective :class:`EntityView` from *target* for each sequence s are
-        available as ``s.GetAttachedView()``
+        """Reference sequence for each group in :attr:`~chem_groups`
 
         :getter: Computed on first use (cached)
         :type: :class:`ost.seq.SequenceList`
         """
         if self._chem_group_ref_seqs is None:
-            self._chem_group_ref_seqs = seq.CreateSequenceList()
-            for a in self.chem_group_alignments:
-                s = seq.CreateSequence(a.GetSequence(0).GetName(),
-                                       a.GetSequence(0).GetGaplessString())
-                s.AttachView(a.GetSequence(0).GetAttachedView())
-                self._chem_group_ref_seqs.AddSequence(s)
+            self._ComputeChemGroups()
         return self._chem_group_ref_seqs
 
     @property
@@ -678,14 +757,7 @@ class ChainMapper:
         :type: :class:`list` of :class:`ost.mol.ChemType`
         """
         if self._chem_group_types is None:
-            self._chem_group_alignments, self._chem_group_types = \
-            _GetChemGroupAlignments(self.polypep_seqs, self.polynuc_seqs,
-                                    self.aligner,
-                                    pep_seqid_thr=self.pep_seqid_thr,
-                                    min_pep_length=self.min_pep_length,
-                                    nuc_seqid_thr=self.nuc_seqid_thr,
-                                    min_nuc_length=self.min_nuc_length)
-
+            self._ComputeChemGroups()
         return self._chem_group_types
         
     def GetChemMapping(self, model):
@@ -695,39 +767,51 @@ class ChainMapper:
                       selection that only includes peptides and nucleotides
                       is performed and returned along other results.
         :type model: :class:`ost.mol.EntityView`/:class:`ost.mol.EntityHandle`
-        :returns: Tuple with two lists of length `len(self.chem_groups)` and
-                  an :class:`ost.mol.EntityView` representing *model*:
+        :returns: Tuple with two lists of length `len(self.chem_groups)`, a list
+                  and an :class:`ost.mol.EntityView` representing *model*:
                   1) Each element is a :class:`list` with mdl chain names that
                   map to the chem group at that position.
                   2) Each element is a :class:`ost.seq.AlignmentList` aligning
                   these mdl chain sequences to the chem group ref sequences.
-                  3) A selection of *model* that only contains polypeptides and
+                  3) The model chains that could not be mapped to the reference
+                  4) A selection of *model* that only contains polypeptides and
                   polynucleotides whose ATOMSEQ exactly matches the sequence
                   info in the returned alignments.
         """
         mdl, mdl_pep_seqs, mdl_nuc_seqs = self.ProcessStructure(model)
         mapping = [list() for x in self.chem_groups]
+        mdl_chains_without_chem_mapping = list()
         alns = [seq.AlignmentList() for x in self.chem_groups]
 
         for s in mdl_pep_seqs:
-            idx, aln = _MapSequence(self.chem_group_ref_seqs, 
-                                    self.chem_group_types,
-                                    s, mol.ChemType.AMINOACIDS,
-                                    self.aligner)
-            if idx is not None:
+            idx, aln = self._MapSequence(self.chem_group_ref_seqs, 
+                                         self.chem_group_types,
+                                         s, mol.ChemType.AMINOACIDS, mdl,
+                                         seq_id_thr = self.mdl_map_pep_seqid_thr,
+                                         min_aln_length = self.min_pep_length)
+            if idx is None:
+                ost.LogWarning("Could not map model chain %s to any chem group"
+                               " in the target" % s.name)
+                mdl_chains_without_chem_mapping.append(s.GetName())
+            else:
                 mapping[idx].append(s.GetName())
                 alns[idx].append(aln)
 
         for s in mdl_nuc_seqs:
-            idx, aln = _MapSequence(self.chem_group_ref_seqs, 
-                                    self.chem_group_types,
-                                    s, mol.ChemType.NUCLEOTIDES,
-                                    self.aligner)
-            if idx is not None:
+            idx, aln = self._MapSequence(self.chem_group_ref_seqs, 
+                                         self.chem_group_types,
+                                         s, mol.ChemType.NUCLEOTIDES, mdl,
+                                         seq_id_thr = self.mdl_map_nuc_seqid_thr,
+                                         min_aln_length = self.min_nuc_length)
+            if idx is None:
+                ost.LogWarning("Could not map model chain %s to any chem group"
+                               " in the target" % s.name)
+                mdl_chains_without_chem_mapping.append(s.GetName())
+            else:
                 mapping[idx].append(s.GetName())
                 alns[idx].append(aln)
 
-        return (mapping, alns, mdl)
+        return (mapping, alns, mdl_chains_without_chem_mapping, mdl)
 
 
     def GetlDDTMapping(self, model, inclusion_radius=15.0,
@@ -755,10 +839,6 @@ class ChainMapper:
 
         * **naive**: Enumerates all possible mappings and returns best        
 
-        * **greedy_fast**: perform all vs. all single chain lDDTs within the
-          respective ref/mdl chem groups. The mapping with highest number of
-          conserved contacts is selected as seed for greedy extension
-
         * **greedy_full**: try multiple seeds for greedy extension, i.e. try
           all ref/mdl chain combinations within the respective chem groups and
           retain the mapping leading to the best lDDT.
@@ -784,7 +864,7 @@ class ChainMapper:
         :param thresholds: Thresholds for lDDT
         :type thresholds: :class:`list` of :class:`float`
         :param strategy: Strategy to find mapping. Must be in ["naive",
-                         "greedy_fast", "greedy_full", "greedy_block"]
+                         "greedy_full", "greedy_block"]
         :type strategy: :class:`str`
         :param steep_opt_rate: Only relevant for greedy strategies.
                                If set, every *steep_opt_rate* mappings, a simple
@@ -811,15 +891,16 @@ class ChainMapper:
         :returns: A :class:`MappingResult`
         """
 
-        strategies = ["naive", "greedy_fast", "greedy_full", "greedy_block",
-                      "heuristic"]
+        strategies = ["naive", "greedy_full", "greedy_block", "heuristic"]
         if strategy not in strategies:
             raise RuntimeError(f"Strategy must be in {strategies}")
 
         if chem_mapping_result is None:
-            chem_mapping, chem_group_alns, mdl = self.GetChemMapping(model)
+            chem_mapping, chem_group_alns, mdl_chains_without_chem_mapping, mdl = \
+            self.GetChemMapping(model)
         else:
-            chem_mapping, chem_group_alns, mdl = chem_mapping_result
+            chem_mapping, chem_group_alns, mdl_chains_without_chem_mapping, mdl = \
+            chem_mapping_result
 
         ref_mdl_alns =  _GetRefMdlAlns(self.chem_groups,
                                        self.chem_group_alignments,
@@ -834,11 +915,9 @@ class ChainMapper:
                 for ref_ch, mdl_ch in zip(ref_group, mdl_group):
                     if ref_ch is not None and mdl_ch is not None:
                         aln = ref_mdl_alns[(ref_ch, mdl_ch)]
-                        aln.AttachView(0, _CSel(self.target, [ref_ch]))
-                        aln.AttachView(1, _CSel(mdl, [mdl_ch]))
                         alns[(ref_ch, mdl_ch)] = aln
             return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
-                                 one_to_one, alns)
+                                 mdl_chains_without_chem_mapping, one_to_one, alns)
 
         if strategy == "heuristic":
             if _NMappingsWithin(self.chem_groups, chem_mapping,
@@ -862,9 +941,7 @@ class ChainMapper:
                                             inclusion_radius=inclusion_radius,
                                             thresholds=thresholds,
                                             steep_opt_rate=steep_opt_rate)
-            if strategy == "greedy_fast":
-                mapping = _lDDTGreedyFast(the_greed)
-            elif strategy == "greedy_full":
+            if strategy == "greedy_full":
                 mapping = _lDDTGreedyFull(the_greed)
             elif strategy == "greedy_block":
                 mapping = _lDDTGreedyBlock(the_greed, block_seed_size,
@@ -877,12 +954,11 @@ class ChainMapper:
             for ref_ch, mdl_ch in zip(ref_group, mdl_group):
                 if ref_ch is not None and mdl_ch is not None:
                     aln = ref_mdl_alns[(ref_ch, mdl_ch)]
-                    aln.AttachView(0, _CSel(self.target, [ref_ch]))
-                    aln.AttachView(1, _CSel(mdl, [mdl_ch]))
                     alns[(ref_ch, mdl_ch)] = aln
 
         return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
-                             mapping, alns, opt_score = opt_lddt)
+                             mdl_chains_without_chem_mapping, mapping, alns,
+                             opt_score = opt_lddt)
 
 
     def GetQSScoreMapping(self, model, contact_d = 12.0, strategy = "heuristic",
@@ -900,11 +976,6 @@ class ChainMapper:
 
         * **naive**: Naively iterate all possible mappings and return best based
                      on QS score.
-
-        * **greedy_fast**: perform all vs. all single chain lDDTs within the
-          respective ref/mdl chem groups. The mapping with highest number of
-          conserved contacts is selected as seed for greedy extension.
-          Extension is based on QS-score.
 
         * **greedy_full**: try multiple seeds for greedy extension, i.e. try
           all ref/mdl chain combinations within the respective chem groups and
@@ -930,7 +1001,7 @@ class ChainMapper:
                           contact in qs scoring
         :type contact_d: :class:`float` 
         :param strategy: Strategy for sampling, must be in ["naive",
-                         "greedy_fast", "greedy_full", "greedy_block"]
+                         greedy_full", "greedy_block"]
         :type strategy: :class:`str`
         :param chem_mapping_result: Pro param. The result of
                                     :func:`~GetChemMapping` where you provided
@@ -951,14 +1022,16 @@ class ChainMapper:
         :returns: A :class:`MappingResult`
         """
 
-        strategies = ["naive", "greedy_fast", "greedy_full", "greedy_block", "heuristic"]
+        strategies = ["naive", "greedy_full", "greedy_block", "heuristic"]
         if strategy not in strategies:
             raise RuntimeError(f"strategy must be {strategies}")
 
         if chem_mapping_result is None:
-            chem_mapping, chem_group_alns, mdl = self.GetChemMapping(model)
+            chem_mapping, chem_group_alns, mdl_chains_without_chem_mapping, mdl = \
+            self.GetChemMapping(model)
         else:
-            chem_mapping, chem_group_alns, mdl = chem_mapping_result
+            chem_mapping, chem_group_alns, mdl_chains_without_chem_mapping, mdl = \
+            chem_mapping_result
         ref_mdl_alns =  _GetRefMdlAlns(self.chem_groups,
                                        self.chem_group_alignments,
                                        chem_mapping,
@@ -971,11 +1044,9 @@ class ChainMapper:
                 for ref_ch, mdl_ch in zip(ref_group, mdl_group):
                     if ref_ch is not None and mdl_ch is not None:
                         aln = ref_mdl_alns[(ref_ch, mdl_ch)]
-                        aln.AttachView(0, _CSel(self.target, [ref_ch]))
-                        aln.AttachView(1, _CSel(mdl, [mdl_ch]))
                         alns[(ref_ch, mdl_ch)] = aln
             return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
-                                 one_to_one, alns)
+                                 mdl_chains_without_chem_mapping, one_to_one, alns)
 
         if strategy == "heuristic":
             if _NMappingsWithin(self.chem_groups, chem_mapping,
@@ -1000,9 +1071,7 @@ class ChainMapper:
                                                contact_d = contact_d,
                                                steep_opt_rate=steep_opt_rate,
                                                greedy_prune_contact_map = greedy_prune_contact_map)
-            if strategy == "greedy_fast":
-                mapping = _QSScoreGreedyFast(the_greed)
-            elif strategy == "greedy_full":
+            if strategy == "greedy_full":
                 mapping = _QSScoreGreedyFull(the_greed)
             elif strategy == "greedy_block":
                 mapping = _QSScoreGreedyBlock(the_greed, block_seed_size,
@@ -1015,12 +1084,11 @@ class ChainMapper:
             for ref_ch, mdl_ch in zip(ref_group, mdl_group):
                 if ref_ch is not None and mdl_ch is not None:
                     aln = ref_mdl_alns[(ref_ch, mdl_ch)]
-                    aln.AttachView(0, _CSel(self.target, [ref_ch]))
-                    aln.AttachView(1, _CSel(mdl, [mdl_ch]))
                     alns[(ref_ch, mdl_ch)] = aln
 
         return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
-                             mapping, alns, opt_score = opt_qsscore)
+                             mdl_chains_without_chem_mapping, mapping, alns,
+                             opt_score = opt_qsscore)
 
     def GetRMSDMapping(self, model, strategy = "heuristic", subsampling=50,
                        chem_mapping_result = None, heuristic_n_max_naive = 120):
@@ -1040,6 +1108,14 @@ class ChainMapper:
           For each starting point, iteratively add the model/target chain pair
           with lowest RMSD until a full mapping is achieved. The mapping with
           lowest RMSD is returned.
+
+        * **greedy_single_centroid**: Same as *greedy_single* but iteratively
+          adds model/target chain pairs with lowest centroid distance. The
+          mapping with the lowest centroid RMSD is returned. This is mainly for
+          evaluation purposes. One known failure mode is that intertwined
+          structures may have multiple centroids sitting on top of each other.
+          RMSD and thus *greedy_single* are better able to disentangle this
+          situation.
 
         * **greedy_iterative**: Same as greedy_single_rmsd exept that the
           transformation gets updated with each added chain pair.
@@ -1066,15 +1142,18 @@ class ChainMapper:
         :returns: A :class:`MappingResult`
         """
 
-        strategies = ["naive", "greedy_single", "greedy_iterative", "heuristic"]
+        strategies = ["naive", "greedy_single", "greedy_single_centroid",
+                      "greedy_iterative", "heuristic"]
 
         if strategy not in strategies:
             raise RuntimeError(f"strategy must be {strategies}")
 
         if chem_mapping_result is None:
-            chem_mapping, chem_group_alns, mdl = self.GetChemMapping(model)
+            chem_mapping, chem_group_alns, mdl_chains_without_chem_mapping, mdl = \
+            self.GetChemMapping(model)
         else:
-            chem_mapping, chem_group_alns, mdl = chem_mapping_result
+            chem_mapping, chem_group_alns, mdl_chains_without_chem_mapping, mdl = \
+            chem_mapping_result
         ref_mdl_alns =  _GetRefMdlAlns(self.chem_groups,
                                        self.chem_group_alignments,
                                        chem_mapping,
@@ -1088,11 +1167,9 @@ class ChainMapper:
                 for ref_ch, mdl_ch in zip(ref_group, mdl_group):
                     if ref_ch is not None and mdl_ch is not None:
                         aln = ref_mdl_alns[(ref_ch, mdl_ch)]
-                        aln.AttachView(0, _CSel(self.target, [ref_ch]))
-                        aln.AttachView(1, _CSel(mdl, [mdl_ch]))
                         alns[(ref_ch, mdl_ch)] = aln
             return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
-                                 one_to_one, alns)
+                                 mdl_chains_without_chem_mapping, one_to_one, alns)
 
         trg_group_pos, mdl_group_pos = _GetRefPos(self.target, mdl,
                                                   self.chem_group_alignments,
@@ -1109,36 +1186,43 @@ class ChainMapper:
         mapping = None
 
         if strategy.startswith("greedy"):
-          # get transforms of any mdl chain onto any trg chain in same chem
-          # group that fulfills gdtts threshold
-          initial_transforms = list()
-          initial_mappings = list()
-          for trg_pos, trg_chains, mdl_pos, mdl_chains in zip(trg_group_pos,
-                                                              self.chem_groups,
-                                                              mdl_group_pos,
-                                                              chem_mapping):
-              for t_pos, t in zip(trg_pos, trg_chains):
-                  for m_pos, m in zip(mdl_pos, mdl_chains):
-                      if len(t_pos) >= 3 and len(m_pos) >= 3:
-                          transform = _GetSuperposition(m_pos, t_pos,
-                                                        False).transformation
-                          initial_transforms.append(transform)
-                          initial_mappings.append((t,m))
+            # get transforms of any mdl chain onto any trg chain in same chem
+            # group that fulfills gdtts threshold
+            initial_transforms = list()
+            initial_mappings = list()
+            for trg_pos, trg_chains, mdl_pos, mdl_chains in zip(trg_group_pos,
+                                                                self.chem_groups,
+                                                                mdl_group_pos,
+                                                                chem_mapping):
+                for t_pos, t in zip(trg_pos, trg_chains):
+                    for m_pos, m in zip(mdl_pos, mdl_chains):
+                        if len(t_pos) >= 3 and len(m_pos) >= 3:
+                            transform = _GetSuperposition(m_pos, t_pos,
+                                                          False).transformation
+                            initial_transforms.append(transform)
+                            initial_mappings.append((t,m))
 
-          if strategy == "greedy_single":
-              mapping = _SingleRigidRMSD(initial_transforms,
-                                         initial_mappings,
-                                         self.chem_groups,
-                                         chem_mapping,
-                                         trg_group_pos,
-                                         mdl_group_pos)
+            if strategy == "greedy_single":
+                mapping = _SingleRigidRMSD(initial_transforms,
+                                           initial_mappings,
+                                           self.chem_groups,
+                                           chem_mapping,
+                                           trg_group_pos,
+                                           mdl_group_pos)
 
+            elif strategy == "greedy_single_centroid":
+                mapping = _SingleRigidCentroid(initial_transforms,
+                                               initial_mappings,
+                                               self.chem_groups,
+                                               chem_mapping,
+                                               trg_group_pos,
+                                               mdl_group_pos)
 
-          elif strategy == "greedy_iterative":
-              mapping = _IterativeRigidRMSD(initial_transforms,
-                                            initial_mappings,
-                                            self.chem_groups, chem_mapping,
-                                            trg_group_pos, mdl_group_pos)
+            elif strategy == "greedy_iterative":
+                mapping = _IterativeRigidRMSD(initial_transforms,
+                                              initial_mappings,
+                                              self.chem_groups, chem_mapping,
+                                              trg_group_pos, mdl_group_pos)
         elif strategy == "naive":
             mapping = _NaiveRMSD(self.chem_groups, chem_mapping,
                                  trg_group_pos, mdl_group_pos,
@@ -1160,12 +1244,229 @@ class ChainMapper:
             for ref_ch, mdl_ch in zip(ref_group, mdl_group):
                 if ref_ch is not None and mdl_ch is not None:
                     aln = ref_mdl_alns[(ref_ch, mdl_ch)]
-                    aln.AttachView(0, _CSel(self.target, [ref_ch]))
-                    aln.AttachView(1, _CSel(mdl, [mdl_ch]))
                     alns[(ref_ch, mdl_ch)] = aln
 
         return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
-                             final_mapping, alns)
+                             mdl_chains_without_chem_mapping, final_mapping, alns)
+
+
+    def GetAFMMapping(self, model, chem_mapping_result = None):
+        """Identify chain mapping as in AlphaFold-Multimer (AFM)
+
+        Described in section 7.3 of
+
+        Richard Evans, Michael O’Neill, Alexander Pritzel, Natasha Antropova,
+        Andrew Senior, Tim Green, Augustin Žídek, Russ Bates, Sam Blackwell,
+        Jason Yim, et al. Protein complex prediction with AlphaFold-Multimer.
+        bioRxiv preprint bioRxiv:10.1101/2021.10.04.463034, 2021.
+
+        To summarize (largely follows the description in the AF-Multimer paper):
+        One anchor chain in the ground truth (reference) is selected. If the
+        reference has stoichiometry A3B2, an arbitary chain in B is selected
+        as it has smaller ambiguity. In a tie, for example A2B2, the longest
+        chain in A, B is selected.
+
+        Given a model chain with same sequence as the reference anchor chain,
+        a CA-RMSD (C3' for nucleotides) based superposition is performed. Chains
+        are then greedily assigned by minimum distance of their geometric
+        centers. This procedure is repeated for every model chain with same
+        sequence and the assignment with minimal RMSD of the geometric centers
+        is returned.
+
+        A modification of this algorithm allows to deal with different
+        stoichiometries in reference and model. In the anchor selection, this
+        function ensures that there is at least one model chain that can be
+        mapped to this anchor. If the logic above does not identify a mappable
+        chain pair for the smallest group, it continues with the second smallest
+        group etc.
+
+        :param model: Model to map
+        :type model: :class:`ost.mol.EntityView`/:class:`ost.mol.EntityHandle`
+        :param chem_mapping_result: Pro param. The result of
+                                    :func:`~GetChemMapping` where you provided
+                                    *model*. If set, *model* parameter is not
+                                    used.
+        :type chem_mapping_result: :class:`tuple`
+        :returns: A :class:`MappingResult`
+        """
+        if chem_mapping_result is None:
+            chem_mapping, chem_group_alns, mdl_chains_without_chem_mapping, mdl = \
+            self.GetChemMapping(model)
+        else:
+            chem_mapping, chem_group_alns, mdl_chains_without_chem_mapping, mdl = \
+            chem_mapping_result
+        ref_mdl_alns =  _GetRefMdlAlns(self.chem_groups,
+                                       self.chem_group_alignments,
+                                       chem_mapping,
+                                       chem_group_alns)
+
+        # check for the simplest case
+        one_to_one = _CheckOneToOneMapping(self.chem_groups, chem_mapping)
+        if one_to_one is not None:
+            alns = dict()
+            for ref_group, mdl_group in zip(self.chem_groups, one_to_one):
+                for ref_ch, mdl_ch in zip(ref_group, mdl_group):
+                    if ref_ch is not None and mdl_ch is not None:
+                        aln = ref_mdl_alns[(ref_ch, mdl_ch)]
+                        alns[(ref_ch, mdl_ch)] = aln
+            return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
+                                 mdl_chains_without_chem_mapping, one_to_one, alns)
+
+        # Select anchor chain in reference
+        ref_group_idx = None
+        ref_ch = None
+
+        chem_group_sizes = list(set([len(g) for g in self.chem_groups]))
+        chem_group_sizes.sort()
+
+        for min_size in chem_group_sizes:
+            min_chem_groups = list()
+            for chem_group_idx, chem_group in enumerate(self.chem_groups):
+                if len(chem_group) == min_size:
+                    min_chem_groups.append(chem_group_idx)
+            if len(min_chem_groups) == 1:
+                if len(chem_mapping[min_chem_groups[0]]) > 0:
+                    # Unique smallest chem group that has at least one
+                    # model chain for mapping
+                    # => select arbitrary chain
+                    ref_group_idx = min_chem_groups[0]
+                    ref_ch = self.chem_groups[min_chem_groups[0]][0]
+            else:
+                # No unique smallest chem group
+                # => select the largest chain from any of these chem groups
+                #    that has at least one model chain for mapping
+                n_max = 0
+                for chem_group_idx in min_chem_groups:
+                    if len(chem_mapping[chem_group_idx]) > 0:
+                        for ch in self.chem_groups[chem_group_idx]:
+                            n = self.target.FindChain(ch).GetResidueCount()
+                            if n > n_max:
+                                n_max = n
+                                ref_group_idx = chem_group_idx
+                                ref_ch = ch
+            if ref_group_idx is not None and ref_ch is not None:
+                break
+
+        # One transformation for each model chain that can be mapped to this one
+        # anchor in the reference
+        ref_bb_pos = _GetBBPos(self.target)
+        mdl_bb_pos = _GetBBPos(mdl)
+        transformations = list()
+        for mdl_ch in chem_mapping[ref_group_idx]:
+            aln = ref_mdl_alns[(ref_ch, mdl_ch)]
+            # assertion can be removed after some testing
+            l1 = len(ref_bb_pos[ref_ch])
+            l2 = len(aln.GetSequence(0).GetGaplessString())
+            assert(l1 == l2)
+            l1 = len(mdl_bb_pos[mdl_ch])
+            l2 = len(aln.GetSequence(1).GetGaplessString())
+            assert(l1 == l2)
+            # extract aligned positions
+            ref_idx = 0
+            mdl_idx = 0
+            ref_pos = geom.Vec3List()
+            mdl_pos = geom.Vec3List()
+            for col in aln:
+                if col[0] != '-' and col[1] != '-':
+                    ref_pos.append(ref_bb_pos[ref_ch][ref_idx])
+                    mdl_pos.append(mdl_bb_pos[mdl_ch][mdl_idx])
+                if col[0] != '-':
+                    ref_idx += 1
+                if col[1] != '-':
+                    mdl_idx += 1
+            t = _GetSuperposition(mdl_pos, ref_pos, False).transformation
+            transformations.append(t)
+
+        ref_centers = {k: v.center for k,v in ref_bb_pos.items()}
+        mdl_chains = list()
+        mdl_centers = list()
+        for k,v in mdl_bb_pos.items():
+            mdl_chains.append(k)
+            mdl_centers.append(v.center)
+        mdl_centers = geom.Vec3List(mdl_centers)
+
+        best_rmsd = float("inf") 
+        best_mapping = None # k: ref_ch, v: mdl_ch
+
+        for t in transformations:
+            tmp = geom.Vec3List(mdl_centers)
+            tmp.ApplyTransform(t)
+            # somehow the Vec3List did not really work in a dict comprehension
+            t_mdl_centers = dict()
+            for i in range(len(tmp)):
+                t_mdl_centers[mdl_chains[i]] = tmp[i]
+
+            # one entry for each possible assignment
+            # (<squared_distance>, <ref_ch>, <mdl_ch>)
+            tmp = list()
+            for a, b in zip(self.chem_groups, chem_mapping):
+                for ref_ch in a:
+                    for mdl_ch in b:
+                        d = geom.Length2(ref_centers[ref_ch]-t_mdl_centers[mdl_ch])
+                        tmp.append((d, ref_ch, mdl_ch))
+            tmp.sort()
+
+            mapping = dict()
+            mapped_mdl_chains = set()
+            for item in tmp:
+                if item[1] not in mapping and item[2] not in mapped_mdl_chains:
+                    mapping[item[1]] = item[2]
+                    mapped_mdl_chains.add(item[2])
+       
+            if len(mapping) == 0:
+                raise RuntimeError("Empty mapping in GetAFMMapping")
+            elif len(mapping) == 1:
+                # by definition zero
+                rmsd = 0.0
+            elif len(mapping) == 2:
+                # no superposition possible with two positions
+                # derive rmsd from the distance difference between
+                # the centroid pairs in reference and model
+                ref_p = [ref_centers[k] for k in mapping.keys()]
+                mdl_p = [t_mdl_centers[v] for v in mapping.values()]
+                ref_d = geom.Distance(ref_p[0], ref_p[1])
+                mdl_d = geom.Distance(mdl_p[0], mdl_p[1])
+                # compute RMSD when placing pair of coordinates with smaller
+                # distance in the middle of pair of cooridnates with larger
+                # distance
+                dd = abs(ref_d-mdl_d) # distance difference
+                # rmsd = sqrt(1/2 * ((dd/2)**2 + (dd/2)**2))
+                # => rmsd = dd/2
+                rmsd = dd/2
+            else:
+                # go for classic Kabsch superposition
+                mapped_ref_centers = geom.Vec3List()
+                mapped_mdl_centers = geom.Vec3List()
+                for ref_ch, mdl_ch in mapping.items():
+                    mapped_ref_centers.append(ref_centers[ref_ch])
+                    mapped_mdl_centers.append(t_mdl_centers[mdl_ch])
+                rmsd = _GetSuperposition(mapped_ref_centers,
+                                         mapped_mdl_centers, False).rmsd
+            if rmsd < best_rmsd:
+                best_rmsd = rmsd
+                best_mapping = mapping
+
+        # translate mapping format and return
+        final_mapping = list()
+        for ref_chains in self.chem_groups:
+            mapped_mdl_chains = list()
+            for ref_ch in ref_chains:
+                if ref_ch in best_mapping:
+                    mapped_mdl_chains.append(best_mapping[ref_ch])
+                else:
+                    mapped_mdl_chains.append(None)
+            final_mapping.append(mapped_mdl_chains)
+
+        alns = dict()
+        for ref_group, mdl_group in zip(self.chem_groups, final_mapping):
+            for ref_ch, mdl_ch in zip(ref_group, mdl_group):
+                if ref_ch is not None and mdl_ch is not None:
+                    aln = ref_mdl_alns[(ref_ch, mdl_ch)]
+                    alns[(ref_ch, mdl_ch)] = aln
+
+        return MappingResult(self.target, mdl, self.chem_groups, chem_mapping,
+                             mdl_chains_without_chem_mapping, final_mapping, alns)
+
 
     def GetMapping(self, model, n_max_naive = 40320):
         """ Convenience function to get mapping with currently preferred method
@@ -1293,9 +1594,11 @@ class ChainMapper:
 
         # perform mapping and alignments on full structures
         if chem_mapping_result is None:
-            chem_mapping, chem_group_alns, mdl = self.GetChemMapping(model)
+            chem_mapping, chem_group_alns, mdl_chains_without_chem_mapping, mdl = \
+            self.GetChemMapping(model)
         else:
-            chem_mapping, chem_group_alns, mdl = chem_mapping_result
+            chem_mapping, chem_group_alns, mdl_chains_without_chem_mapping, mdl = \
+            chem_mapping_result
         ref_mdl_alns =  _GetRefMdlAlns(self.chem_groups,
                                        self.chem_group_alignments,
                                        chem_mapping,
@@ -1455,7 +1758,8 @@ class ChainMapper:
                       :attr:`chem_groups`
         :type model: :class:`ost.mol.EntityView`/:class:`ost.mol.EntityHandle`
         """
-        chem_mapping, chem_group_alns, mdl = self.GetChemMapping(model)
+        chem_mapping, chem_group_alns, mdl_chains_without_chem_mapping, mdl = \
+        self.GetChemMapping(model)
         return _NMappings(self.chem_groups, chem_mapping)
 
     def ProcessStructure(self, ent):
@@ -1468,7 +1772,6 @@ class ChainMapper:
         * filters view by chain lengths, see *min_pep_length* and
           *min_nuc_length* in constructor
         * Extracts atom sequences for each chain in that view
-        * Attaches corresponding :class:`ost.mol.EntityView` to each sequence
         * If residue number alignments are used, strictly increasing residue
           numbers without insertion codes are ensured in each chain
 
@@ -1477,8 +1780,7 @@ class ChainMapper:
         :returns: Tuple with 3 elements: 1) :class:`ost.mol.EntityView`
                   containing peptide and nucleotide residues 2)
                   :class:`ost.seq.SequenceList` containing ATOMSEQ sequences
-                  for each polypeptide chain in returned view, sequences have
-                  :class:`ost.mol.EntityView` of according chains attached
+                  for each polypeptide chain in returned view
                   3) same for polynucleotide chains
         """
         view = ent.CreateEmptyView()
@@ -1524,9 +1826,11 @@ class ChainMapper:
 
             # filter out short chains
             if n_pep > 0 and n_pep < self.min_pep_length:
+                ost.LogWarning("Skipping short peptide chain: %s" % ch.name)
                 continue
 
             if n_nuc > 0 and n_nuc < self.min_nuc_length:
+                ost.LogWarning("Skipping short nucleotide chain: %s" % ch.name)
                 continue
 
             # the superfast residue number based alignment adds some 
@@ -1547,7 +1851,6 @@ class ChainMapper:
 
             s = ''.join([r.one_letter_code for r in ch.residues])
             s = seq.CreateSequence(ch.GetName(), s)
-            s.AttachView(_CSel(view, [ch.GetName()]))
             if n_pep == n_res:
                 polypep_seqs.AddSequence(s)
             elif n_nuc == n_res:
@@ -1563,81 +1866,32 @@ class ChainMapper:
                                f"- mapping failed")
 
         # select for chains for which we actually extracted the sequence
-        chain_names = [s.GetAttachedView().chains[0].name for s in polypep_seqs]
-        chain_names += [s.GetAttachedView().chains[0].name for s in polynuc_seqs]
+        chain_names = [s.name for s in polypep_seqs]
+        chain_names += [s.name for s in polynuc_seqs]
         view = _CSel(view, chain_names)
 
         return (view, polypep_seqs, polynuc_seqs)
 
-    def Align(self, s1, s2, stype):
+    def NWAlign(self, s1, s2, stype):
         """ Access to internal sequence alignment functionality
 
-        Alignment parameterization is setup at ChainMapper construction
+        Performs Needleman-Wunsch alignment with parameterization
+        setup at ChainMapper construction
 
-        :param s1: First sequence to align - must have view attached in case
-                   of resnum_alignments
+        :param s1: First sequence to align
         :type s1: :class:`ost.seq.SequenceHandle`
-        :param s2: Second sequence to align - must have view attached in case
-                   of resnum_alignments
+        :param s2: Second sequence to align
         :type s2: :class:`ost.seq.SequenceHandle`
         :param stype: Type of sequences to align, must be in
                       [:class:`ost.mol.ChemType.AMINOACIDS`,
                       :class:`ost.mol.ChemType.NUCLEOTIDES`]
         :returns: Pairwise alignment of s1 and s2
         """
-        if stype not in [mol.ChemType.AMINOACIDS, mol.ChemType.NUCLEOTIDES]:
-            raise RuntimeError("stype must be ost.mol.ChemType.AMINOACIDS or "
-                               "ost.mol.ChemType.NUCLEOTIDES")
-        return self.aligner.Align(s1, s2, chem_type = stype)
-
-
-# INTERNAL HELPERS
-##################
-class _Aligner:
-    def __init__(self, pep_subst_mat = seq.alg.BLOSUM62, pep_gap_open = -5,
-                 pep_gap_ext = -2, nuc_subst_mat = seq.alg.NUC44,
-                 nuc_gap_open = -4, nuc_gap_ext = -4, resnum_aln = False):
-        """ Helper class to compute alignments
-
-        Sets default values for substitution matrix, gap open and gap extension
-        penalties. They are only used in default mode (Needleman-Wunsch aln).
-        If *resnum_aln* is True, only residue numbers of views that are attached
-        to input sequences are considered. 
-        """
-        self.pep_subst_mat = pep_subst_mat
-        self.pep_gap_open = pep_gap_open
-        self.pep_gap_ext = pep_gap_ext
-        self.nuc_subst_mat = nuc_subst_mat
-        self.nuc_gap_open = nuc_gap_open
-        self.nuc_gap_ext = nuc_gap_ext
-        self.resnum_aln = resnum_aln
-
-    def Align(self, s1, s2, chem_type=None):
-        if self.resnum_aln:
-            return self.ResNumAlign(s1, s2)
-        else:
-            if chem_type is None:
-                raise RuntimeError("Must specify chem_type for NW alignment")
-            return self.NWAlign(s1, s2, chem_type) 
-
-    def NWAlign(self, s1, s2, chem_type):
-        """ Returns pairwise alignment using Needleman-Wunsch algorithm
-    
-        :param s1: First sequence to align
-        :type s1: :class:`ost.seq.SequenceHandle`
-        :param s2: Second sequence to align
-        :type s2: :class:`ost.seq.SequenceHandle`
-        :param chem_type: Must be in [:class:`ost.mol.ChemType.AMINOACIDS`,
-                          :class:`ost.mol.ChemType.NUCLEOTIDES`], determines
-                          substitution matrix and gap open/extension penalties
-        :type chem_type: :class:`ost.mol.ChemType`
-        :returns: Alignment with s1 as first and s2 as second sequence 
-        """
-        if chem_type == mol.ChemType.AMINOACIDS:
+        if stype == mol.ChemType.AMINOACIDS:
             return seq.alg.SemiGlobalAlign(s1, s2, self.pep_subst_mat,
                                            gap_open=self.pep_gap_open,
                                            gap_ext=self.pep_gap_ext)[0]
-        elif chem_type == mol.ChemType.NUCLEOTIDES:
+        elif stype == mol.ChemType.NUCLEOTIDES:
             return seq.alg.SemiGlobalAlign(s1, s2, self.nuc_subst_mat,
                                            gap_open=self.nuc_gap_open,
                                            gap_ext=self.nuc_gap_ext)[0]
@@ -1645,59 +1899,401 @@ class _Aligner:
             raise RuntimeError("Invalid ChemType")
         return aln
 
-    def ResNumAlign(self, s1, s2):
-        """ Returns pairwise alignment using residue numbers of attached views
-    
-        Assumes that there are no insertion codes (alignment only on numerical
-        component) and that resnums are strictly increasing (fast min/max
-        identification). These requirements are assured if a structure has been
-        processed by :class:`ChainMapper`.
+    def SEQRESAlign(self, seqres, s, s_ent):
+        """ Access to internal sequence alignment functionality
 
-        :param s1: First sequence to align, must have :class:`ost.mol.EntityView`
-                   attached
-        :type s1: :class:`ost.seq.SequenceHandle`
-        :param s2: Second sequence to align, must have :class:`ost.mol.EntityView`
-                   attached
-        :type s2: :class:`ost.seq.SequenceHandle`
+        Performs alignment on SEQRES. Residue numbers for *s* are
+        extracted from *s_ent*. Residue numbers start from 1, i.e.
+        1 aligns to the first element in *seqres*.
+
+        :param seqres: SEQRES sequence
+        :type seqres: :class:`ost.seq.SequenceHandle`
+        :param s: Sequence to align
+        :type s: :class:`ost.seq.SequenceHandle`
+        :param s_ent: Structure which must contain a chain of same name as *s*.
+                      This chain must have the exact same number of residues
+                      as characters in *s*.
+        :type s_ent: :class:`ost.mol.EntityView`/:class:`ost.mol.EntityHandle`
         """
-        assert(s1.HasAttachedView())
-        assert(s2.HasAttachedView())
-        v1 = s1.GetAttachedView()
-        rnums1 = [r.GetNumber().GetNum() for r in v1.residues]
-        v2 = s2.GetAttachedView()
-        rnums2 = [r.GetNumber().GetNum() for r in v2.residues]
+
+        ch = s_ent.FindChain(s.name)
+
+        if not ch.IsValid():
+            raise RuntimeError("s_ent lacks required chain in SEQRESAlign")
+
+        if len(s) != ch.GetResidueCount():
+            raise RuntimeError("Sequence/structure mismatch in SEQRESAlign")
+
+        rnums = [r.GetNumber().GetNum() for r in ch.residues]
+        max_rnum = max(len(seqres), max(rnums))
+
+        # potentially add some trailing gaps
+        seqres_s = seqres.GetGaplessString() + '-'*(max_rnum-len(seqres))
+
+        olcs = ['-'] * max_rnum
+        for olc, num in zip(s, rnums):
+            olcs[num-1] = olc
+
+        aln = seq.CreateAlignment()
+        aln.AddSequence(seq.CreateSequence(seqres.GetName(), seqres_s))
+        aln.AddSequence(seq.CreateSequence(s.GetName(), ''.join(olcs)))
+        return aln
+
+    def ResNumAlign(self, s1, s2, s1_ent, s2_ent):
+        """ Access to internal sequence alignment functionality
+
+        Performs residue number based alignment. Residue numbers are extracted
+        from *s1_ent*/*s2_ent*.
+
+        :param s1: First sequence to align
+        :type s1: :class:`ost.seq.SequenceHandle`
+        :param s2: Second sequence to align
+        :type s2: :class:`ost.seq.SequenceHandle`
+        :param s1_ent: Structure as source for residue numbers in *s1*. Must
+                       contain a chain named after sequence name in *s1*. This
+                       chain must have the exact same number of residues as
+                       characters in s1.
+        :type s1_ent: :class:`ost.mol.EntityView`/:class:`ost.mol.EntityHandle`
+        :param s2_ent: Same for *s2*.
+        :type s2_ent: :class:`ost.mol.EntityView`/:class:`ost.mol.EntityHandle`
+
+        :returns: Pairwise alignment of s1 and s2
+        """
+        ch1 = s1_ent.FindChain(s1.name)
+        ch2 = s2_ent.FindChain(s2.name)
+
+        if not ch1.IsValid():
+            raise RuntimeError("s1_ent lacks requested chain in ResNumAlign")
+
+        if not ch2.IsValid():
+            raise RuntimeError("s2_ent lacks requested chain in ResNumAlign")
+
+        if len(s1) != ch1.GetResidueCount():
+            raise RuntimeError("Sequence/structure mismatch in ResNumAlign")
+
+        if len(s2) != ch2.GetResidueCount():
+            raise RuntimeError("Sequence/structure mismatch in ResNumAlign")
+
+        rnums1 = [r.GetNumber().GetNum() for r in ch1.residues]
+        rnums2 = [r.GetNumber().GetNum() for r in ch2.residues]
 
         min_num = min(rnums1[0], rnums2[0])
         max_num = max(rnums1[-1], rnums2[-1])
         aln_length = max_num - min_num + 1
 
         aln_s1 = ['-'] * aln_length
-        for r, rnum in zip(v1.residues, rnums1):
-            aln_s1[rnum-min_num] = r.one_letter_code
+        for olc, rnum in zip(s1, rnums1):
+            aln_s1[rnum-min_num] = olc
 
         aln_s2 = ['-'] * aln_length
-        for r, rnum in zip(v2.residues, rnums2):
-            aln_s2[rnum-min_num] = r.one_letter_code
+        for olc, rnum in zip(s2, rnums2):
+            aln_s2[rnum-min_num] = olc
 
         aln = seq.CreateAlignment()
         aln.AddSequence(seq.CreateSequence(s1.GetName(), ''.join(aln_s1)))
         aln.AddSequence(seq.CreateSequence(s2.GetName(), ''.join(aln_s2)))
         return aln
 
+
+    def _ComputeChemGroups(self):
+        """ Sets properties :attr:`~chem_groups`,
+        :attr:`~chem_group_alignments`, :attr:`~chem_group_ref_seqs`,
+        :attr:`~chem_group_types`
+        """
+
+        if self.seqres_set:
+            self._chem_group_alignments, self._chem_group_types =\
+            self._ChemGroupAlignmentsFromSEQRES()
+        else:
+            self._chem_group_alignments, self._chem_group_types =\
+            self._ChemGroupAlignmentsFromATOMSEQ()
+
+        self._chem_group_ref_seqs = seq.CreateSequenceList()
+        for a in self.chem_group_alignments:
+            s = seq.CreateSequence(a.GetSequence(0).GetName(),
+                                   a.GetSequence(0).GetGaplessString())
+            self._chem_group_ref_seqs.AddSequence(s)
+
+        self._chem_groups = list()
+        for a in self.chem_group_alignments:
+            group = list()
+            for s_idx in range(1, a.GetCount()):
+                s = a.GetSequence(s_idx)
+                group.append(s.GetName())
+            self._chem_groups.append(group)
+
+
+    def _ChemGroupAlignmentsFromSEQRES(self):
+        """ Groups target sequences based on SEQRES
+
+        returns tuple that can be set as self._chem_group_alignments and
+        self._chem_group_types
+        """
+        pep_groups = self._GroupSequencesSEQRES(self.polypep_seqs)
+        nuc_groups = self._GroupSequencesSEQRES(self.polynuc_seqs)
+        group_types = [mol.ChemType.AMINOACIDS] * len(pep_groups)
+        group_types += [mol.ChemType.NUCLEOTIDES] * len(nuc_groups)
+        groups = pep_groups
+        groups.extend(nuc_groups)
+
+        return (groups, group_types)
+
+
+    def _GroupSequencesSEQRES(self, poly_seqs):
+
+        alns = dict()
+
+        for poly_seq in poly_seqs:
+            sname = poly_seq.GetName()
+            seqres_name = self.trg_seqres_mapping[sname]
+            if seqres_name not in alns:
+                aln = seq.CreateAlignment()
+                seqres = None
+                for s in self.seqres:
+                    if s.GetName() == seqres_name:
+                        seqres = s
+                        break
+                if seqres is None:
+                    # each element in self.trg_seqres_mapping is guaranteed
+                    # to have a SEQRES counterpart as checked in ChainMapper
+                    # constructor. So we should never end up here.
+                    raise RuntimeError("You should never get here - contact "
+                                       "OST developer")
+                aln.AddSequence(seqres)
+                alns[seqres_name] = aln
+            seqres = alns[seqres_name].GetSequence(0)
+            aln_length = seqres.GetLength()
+            atomseq = ['-'] * aln_length
+            trg_chain = self.target.FindChain(sname)
+            assert(trg_chain.IsValid())
+            assert(trg_chain.GetResidueCount() == len(poly_seq))
+            for olc, r in zip(poly_seq, trg_chain.residues):
+                num = r.GetNumber().GetNum()
+                if num < 1 or num > aln_length:
+                    raise RuntimeError(f"Observed residue with invalid number: "
+                                       f"\"{r}\" which cannot be aligned to "
+                                       f"seqres with id \"{seqres_name}\"")
+                if olc != seqres[num-1]:
+                    raise RuntimeError(f"Sequence mismatch of residue \"{r}\" "
+                                       f"with olc \"{olc}\" and residue number "
+                                       f"\"{num}\". Character at that location "
+                                       f"in seqres: \"{seqres[num-1]}\"."
+                                       f"Seqres name: \"{seqres_name}\"")
+                atomseq[num-1] = olc
+            atomseq = ''.join(atomseq)
+            alns[seqres_name].AddSequence(seq.CreateSequence(sname, atomseq))
+
+        return [aln for aln in alns.values()]
+
+
+    def _ChemGroupAlignmentsFromATOMSEQ(self):
+        """ Groups target sequences based on ATOMSEQ
+
+        returns tuple that can be set as self._chem_group_alignments and
+        self._chem_group_types
+        """
+        pep_groups = self._GroupSequences(self.polypep_seqs, self.pep_seqid_thr,
+                                          self.min_pep_length,
+                                          mol.ChemType.AMINOACIDS)
+        nuc_groups = self._GroupSequences(self.polynuc_seqs, self.nuc_seqid_thr,
+                                          self.min_nuc_length,
+                                          mol.ChemType.NUCLEOTIDES)
+
+        # pep_groups and nuc_groups give us alignments based on ATOMSEQ.
+        # For example: If you have polymer chains A,B and C in the same
+        # group and A is the longest one, you get an alignment that looks
+        # like:
+        # A: ASDFE
+        # B: ASDF-
+        # C: -SDFE
+        #
+        # however, the first sequence in chem group alignments must not be
+        # bound to any ATOMSEQ and represent the reference sequence. In the
+        # case of this function, this is simply a copy of sequence A:
+        # REF: ASDFE
+        # A:   ASDFE
+        # B:   ASDF-
+        # C:   -SDFE
+
+        # do pep_groups
+        tmp = list()
+        for a in pep_groups:
+            new_a = seq.CreateAlignment()
+            new_a.AddSequence(a.GetSequence(0))
+            for s_idx in range(a.GetCount()):
+                new_a.AddSequence(a.GetSequence(s_idx))
+            tmp.append(new_a)
+        pep_groups = tmp
+
+        # do nuc groups        
+        tmp = list()
+        for a in nuc_groups:
+            new_a = seq.CreateAlignment()
+            new_a.AddSequence(a.GetSequence(0))
+            for s_idx in range(a.GetCount()):
+                new_a.AddSequence(a.GetSequence(s_idx))
+            tmp.append(new_a)
+        nuc_groups = tmp
+
+        group_types = [mol.ChemType.AMINOACIDS] * len(pep_groups)
+        group_types += [mol.ChemType.NUCLEOTIDES] * len(nuc_groups)
+        groups = pep_groups
+        groups.extend(nuc_groups)
+
+        return (groups, group_types)
+
+    def _GroupSequences(self, seqs, seqid_thr, min_length, chem_type):
+        """Get list of alignments representing groups of equivalent sequences
+    
+        :param seqid_thr: Threshold used to decide when two chains are identical.
+        :type seqid_thr:  :class:`float`
+        :param gap_thr: Additional threshold to avoid gappy alignments with high
+                        seqid. Number of aligned columns must be at least this
+                        number.
+        :type gap_thr: :class:`int`
+        :param aligner: Helper class to generate pairwise alignments
+        :type aligner: :class:`_Aligner`
+        :param chem_type: ChemType of seqs, must be in
+                          [:class:`ost.mol.ChemType.AMINOACIDS`,
+                          :class:`ost.mol.ChemType.NUCLEOTIDES`]
+        :type chem_type: :class:`ost.mol.ChemType` 
+        :returns: A list of alignments, one alignment for each group
+                  with longest sequence (reference) as first sequence.
+        :rtype: :class:`ost.seq.AlignmentList`
+        """
+        groups = list()
+        for s_idx in range(len(seqs)):
+            matching_group = None
+            for g_idx in range(len(groups)):
+                for g_s_idx in range(len(groups[g_idx])):
+                    if self.resnum_alignments:
+                        aln = self.ResNumAlign(seqs[s_idx],
+                                               seqs[groups[g_idx][g_s_idx]],
+                                               self.target, self.target)
+                    else:
+                        aln = self.NWAlign(seqs[s_idx],
+                                           seqs[groups[g_idx][g_s_idx]],
+                                           chem_type)
+                    sid, n_aligned = _GetAlnPropsOne(aln)
+                    if sid >= seqid_thr and n_aligned >= min_length:
+                        matching_group = g_idx
+                        break
+                if matching_group is not None:
+                    break
+    
+            if matching_group is None:
+                groups.append([s_idx])
+            else:
+                groups[matching_group].append(s_idx)
+    
+        # sort based on sequence length
+        sorted_groups = list()
+        for g in groups:
+            if len(g) > 1:
+                tmp = sorted([[len(seqs[i]), i] for i in g], reverse=True)
+                sorted_groups.append([x[1] for x in tmp])
+            else:
+                sorted_groups.append(g)
+    
+        # translate from indices back to sequences and directly generate alignments
+        # of the groups with the longest (first) sequence as reference
+        aln_list = seq.AlignmentList()
+        for g in sorted_groups:
+            if len(g) == 1:
+                # aln with one single sequence
+                aln_list.append(seq.CreateAlignment(seqs[g[0]]))
+            else:
+                # obtain pairwise aln of first sequence (reference) to all others
+                alns = seq.AlignmentList()
+                i = g[0]
+                for j in g[1:]:
+                    if self.resnum_alignments:
+                        aln = self.ResNumAlign(seqs[i], seqs[j],
+                                               self.target, self.target)
+                    else:
+                        aln = self.NWAlign(seqs[i], seqs[j], chem_type)
+                    alns.append(aln)
+                # and merge
+                aln_list.append(seq.alg.MergePairwiseAlignments(alns, seqs[i]))
+    
+        return aln_list
+
+    def _MapSequence(self, ref_seqs, ref_types, s, s_type, s_ent,
+                     seq_id_thr=0.0, min_aln_length=0):
+        """Tries top map *s* onto any of the sequences in *ref_seqs*
+    
+        Computes alignments of *s* to each of the reference sequences of equal type
+        and sorts them by seqid*fraction_covered (seqid: sequence identity of
+        aligned columns in alignment, fraction_covered: Fraction of non-gap
+        characters in reference sequence that are covered by non-gap characters in
+        *s*). Best scoring mapping is returned. Optionally, *seq_id*/
+        *min_aln_length* thresholds can be enabled to avoid non-sensical mappings.
+        However, *min_aln_length* only has an effect if *seq_id_thr* > 0!!!
+    
+        :param ref_seqs: Reference sequences 
+        :type ref_seqs: :class:`ost.seq.SequenceList`
+        :param ref_types: Types of reference sequences, e.g.
+                          ost.mol.ChemType.AminoAcids
+        :type ref_types: :class:`list` of :class:`ost.mol.ChemType`
+        :param s: Sequence to map
+        :type s: :class:`ost.seq.SequenceHandle`
+        :param s_type: Type of *s*, only try mapping to sequences in *ref_seqs*
+                       with equal type as defined in *ref_types*
+        :param s_ent: Entity which represents *s*. Only relevant in case of
+                      residue number alignments.
+        :type s_ent: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
+        :param seq_id_thr: Minimum sequence identity to be considered as match
+        :type seq_id_thr: :class:`float`
+        :param min_aln_length: Minimum number of aligned columns to be considered
+                               as match. Only has an effect if *seq_id_thr* > 0!
+        :type min_aln_length: :class:`int`    
+        :returns: Tuple with two elements. 1) index of sequence in *ref_seqs* to
+                  which *s* can be mapped 2) Pairwise sequence alignment with 
+                  sequence from *ref_seqs* as first sequence. Both elements are
+                  None if no mapping can be found or if thresholds are not 
+                  fulfilled for any alignment.
+        :raises: :class:`RuntimeError` if mapping is ambiguous, i.e. *s*
+                 successfully maps to more than one sequence in *ref_seqs* 
+        """
+        scored_alns = list()
+        for ref_idx, ref_seq in enumerate(ref_seqs):
+            if ref_types[ref_idx] == s_type:
+                if self.seqres_set:
+                    aln = self.SEQRESAlign(ref_seq, s, s_ent)
+                elif self.resnum_alignments:
+                    aln = self.ResNumAlign(ref_seq, s, self.target, s_ent)
+                else:
+                    aln = self.NWAlign(ref_seq, s, s_type)
+                seqid, n_tot, n_aligned = _GetAlnPropsTwo(aln)
+                if seq_id_thr > 0:
+                    if seqid >= seq_id_thr and n_aligned >= min_aln_length:
+                        fraction_covered = float(n_aligned)/n_tot
+                        score = seqid * fraction_covered
+                        scored_alns.append((score, ref_idx, aln))
+                else:
+                    fraction_covered = float(n_aligned)/n_tot
+                    score = seqid * fraction_covered
+                    scored_alns.append((score, ref_idx, aln))
+    
+        if len(scored_alns) == 0:
+            return (None, None) # no mapping possible...
+    
+        scored_alns = sorted(scored_alns, key=lambda x: x[0], reverse=True)
+        return (scored_alns[0][1], scored_alns[0][2])
+
 def _GetAlnPropsTwo(aln):
     """Returns basic properties of *aln* version two...
 
     :param aln: Alignment to compute properties
     :type aln: :class:`seq.AlignmentHandle`
-    :returns: Tuple with 2 elements. 1) sequence identify in range [0, 100] 
-              considering aligned columns 2) Fraction of non-gap characters
-              in first sequence that are covered by non-gap characters in
-              second sequence.
+    :returns: Tuple with 3 elements. 1) sequence identity in range [0, 100] 
+              considering aligned columns 2) Number of non gap characters in
+              first sequence 3) Number of aligned characters.
     """
     assert(aln.GetCount() == 2)
     n_tot = sum([1 for col in aln if col[0] != '-'])
     n_aligned = sum([1 for col in aln if (col[0] != '-' and col[1] != '-')])
-    return (seq.alg.SequenceIdentity(aln), float(n_aligned)/n_tot) 
+    return (seq.alg.SequenceIdentity(aln), n_tot, n_aligned) 
 
 def _GetAlnPropsOne(aln):
     
@@ -1712,160 +2308,6 @@ def _GetAlnPropsOne(aln):
     seqid = seq.alg.SequenceIdentity(aln)
     n_aligned = sum([1 for col in aln if (col[0] != '-' and col[1] != '-')])
     return (seqid, n_aligned) 
-
-def _GetChemGroupAlignments(pep_seqs, nuc_seqs, aligner, pep_seqid_thr=95.,
-                            min_pep_length=6, nuc_seqid_thr=95.,
-                            min_nuc_length=4):
-    """Returns alignments with groups of chemically equivalent chains
-
-    :param pep_seqs: List of polypeptide sequences
-    :type pep_seqs: :class:`seq.SequenceList`
-    :param nuc_seqs: List of polynucleotide sequences
-    :type nuc_seqs: :class:`seq.SequenceList` 
-    :param aligner: Helper class to generate pairwise alignments
-    :type aligner: :class:`_Aligner`
-    :param pep_seqid_thr: Threshold used to decide when two peptide chains are
-                          identical. 95 percent tolerates the few mutations
-                          crystallographers like to do.
-    :type pep_seqid_thr:  :class:`float`
-    :param min_pep_length: Additional threshold to avoid gappy alignments with high
-                           seqid. Number of aligned columns must be at least this
-                           number.
-    :type min_pep_length: :class:`int`
-    :param nuc_seqid_thr: Nucleotide equivalent of *pep_seqid_thr*
-    :type nuc_seqid_thr:  :class:`float`
-    :param min_nuc_length: Nucleotide equivalent of *min_pep_length*
-    :type min_nuc_length: :class:`int`
-    :returns: Tuple with first element being an AlignmentList. Each alignment
-              represents a group of chemically equivalent chains and the first
-              sequence is the longest. Second element is a list of equivalent
-              length specifying the types of the groups. List elements are in
-              [:class:`ost.ChemType.AMINOACIDS`,
-              :class:`ost.ChemType.NUCLEOTIDES`] 
-    """
-    pep_groups = _GroupSequences(pep_seqs, pep_seqid_thr, min_pep_length, aligner,
-                                 mol.ChemType.AMINOACIDS)
-    nuc_groups = _GroupSequences(nuc_seqs, nuc_seqid_thr, min_nuc_length, aligner,
-                                 mol.ChemType.NUCLEOTIDES)
-    group_types = [mol.ChemType.AMINOACIDS] * len(pep_groups)
-    group_types += [mol.ChemType.NUCLEOTIDES] * len(nuc_groups)
-    groups = pep_groups
-    groups.extend(nuc_groups)
-    return (groups, group_types)
-
-def _GroupSequences(seqs, seqid_thr, min_length, aligner, chem_type):
-    """Get list of alignments representing groups of equivalent sequences
-
-    :param seqid_thr: Threshold used to decide when two chains are identical.
-    :type seqid_thr:  :class:`float`
-    :param gap_thr: Additional threshold to avoid gappy alignments with high
-                    seqid. Number of aligned columns must be at least this
-                    number.
-    :type gap_thr: :class:`int`
-    :param aligner: Helper class to generate pairwise alignments
-    :type aligner: :class:`_Aligner`
-    :param chem_type: ChemType of seqs which is passed to *aligner*, must be in
-                      [:class:`ost.mol.ChemType.AMINOACIDS`,
-                      :class:`ost.mol.ChemType.NUCLEOTIDES`]
-    :type chem_type: :class:`ost.mol.ChemType` 
-    :returns: A list of alignments, one alignment for each group
-              with longest sequence (reference) as first sequence.
-    :rtype: :class:`ost.seq.AlignmentList`
-    """
-    groups = list()
-    for s_idx in range(len(seqs)):
-        matching_group = None
-        for g_idx in range(len(groups)):
-            for g_s_idx in range(len(groups[g_idx])):
-                aln  = aligner.Align(seqs[s_idx], seqs[groups[g_idx][g_s_idx]],
-                                     chem_type)
-                sid, n_aligned = _GetAlnPropsOne(aln)
-                if sid >= seqid_thr and n_aligned >= min_length:
-                    matching_group = g_idx
-                    break
-            if matching_group is not None:
-                break
-
-        if matching_group is None:
-            groups.append([s_idx])
-        else:
-            groups[matching_group].append(s_idx)
-
-    # sort based on sequence length
-    sorted_groups = list()
-    for g in groups:
-        if len(g) > 1:
-            tmp = sorted([[len(seqs[i]), i] for i in g], reverse=True)
-            sorted_groups.append([x[1] for x in tmp])
-        else:
-            sorted_groups.append(g)
-
-    # translate from indices back to sequences and directly generate alignments
-    # of the groups with the longest (first) sequence as reference
-    aln_list = seq.AlignmentList()
-    for g in sorted_groups:
-        if len(g) == 1:
-            # aln with one single sequence
-            aln_list.append(seq.CreateAlignment(seqs[g[0]]))
-        else:
-            # obtain pairwise aln of first sequence (reference) to all others
-            alns = seq.AlignmentList()
-            i = g[0]
-            for j in g[1:]:
-                alns.append(aligner.Align(seqs[i], seqs[j], chem_type))
-            # and merge
-            aln_list.append(seq.alg.MergePairwiseAlignments(alns, seqs[i]))
-
-    # transfer attached views
-    seq_dict = {s.GetName(): s for s in seqs}
-    for aln_idx in range(len(aln_list)):
-        for aln_s_idx in range(aln_list[aln_idx].GetCount()):
-            s_name = aln_list[aln_idx].GetSequence(aln_s_idx).GetName()
-            s = seq_dict[s_name]
-            aln_list[aln_idx].AttachView(aln_s_idx, s.GetAttachedView())
-
-    return aln_list
-
-def _MapSequence(ref_seqs, ref_types, s, s_type, aligner):
-    """Tries top map *s* onto any of the sequences in *ref_seqs*
-
-    Computes alignments of *s* to each of the reference sequences of equal type
-    and sorts them by seqid*fraction_covered (seqid: sequence identity of
-    aligned columns in alignment, fraction_covered: Fraction of non-gap
-    characters in reference sequence that are covered by non-gap characters in
-    *s*). Best scoring mapping is returned.
-
-    :param ref_seqs: Reference sequences 
-    :type ref_seqs: :class:`ost.seq.SequenceList`
-    :param ref_types: Types of reference sequences, e.g.
-                      ost.mol.ChemType.AminoAcids
-    :type ref_types: :class:`list` of :class:`ost.mol.ChemType`
-    :param s: Sequence to map
-    :type s: :class:`ost.seq.SequenceHandle`
-    :param s_type: Type of *s*, only try mapping to sequences in *ref_seqs*
-                   with equal type as defined in *ref_types*
-    :param aligner: Helper class to generate pairwise alignments
-    :type aligner: :class:`_Aligner`
-    :returns: Tuple with two elements. 1) index of sequence in *ref_seqs* to
-              which *s* can be mapped 2) Pairwise sequence alignment with 
-              sequence from *ref_seqs* as first sequence. Both elements are
-              None if no mapping can be found.
-    :raises: :class:`RuntimeError` if mapping is ambiguous, i.e. *s*
-             successfully maps to more than one sequence in *ref_seqs* 
-    """
-    scored_alns = list()
-    for ref_idx, ref_seq in enumerate(ref_seqs):
-        if ref_types[ref_idx] == s_type:
-            aln = aligner.Align(ref_seq, s, s_type)
-            seqid, fraction_covered = _GetAlnPropsTwo(aln)
-            score = seqid * fraction_covered
-            scored_alns.append((score, ref_idx, aln))
-
-    if len(scored_alns) == 0:
-        return (None, None) # no mapping possible...
-
-    scored_alns = sorted(scored_alns, key=lambda x: x[0], reverse=True)
-    return (scored_alns[0][1], scored_alns[0][2])
 
 def _GetRefMdlAlns(ref_chem_groups, ref_chem_group_msas, mdl_chem_groups,
                    mdl_chem_group_alns, pairs=None):
@@ -1912,13 +2354,21 @@ def _GetRefMdlAlns(ref_chem_groups, ref_chem_group_msas, mdl_chem_groups,
                 # obtain alignments of mdl and ref chains towards chem
                 # group ref sequence and merge them
                 aln_list = seq.AlignmentList()
+                
                 # do ref aln
+                ############
+                # reference sequence
                 s1 = ref_aln.GetSequence(0)
-                s2 = ref_aln.GetSequence(ref_chains.index(ref_ch))
+                # ATOMSEQ of ref_ch
+                s2 = ref_aln.GetSequence(1+ref_chains.index(ref_ch))
                 aln_list.append(seq.CreateAlignment(s1, s2))
+
                 # do mdl aln
+                ############
                 aln_list.append(mdl_alns[mdl_ch])
+
                 # merge
+                #######
                 ref_seq = seq.CreateSequence(s1.GetName(),
                                              s1.GetGaplessString())
                 merged_aln = seq.alg.MergePairwiseAlignments(aln_list,
@@ -1950,10 +2400,11 @@ def _GetRefMdlAlns(ref_chem_groups, ref_chem_group_msas, mdl_chem_groups,
 def _CheckOneToOneMapping(ref_chains, mdl_chains):
     """ Checks whether we already have a perfect one to one mapping
 
-    That means each list in *ref_chains* has exactly one element and each
-    list in *mdl_chains* has either one element (it's mapped) or is empty
-    (ref chain has no mapped mdl chain). Returns None if no such mapping
-    can be found.
+    That means each list in *ref_chains* has either exactly one element
+    and the respective list in *mdl_chains* has also one element or
+    it has several elements and the respective list in *mdl_chains* is
+    empty (ref chain(s) has no mapped mdl chain). Returns None if no such
+    mapping can be found.
 
     :param ref_chains: corresponds to :attr:`ChainMapper.chem_groups`
     :type ref_chains: :class:`list` of :class:`list` of :class:`str`
@@ -1968,8 +2419,8 @@ def _CheckOneToOneMapping(ref_chains, mdl_chains):
     for ref, mdl in zip(ref_chains, mdl_chains):
         if len(ref) == 1 and len(mdl) == 1:
             one_to_one.append(mdl)
-        elif len(ref) == 1 and len(mdl) == 0:
-            one_to_one.append([None])
+        elif len(ref) >= 1 and len(mdl) == 0:
+            one_to_one.append(len(ref)*[None])
         else:
             only_one_to_one = False
             break
@@ -2176,47 +2627,6 @@ def _GetSeeds(ref_chem_groups, mdl_chem_groups, mapped_ref_chains = set(),
                     if mdl_ch not in mapped_mdl_chains:
                         seeds.append((ref_ch, mdl_ch))
     return seeds
-
-
-def _lDDTGreedyFast(the_greed):
-
-    something_happened = True
-    mapping = dict()
-
-    while something_happened:
-        something_happened = False
-        seeds = _GetSeeds(the_greed.ref_chem_groups,
-                          the_greed.mdl_chem_groups,
-                          mapped_ref_chains = set(mapping.keys()),
-                          mapped_mdl_chains = set(mapping.values()))
-        # search for best scoring starting point
-        n_best = 0
-        best_seed = None
-        for seed in seeds:
-            n = the_greed._NSCConserved(seed[0], seed[1]).sum()
-            if n > n_best:
-                n_best = n
-                best_seed = seed
-        if n_best == 0:
-            break # no proper seed found anymore...
-        # add seed to mapping and start the greed
-        mapping[best_seed[0]] = best_seed[1]
-        mapping = the_greed.ExtendMapping(mapping)
-        something_happened = True
-
-    # translate mapping format and return
-    final_mapping = list()
-    for ref_chains in the_greed.ref_chem_groups:
-        mapped_mdl_chains = list()
-        for ref_ch in ref_chains:
-            if ref_ch in mapping:
-                mapped_mdl_chains.append(mapping[ref_ch])
-            else:
-                mapped_mdl_chains.append(None)
-        final_mapping.append(mapped_mdl_chains)
-
-    return final_mapping
-
 
 def _lDDTGreedyFull(the_greed):
     """ Uses each reference chain as starting point for expansion
@@ -2604,46 +3014,6 @@ def _QSScoreNaive(trg, mdl, chem_groups, chem_mapping, ref_mdl_alns, contact_d,
             best_score = score_result.QS_global
     return (best_mapping, best_score)
 
-
-def _QSScoreGreedyFast(the_greed):
-
-    something_happened = True
-    mapping = dict()
-    while something_happened:
-        something_happened = False
-        # search for best scoring starting point, we're using lDDT here
-        n_best = 0
-        best_seed = None
-        seeds = _GetSeeds(the_greed.ref_chem_groups,
-                          the_greed.mdl_chem_groups,
-                          mapped_ref_chains = set(mapping.keys()),
-                          mapped_mdl_chains = set(mapping.values()))
-        for seed in seeds:
-            n = the_greed.SCCounts(seed[0], seed[1])
-            if n > n_best:
-                n_best = n
-                best_seed = seed
-        if n_best == 0:
-            break # no proper seed found anymore...
-        # add seed to mapping and start the greed
-        mapping[best_seed[0]] = best_seed[1]
-        mapping = the_greed.ExtendMapping(mapping)
-        something_happened = True
-
-    # translate mapping format and return
-    final_mapping = list()
-    for ref_chains in the_greed.ref_chem_groups:
-        mapped_mdl_chains = list()
-        for ref_ch in ref_chains:
-            if ref_ch in mapping:
-                mapped_mdl_chains.append(mapping[ref_ch])
-            else:
-                mapped_mdl_chains.append(None)
-        final_mapping.append(mapped_mdl_chains)
-
-    return final_mapping
-
-
 def _QSScoreGreedyFull(the_greed):
     """ Uses each reference chain as starting point for expansion
     """
@@ -2838,6 +3208,90 @@ def _SingleRigidRMSD(initial_transforms, initial_mappings, chem_groups,
 
     return best_mapping
 
+
+def _SingleRigidCentroid(initial_transforms, initial_mappings, chem_groups,
+                         chem_mapping, trg_group_pos, mdl_group_pos):
+    """
+    Takes initial transforms and sequentially adds chain pairs with lowest
+    centroid distance.
+    The mapping from the transform that leads to lowest overall RMSD of
+    the centroids is returned.
+    """
+    best_mapping = dict()
+    best_rmsd = float("inf")
+
+    trg_group_centroids = list()
+    mdl_group_centroids = list()
+
+    for trg_pos, mdl_pos, in zip(trg_group_pos, mdl_group_pos):
+        trg_group_centroids.append(geom.Vec3List([p.center for p in trg_pos]))
+        mdl_group_centroids.append(geom.Vec3List([p.center for p in mdl_pos]))
+
+    for transform in initial_transforms:
+        mapping = dict()
+        mapped_mdl_chains = set()
+        mapped_trg_centroids = list()
+        mapped_mdl_centroids = list()
+        for trg_chains, mdl_chains, trg_centroids, mdl_centroids, in zip(chem_groups,
+                                                                         chem_mapping,
+                                                                         trg_group_centroids,
+                                                                         mdl_group_centroids):
+            if len(trg_centroids) == 0 or len(mdl_centroids) == 0:
+                continue # cannot compute valid rmsd
+            distances = list()
+            t_mdl_centroids = geom.Vec3List(mdl_centroids)
+            t_mdl_centroids.ApplyTransform(transform)
+
+            for trg_idx in range(len(trg_chains)):
+                for mdl_idx in range(len(mdl_chains)):
+                    distances.append((geom.Length2(trg_centroids[trg_idx]-t_mdl_centroids[mdl_idx]),
+                                     (trg_chains[trg_idx], mdl_chains[mdl_idx]),
+                                     (trg_centroids[trg_idx], t_mdl_centroids[mdl_idx])))
+
+            distances.sort()
+            for item in distances:
+                p = item[1]
+                if p[0] not in mapping and p[1] not in mapped_mdl_chains:
+                    mapping[p[0]] = p[1]
+                    mapped_mdl_chains.add(p[1])
+                    mapped_trg_centroids.append(item[2][0])
+                    mapped_mdl_centroids.append(item[2][1])
+
+
+        if len(mapping) == 0:
+            raise RuntimeError("Empty mapping in _SingleRigidCentroid")
+        elif len(mapping) == 1:
+            # by definition zero
+            rmsd = 0.0
+        elif len(mapping) == 2:
+            # no superposition possible with two positions
+            # derive rmsd from the distance difference between
+            # the centroid pairs in reference and model
+            ref_d = geom.Distance(mapped_trg_centroids[0],
+                                  mapped_trg_centroids[1])
+            mdl_d = geom.Distance(mapped_mdl_centroids[0],
+                                  mapped_mdl_centroids[1])
+            # compute RMSD when placing pair of coordinates with smaller
+            # distance in the middle of pair of cooridnates with larger
+            # distance
+            dd = abs(ref_d-mdl_d) # distance difference
+            # rmsd = sqrt(1/2 * ((dd/2)**2 + (dd/2)**2))
+            # => rmsd = dd/2
+            rmsd = dd/2
+        else:
+            # go for classic Kabsch superposition
+            mapped_trg_centroids = geom.Vec3List(mapped_trg_centroids)
+            mapped_mdl_centroids = geom.Vec3List(mapped_mdl_centroids)
+            rmsd = _GetSuperposition(mapped_trg_centroids,
+                                     mapped_mdl_centroids, False).rmsd
+
+        if rmsd < best_rmsd:
+            best_rmsd = rmsd
+            best_mapping = mapping
+
+    return best_mapping
+
+
 def _IterativeRigidRMSD(initial_transforms, initial_mappings, chem_groups,
                         chem_mapping, trg_group_pos, mdl_group_pos):
     """ Takes initial transforms and sequentially adds chain pairs with
@@ -2936,7 +3390,7 @@ def _NaiveRMSD(chem_groups, chem_mapping, trg_group_pos, mdl_group_pos,
         for m_pos, m in zip(mdl_pos, mdl_chains):
             mdl_pos_dict[m] = m_pos
         
-    best_mapping = dict()
+    best_mapping = [[None]*len(x) for x in chem_groups]
     best_rmsd = float("inf")
 
     for mapping in _ChainMappings(chem_groups, chem_mapping, n_max_naive):
@@ -2947,10 +3401,11 @@ def _NaiveRMSD(chem_groups, chem_mapping, trg_group_pos, mdl_group_pos,
                 if trg_ch is not None and mdl_ch is not None:
                     trg_pos.extend(trg_pos_dict[trg_ch])
                     mdl_pos.extend(mdl_pos_dict[mdl_ch])
-        superpose_res = mol.alg.SuperposeSVD(mdl_pos, trg_pos)
-        if superpose_res.rmsd < best_rmsd:
-            best_rmsd = superpose_res.rmsd
-            best_mapping = mapping
+        if len(mdl_pos) >= 3:
+            superpose_res = mol.alg.SuperposeSVD(mdl_pos, trg_pos)
+            if superpose_res.rmsd < best_rmsd:
+                best_rmsd = superpose_res.rmsd
+                best_mapping = mapping
 
     # this is stupid...
     tmp = dict()
@@ -2965,11 +3420,6 @@ def _GetRefPos(trg, mdl, trg_msas, mdl_alns, max_pos = None):
     """ Extracts reference positions which are present in trg and mdl
     """
 
-    # select only backbone atoms, makes processing simpler later on
-    # (just select res.atoms[0].GetPos() as ref pos)
-    bb_trg = trg.Select("aname=\"CA\",\"C3'\"")
-    bb_mdl = mdl.Select("aname=\"CA\",\"C3'\"")
-
     # mdl_alns are pairwise, let's construct MSAs
     mdl_msas = list()
     for aln_list in mdl_alns:
@@ -2980,6 +3430,11 @@ def _GetRefPos(trg, mdl, trg_msas, mdl_alns, max_pos = None):
         else:
             mdl_msas.append(seq.CreateAlignment())
 
+    # fetch positions of all backbone atoms
+    bb_trg = _GetBBPos(trg)
+    bb_mdl = _GetBBPos(mdl)
+
+    # there are the actual return values
     trg_pos = list()
     mdl_pos = list()
 
@@ -3015,7 +3470,9 @@ def _GetRefPos(trg, mdl, trg_msas, mdl_alns, max_pos = None):
         # extract positions
         trg_pos.append(list())
         mdl_pos.append(list())
-        for s_idx in range(trg_msa.GetCount()):
+        # first seq in trg_msa is ref sequence and does not refer to any
+        # ATOMSEQ
+        for s_idx in range(1, trg_msa.GetCount()):
             trg_pos[-1].append(_ExtractMSAPos(trg_msa, s_idx, trg_indices,
                                               bb_trg))
         # first seq in mdl_msa is ref sequence in trg and does not belong to mdl
@@ -3024,6 +3481,23 @@ def _GetRefPos(trg, mdl, trg_msas, mdl_alns, max_pos = None):
                                               bb_mdl))
 
     return (trg_pos, mdl_pos)
+
+def _GetBBPos(ent):
+    """ Helper for _GetRefPos
+
+    Returns a dict with key: chain name and value: a geom.Vec3List of backbone
+    atom positions. Assumes that either CA or C3' is always there.
+    """
+    bb = dict()
+    for ch in ent.chains:
+        l = geom.Vec3List()
+        for r in ch.residues:
+            a = r.FindAtom("CA")
+            if not a.IsValid():
+                a = r.FindAtom("C3'")
+            l.append(a.GetPos())
+        bb[ch.name] = l
+    return bb
 
 def _GetFullyCoveredIndices(msa):
     """ Helper for _GetRefPos
@@ -3061,7 +3535,7 @@ def _RefIndicesToColumnIndices(msa, indices):
             ref_idx += 1
     return [mapping[i] for i in indices]
 
-def _ExtractMSAPos(msa, s_idx, indices, view):
+def _ExtractMSAPos(msa, s_idx, indices, bb):
     """ Helper for _GetRefPos
 
     Returns a geom.Vec3List containing positions refering to given msa sequence.
@@ -3070,13 +3544,14 @@ def _ExtractMSAPos(msa, s_idx, indices, view):
     Indices refers to column indices in msa!
     """
     s = msa.GetSequence(s_idx)
-    s_v = _CSel(view, [s.GetName()])
+    ch_bb = bb[s.GetName()]
 
     # sanity check
-    assert(len(s.GetGaplessString()) == len(s_v.residues))
+    assert(len(s.GetGaplessString()) == len(ch_bb))
 
     residue_idx = [s.GetResidueIndex(i) for i in indices]
-    return geom.Vec3List([s_v.residues[i].atoms[0].pos for i in residue_idx])
+    return geom.Vec3List([ch_bb[i] for i in residue_idx])
+
 
 def _NChemGroupMappings(ref_chains, mdl_chains):
     """ Number of mappings within one chem group

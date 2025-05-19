@@ -67,7 +67,12 @@ module(NAME io SOURCES "${OST_IO_SOURCES}"
                ${OST_IO_IMG_HEADERS} IN_DIR img
                ${OST_IO_SEQ_HEADERS} IN_DIR seq            
                ${OST_IO_HEADERS} 
-       DEPENDS_ON ${OST_IO_DEPENDENCIES})
-target_link_libraries(ost_io ${BOOST_IOSTREAM_LIBRARIES})
-target_link_libraries(ost_io ${TIFF_LIBRARIES} ${PNG_LIBRARIES})
+       DEPENDS_ON ${OST_IO_DEPENDENCIES}
+       LINK Boost::filesystem
+            Boost::iostreams
+            ${TIFF_LIBRARIES}
+            ${PNG_LIBRARIES})
+#target_link_libraries(ost_io Boost::filesystem)
+#target_link_libraries(ost_io Boost::iostreams)
+#target_link_libraries(ost_io ${TIFF_LIBRARIES} ${PNG_LIBRARIES})
 

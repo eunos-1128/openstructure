@@ -234,8 +234,51 @@ class TestlDDT(unittest.TestCase):
         # this value is just blindly copied in without checking whether it makes
         # any sense... it's sole purpose is to trigger the respective flag
         # in lDDT computation
-        self.assertEqual(lDDT, 0.6171511842396518)
+        self.assertAlmostEqual(lDDT, 0.6171511842396518, places=5)
 
+    def test_drmsd(self):
+
+        # do 7SGN
+        model = _LoadFile("7SGN_C_model.pdb")
+        target = _LoadFile("7SGN_C_target.pdb")
+
+        lddt_scorer = lDDTScorer(target)
+        drmsd, per_res_drmsd = lddt_scorer.DRMSD(model)
+
+        dl = mol.alg.CreateDistanceList(target.CreateFullView(), 15.0)
+        classic_score = mol.alg.DRMSD(model.CreateFullView(), dl)
+        classic_per_res_scores = list()
+        for r in model.residues:
+            if r.HasProp("localdrmsd"):
+                classic_per_res_scores.append(r.GetFloatProp("localdrmsd"))
+            else:
+                classic_per_res_scores.append(None)
+
+        self.assertAlmostEqual(drmsd, classic_score, 5)
+        for a,b in zip(per_res_drmsd, classic_per_res_scores):
+            self.assertAlmostEqual(a,b,5)
+
+        # do 7W1F_B
+        model = _LoadFile("7W1F_B_model.pdb")
+        target = _LoadFile("7W1F_B_target.pdb")
+
+        # do awesome implementation
+        scorer = lDDTScorer(target)
+        drmsd, per_res_drmsd = scorer.DRMSD(model)
+
+        # do reference implementation
+        dl = mol.alg.CreateDistanceList(target.CreateFullView(), 15.0)
+        classic_score = mol.alg.DRMSD(model.CreateFullView(), dl)
+        classic_per_res_scores = list()
+        for r in model.residues:
+            if r.HasProp("localdrmsd"):
+                classic_per_res_scores.append(r.GetFloatProp("localdrmsd"))
+            else:
+                classic_per_res_scores.append(None)
+
+        self.assertAlmostEqual(drmsd, classic_score, 5)
+        for a,b in zip(per_res_drmsd, classic_per_res_scores):
+            self.assertAlmostEqual(a,b,5)
 
 
 class TestlDDTBS(unittest.TestCase):

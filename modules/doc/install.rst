@@ -30,7 +30,7 @@ a bunch of open-source libraries. If you haven't already installed them, please
 install them now! Where appropriate, the preferred version is given in 
 parentheses.
 
-* `CMake <http://cmake.org>`_ (3.23.1)
+* `CMake <http://cmake.org>`_ (3.25)
 * `Python3 <http://python.org>`_ (3.9.5)
 * `Boost <http://boost.org>`_ (1.76.0)
 * `zlib <https://zlib.net/>`_ (usually comes with Boost or system)

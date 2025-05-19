@@ -33,7 +33,7 @@ object MolckSettingsInitWrapper(tuple args, dict kwargs){
   object self = args[0];
   args = tuple(args.slice(1,_));
 
-  bool rm_unk_atoms = false;
+  bool rm_unk_atoms = true;
   if(kwargs.contains("rm_unk_atoms")){
     rm_unk_atoms = extract<bool>(kwargs["rm_unk_atoms"]);
     kwargs["rm_unk_atoms"].del();
@@ -125,7 +125,7 @@ void export_Molck()
 
   def("RemoveAtoms", &RemoveAtoms, (arg("ent"),
                                     arg("lib"),
-                                    arg("rm_unk_atoms")=false,
+                                    arg("rm_unk_atoms")=true,
                                     arg("rm_non_std")=false,
                                     arg("rm_hyd_atoms")=true,
                                     arg("rm_oxt_atoms")=false,

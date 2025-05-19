@@ -26,10 +26,11 @@ namespace ost { namespace io {
 String EntityToMMCifString(const ost::mol::EntityHandle& ent,
                            const String& data_name, 
                            ost::conop::CompoundLibPtr compound_lib,
-                           bool mmcif_conform) {
+                           bool mmcif_conform,
+                           const std::vector<MMCifWriterEntity>& entity_info) {
   std::stringstream ss;
   MMCifWriter writer;
-  writer.SetStructure(ent, compound_lib, mmcif_conform);
+  writer.SetStructure(ent, compound_lib, mmcif_conform, entity_info);
   writer.Write(data_name, ss);
   return ss.str();
 }
@@ -37,10 +38,24 @@ String EntityToMMCifString(const ost::mol::EntityHandle& ent,
 String EntityToMMCifString(const ost::mol::EntityView& ent,
                            const String& data_name,
                            ost::conop::CompoundLibPtr compound_lib,
-                           bool mmcif_conform) {
+                           bool mmcif_conform,
+                           const std::vector<MMCifWriterEntity>& entity_info) {
   std::stringstream ss;
   MMCifWriter writer;
-  writer.SetStructure(ent, compound_lib, mmcif_conform);
+  writer.SetStructure(ent, compound_lib, mmcif_conform, entity_info);
+  writer.Write(data_name, ss);
+  return ss.str();
+}
+
+String OMFToMMCifString(const ost::io::OMF& omf,
+                        const String& data_name,
+                        ost::conop::CompoundLibPtr compound_lib,
+                        bool mmcif_conform,
+                        const std::vector<MMCifWriterEntity>& entity_info) {
+
+  std::stringstream ss;
+  MMCifWriter writer;
+  writer.SetStructure(omf, compound_lib, mmcif_conform, entity_info);
   writer.Write(data_name, ss);
   return ss.str();
 }

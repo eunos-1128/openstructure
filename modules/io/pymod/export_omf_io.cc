@@ -20,6 +20,7 @@
 using namespace boost::python;
 
 #include <ost/io/mol/omf.hh>
+#include <ost/mol/alg/biounit.hh>
 
 using namespace ost;
 using namespace ost::io;
@@ -50,6 +51,26 @@ namespace{
     return VecToList<String>(omf->GetChainNames());
   }
 
+  OMFPtr wrap_to_assembly(OMFPtr omf,
+                          const ost::mol::alg::BUInfo& bu_info) {
+    return omf->ToAssembly(bu_info.GetAUChains(),
+                           bu_info.GetTransformations(),
+                           bu_info.GetBUChains());
+  }
+
+  tuple wrap_trace(OMFPtr omf,
+                   const String& cname,
+                   const String& aname) {
+    std::vector<int> rnums;
+    geom::Vec3List pos;
+    omf->Trace(cname, aname, rnums, pos);
+    return boost::python::make_tuple(VecToList(rnums), pos);
+  }
+
+  boost::python::list wrap_get_rnums(OMFPtr omf, const String& cname) {
+    const std::vector<int>& rnums = omf->GetRNums(cname);
+    return VecToList<int>(rnums);
+  }
 }
 
 void export_omf_io() {
@@ -78,6 +99,10 @@ void export_omf_io() {
     .def("GetPositions", &OMF::GetPositions, return_value_policy<reference_existing_object>(),(arg("cname")))
     .def("GetBFactors", &OMF::GetBFactors, return_value_policy<reference_existing_object>(),(arg("cname")))
     .def("GetAvgBFactors", &OMF::GetAvgBFactors,(arg("cname")))
+    .def("GetOccupancies", &OMF::GetOccupancies, return_value_policy<reference_existing_object>(),(arg("cname")))
     .def("GetSequence", &OMF::GetSequence, (arg("cname")))
+    .def("GetRNums", &wrap_get_rnums, (arg("cname")))
+    .def("ToAssembly", &wrap_to_assembly, (arg("bu_info")))
+    .def("Trace", &wrap_trace, (arg("cname"), arg("aname")))
   ;
 }

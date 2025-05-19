@@ -107,20 +107,50 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
                            ligands not being scored if the predicted ligand
                            pose is too far from the actual binding site.
     :type full_bs_search: :class:`bool`
+    :param min_pep_length: See :class:`ost.mol.alg.ligand_scoring_base.LigandScorer`.
+    :type min_pep_length: :class:`int`
+    :param min_nuc_length: See :class:`ost.mol.alg.ligand_scoring_base.LigandScorer`
+    :type min_nuc_length: :class:`int`
+    :param pep_seqid_thr: See :class:`ost.mol.alg.ligand_scoring_base.LigandScorer`
+    :type pep_seqid_thr: :class:`float`
+    :param nuc_seqid_thr: See :class:`ost.mol.alg.ligand_scoring_base.LigandScorer`
+    :type nuc_seqid_thr: :class:`float`
+    :param mdl_map_pep_seqid_thr: See :class:`ost.mol.alg.ligand_scoring_base.LigandScorer`
+    :type mdl_map_pep_seqid_thr: :class:`float`
+    :param mdl_map_nuc_seqid_thr: See :class:`ost.mol.alg.ligand_scoring_base.LigandScorer`
+    :type mdl_map_nuc_seqid_thr: :class:`float`
+    :param seqres: See :class:`ost.mol.alg.ligand_scoring_base.LigandScorer`
+    :type seqres: :class:`ost.seq.SequenceList`
+    :param trg_seqres_mapping: See :class:`ost.mol.alg.ligand_scoring_base.LigandScorer`
+    :type trg_seqres_mapping: :class:`dict`
     """
     def __init__(self, model, target, model_ligands, target_ligands,
                  resnum_alignments=False, rename_ligand_chain=False,
                  substructure_match=False, coverage_delta=0.2,
                  max_symmetries=1e5, bs_radius=4.0, lddt_lp_radius=15.0,
                  model_bs_radius=25, binding_sites_topn=100000,
-                 full_bs_search=False):
+                 full_bs_search=False, min_pep_length = 6,
+                 min_nuc_length = 4, pep_seqid_thr = 95.,
+                 nuc_seqid_thr = 95.,
+                 mdl_map_pep_seqid_thr = 0.,
+                 mdl_map_nuc_seqid_thr = 0.,
+                 seqres=None,
+                 trg_seqres_mapping=None):
 
         super().__init__(model, target, model_ligands, target_ligands,
                          resnum_alignments = resnum_alignments,
                          rename_ligand_chain = rename_ligand_chain,
                          substructure_match = substructure_match,
                          coverage_delta = coverage_delta,
-                         max_symmetries = max_symmetries)
+                         max_symmetries = max_symmetries,
+                         min_pep_length = min_pep_length,
+                         min_nuc_length = min_nuc_length,
+                         pep_seqid_thr = pep_seqid_thr,
+                         nuc_seqid_thr = nuc_seqid_thr,
+                         mdl_map_pep_seqid_thr = mdl_map_pep_seqid_thr,
+                         mdl_map_nuc_seqid_thr = mdl_map_nuc_seqid_thr,
+                         seqres = seqres,
+                         trg_seqres_mapping = trg_seqres_mapping)
 
         self.bs_radius = bs_radius
         self.lddt_lp_radius = lddt_lp_radius
@@ -139,10 +169,6 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
 
         # lazily precomputed variables to speedup GetRepr chain mapping calls
         # for localized GetRepr searches
-        self.__chem_mapping = None
-        self.__chem_group_alns = None
-        self.__ref_mdl_alns = None
-        self.__chain_mapping_mdl = None
         self._get_repr_input = dict()
 
         # update state decoding from parent with subclass specific stuff
@@ -304,40 +330,6 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
 
         return self._binding_sites[target_ligand.handle.hash_code]
 
-    @property
-    def _chem_mapping(self):
-        if self.__chem_mapping is None:
-            self.__chem_mapping, self.__chem_group_alns, \
-            self.__chain_mapping_mdl = \
-            self._chain_mapper.GetChemMapping(self.model)
-        return self.__chem_mapping
-
-    @property
-    def _chem_group_alns(self):
-        if self.__chem_group_alns is None:   
-            self.__chem_mapping, self.__chem_group_alns, \
-            self.__chain_mapping_mdl = \
-            self._chain_mapper.GetChemMapping(self.model)
-        return self.__chem_group_alns
-
-    @property
-    def _ref_mdl_alns(self):
-        if self.__ref_mdl_alns is None:
-            self.__ref_mdl_alns = \
-            chain_mapping._GetRefMdlAlns(self._chain_mapper.chem_groups,
-                                    self._chain_mapper.chem_group_alignments,
-                                    self._chem_mapping,
-                                    self._chem_group_alns)
-        return self.__ref_mdl_alns
-  
-    @property
-    def _chain_mapping_mdl(self):
-        if self.__chain_mapping_mdl is None:   
-            self.__chem_mapping, self.__chem_group_alns, \
-            self.__chain_mapping_mdl = \
-            self._chain_mapper.GetChemMapping(self.model)
-        return self.__chain_mapping_mdl
-
     def _get_get_repr_input(self, mdl_ligand):
         if mdl_ligand.handle.hash_code not in self._get_repr_input:
 
@@ -377,6 +369,7 @@ class SCRMSDScorer(ligand_scoring_base.LigandScorer):
 
         return (self._get_repr_input[mdl_ligand.hash_code][1],
                 self._chem_group_alns,
+                self._mdl_chains_without_chem_mapping,
                 self._get_repr_input[mdl_ligand.hash_code][0])
 
 

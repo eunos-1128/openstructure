@@ -490,7 +490,7 @@ void MMCifReader::ParseAndAddAtom(const std::vector<StringRef>& columns)
     if (has_model_) {
       if (curr_model_ != model_id) {
         if (warned_ignored_model_.find(model_id) == warned_ignored_model_.end()) {
-          LOG_WARNING("Ignorning new model " << model_id <<
+          LOG_WARNING("Ignoring new model " << model_id <<
                       ". Only model " << curr_model_ << " was read.");
           warned_ignored_model_.insert(model_id);
         }

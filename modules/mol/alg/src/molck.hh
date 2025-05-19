@@ -45,7 +45,7 @@ struct MolckSettings{
   bool map_nonstd_res;
   bool assign_elem;
 
-  MolckSettings(bool init_rm_unk_atoms=false,
+  MolckSettings(bool init_rm_unk_atoms=true,
                 bool init_rm_non_std=false,
                 bool init_rm_hyd_atoms=true,
                 bool init_rm_oxt_atoms=false,
@@ -65,7 +65,6 @@ struct MolckSettings{
   public:
     std::string ToString(){
       std::string rep = "MolckSettings(rm_unk_atoms=" + BoolToString(rm_unk_atoms) +
-        ", rm_unk_atoms=" + BoolToString(rm_unk_atoms) +
         ", rm_non_std=" + BoolToString(rm_non_std) +
         ", rm_hyd_atoms=" + BoolToString(rm_hyd_atoms) +
         ", rm_oxt_atoms=" + BoolToString(rm_oxt_atoms) +

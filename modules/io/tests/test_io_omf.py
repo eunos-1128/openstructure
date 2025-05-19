@@ -3,6 +3,7 @@ import math
 
 from ost import geom
 from ost import io
+from ost import mol
 
 def compare_atoms(a1, a2, occupancy_thresh = 0.01, bfactor_thresh = 0.01,
                   dist_thresh = 0.001):
@@ -78,7 +79,7 @@ def compare_bonds(ent1, ent2):
 def compare_ent(ent1, ent2, at_occupancy_thresh = 0.01,
                 at_bfactor_thresh = 0.01, at_dist_thresh = 0.001,
                 skip_ss=False, skip_cnames = False, skip_bonds = False,
-                skip_rnums=False, bu_idx = None):
+                skip_rnums=False, bu_idx = None, ignore_chain_order=False):
     if bu_idx is not None:
         if ent1.GetName() + ' ' + str(bu_idx) != ent2.GetName():
             return False
@@ -87,6 +88,11 @@ def compare_ent(ent1, ent2, at_occupancy_thresh = 0.01,
             return False
     chain_names_one = [ch.GetName() for ch in ent1.chains]
     chain_names_two = [ch.GetName() for ch in ent2.chains]
+
+    if ignore_chain_order:
+        chain_names_one = sorted(chain_names_one)
+        chain_names_two = sorted(chain_names_two)
+
     if skip_cnames:
         # only check whether we have the same number of chains
         if len(chain_names_one) != len(chain_names_two):
@@ -94,7 +100,9 @@ def compare_ent(ent1, ent2, at_occupancy_thresh = 0.01,
     else:
         if chain_names_one != chain_names_two:
             return False
-    for ch1, ch2 in zip(ent1.chains, ent2.chains):
+    for cname1, cname2 in zip(chain_names_one, chain_names_two):
+        ch1 = ent1.FindChain(cname1)
+        ch2 = ent2.FindChain(cname2)
         if not compare_chains(ch1, ch2,
                               at_occupancy_thresh = at_occupancy_thresh,
                               at_bfactor_thresh = at_bfactor_thresh,
@@ -200,6 +208,34 @@ class TestOMF(unittest.TestCase):
         loaded_ent = loaded_omf.GetAU()
         self.assertFalse(compare_ent(self.ent, loaded_ent))
         self.assertTrue(compare_ent(self.ent, loaded_ent, at_dist_thresh=0.5))
+
+    def test_assembly_construction(self):
+        omf = io.OMF.FromEntity(self.ent)
+        bu_infos = [mol.alg.BUInfo(bu) for bu in self.info.GetBioUnits()]
+        self.assertEqual(len(bu_infos), 1)
+        bu_info = bu_infos[0]
+        omf_assembly = omf.ToAssembly(bu_info)
+        ent_assembly = mol.alg.CreateBU(self.ent, bu_info)
+
+        self.assertTrue(compare_ent(omf_assembly.GetEntity(), ent_assembly,
+                                    ignore_chain_order=True))
+
+    def test_trace(self):
+        omf = io.OMF.FromEntity(self.ent)
+        rnums, pos = omf.Trace("B", "CA")
+
+        ent_rnums = list()
+        ent_pos = geom.Vec3List()
+        for r in self.ent.FindChain("B").residues:
+            ca = r.FindAtom("CA")
+            if ca.IsValid():
+                ent_rnums.append(r.GetNumber().GetNum())
+                ent_pos.append(ca.GetPos())
+
+        self.assertEqual(rnums, ent_rnums)
+        for a,b in zip(pos, ent_pos):
+            d = geom.Distance(a,b)
+            self.assertTrue(d < 0.001)
 
 
 if __name__== '__main__':

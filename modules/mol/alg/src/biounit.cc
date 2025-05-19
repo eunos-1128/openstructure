@@ -186,6 +186,13 @@ const std::vector<std::vector<geom::Mat4> >& BUInfo::GetTransformations() const 
   return transforms_;
 }
 
+const std::vector<std::vector<std::vector<String> > >& BUInfo::GetBUChains() const {
+  if(bu_chains_.empty()) {
+    this->_InitTransforms();
+  }
+  return bu_chains_;
+}
+
 void BUInfo::_InitTransforms() const {
   int n_intervals = chain_intvl.size() / 2;
   for(int intvl_idx = 0; intvl_idx < n_intervals; ++intvl_idx) {
@@ -223,19 +230,9 @@ void BUInfo::_InitTransforms() const {
     }
     transforms_.push_back(transforms);
   }
-}
 
-ost::mol::EntityHandle CreateBU(const ost::mol::EntityHandle& asu,
-                                const ost::io::MMCifInfoBioUnit& bu) {
-  BUInfo bu_info(bu);
-  return CreateBU(asu, bu_info);
-}
-
-ost::mol::EntityHandle CreateBU(const ost::mol::EntityHandle& asu,
-                                const BUInfo& bu_info) {
-  ost::mol::EntityHandle ent = ost::mol::CreateEntity();
-  ent.SetName(asu.GetName());
-  ost::mol::XCSEditor ed = ent.EditXCS(mol::BUFFERED_EDIT);
+  // get bu chain names
+  /////////////////////
 
   // For chain naming. First copy with transformation: 2.<au_cname>, second
   // 3.<au_cname> etc.
@@ -246,25 +243,13 @@ ost::mol::EntityHandle CreateBU(const ost::mol::EntityHandle& asu,
   // track of this as there can only be one.
   std::set<String> au_chain_copies;
 
-  const std::vector<std::vector<String> >& au_chains = bu_info.GetAUChains();
-  const std::vector<std::vector<geom::Mat4> >& transforms =
-  bu_info.GetTransformations();
-
-  for(uint chain_intvl = 0; chain_intvl < au_chains.size(); ++chain_intvl) {
-    if(au_chains[chain_intvl].empty()) continue;
-    // derive all bonds related to that chain_intvl
-    // potentially also interchain bonds
-    std::stringstream query_ss;
-    query_ss << "cname=" << mol::QueryQuoteName(au_chains[chain_intvl][0]);
-    for(uint i = 1; i < au_chains[chain_intvl].size(); ++i) {
-      query_ss << ',' << mol::QueryQuoteName(au_chains[chain_intvl][i]);
-    }
-    ost::mol::EntityView asu_view = asu.Select(query_ss.str());
-    const ost::mol::BondHandleList& bond_list = asu_view.GetBondList();
-
+  for(uint chain_intvl = 0; chain_intvl < au_chains_.size(); ++chain_intvl) {
+    bu_chains_.push_back(std::vector<std::vector<String> >());
+    if(au_chains_[chain_intvl].empty()) continue;
     // process all transformations
-    for(uint t_idx = 0; t_idx < transforms[chain_intvl].size(); ++t_idx) {
-      const geom::Mat4& m = transforms[chain_intvl][t_idx];
+    for(uint t_idx = 0; t_idx < transforms_[chain_intvl].size(); ++t_idx) {
+      bu_chains_.back().push_back(std::vector<String>());
+      const geom::Mat4& m = transforms_[chain_intvl][t_idx];
       // check if m is identity matrix => no transformation applied
       bool is_identity = true;
       geom::Mat4 identity_matrix = geom::Mat4::Identity();
@@ -277,11 +262,8 @@ ost::mol::EntityHandle CreateBU(const ost::mol::EntityHandle& asu,
         }
       }
 
-      // key: au_at.GetHashCode, value: bu_at
-      // required for bond buildup in the end
-      std::map<long, AtomHandle> atom_mapper;
-      for(uint c_idx = 0; c_idx < au_chains[chain_intvl].size(); ++c_idx) {
-        String au_cname = au_chains[chain_intvl][c_idx];
+      for(uint c_idx = 0; c_idx < au_chains_[chain_intvl].size(); ++c_idx) {
+        String au_cname = au_chains_[chain_intvl][c_idx];
 
         std::stringstream bu_cname_ss;
         if(is_identity && au_chain_copies.find(au_cname) == au_chain_copies.end()) {
@@ -304,17 +286,66 @@ ost::mol::EntityHandle CreateBU(const ost::mol::EntityHandle& asu,
           bu_cname_ss << chain_counter[au_cname] << '.' << au_cname;
           chain_counter[au_cname] += 1;
         }
+        bu_chains_.back().back().push_back(bu_cname_ss.str());
+      }
+    }
+  }
+}
+
+ost::mol::EntityHandle CreateBU(const ost::mol::EntityHandle& asu,
+                                const ost::io::MMCifInfoBioUnit& bu) {
+  BUInfo bu_info(bu);
+  return CreateBU(asu, bu_info);
+}
+
+ost::mol::EntityHandle CreateBU(const ost::mol::EntityHandle& asu,
+                                const BUInfo& bu_info) {
+  ost::mol::EntityHandle ent = ost::mol::CreateEntity();
+  ent.SetName(asu.GetName());
+  ost::mol::XCSEditor ed = ent.EditXCS(mol::BUFFERED_EDIT);
+
+  const std::vector<std::vector<String> >& au_chains = bu_info.GetAUChains();
+  const std::vector<std::vector<geom::Mat4> >& transforms =
+  bu_info.GetTransformations();
+  const std::vector<std::vector<std::vector<String> > >& bu_chains =
+  bu_info.GetBUChains();
+
+  for(uint chain_intvl = 0; chain_intvl < au_chains.size(); ++chain_intvl) {
+    if(au_chains[chain_intvl].empty()) continue;
+
+    // check if all chains from the interval are present in AU
+    for(uint c_idx = 0; c_idx < au_chains[chain_intvl].size(); ++c_idx) {
+      String au_cname = au_chains[chain_intvl][c_idx];
+      ost::mol::ChainHandle asu_ch = asu.FindChain(au_cname);
+      if(!asu_ch.IsValid()) {
+        std::stringstream ss;
+        ss << "Cannot construct biounit with missing asu chain "<<au_cname<<".";
+        throw ost::Error(ss.str());
+      }
+    }
+
+    // derive all bonds related to that chain_intvl
+    // potentially also interchain bonds
+    std::stringstream query_ss;
+    query_ss << "cname=" << mol::QueryQuoteName(au_chains[chain_intvl][0]);
+    for(uint i = 1; i < au_chains[chain_intvl].size(); ++i) {
+      query_ss << ',' << mol::QueryQuoteName(au_chains[chain_intvl][i]);
+    }
+    ost::mol::EntityView asu_view = asu.Select(query_ss.str());
+    const ost::mol::BondHandleList& bond_list = asu_view.GetBondList();
+
+    // process all transformations
+    for(uint t_idx = 0; t_idx < transforms[chain_intvl].size(); ++t_idx) {
+      const geom::Mat4& m = transforms[chain_intvl][t_idx];
+
+      // key: au_at.GetHashCode, value: bu_at
+      // required for bond buildup in the end
+      std::map<long, AtomHandle> atom_mapper;
+      for(uint c_idx = 0; c_idx < au_chains[chain_intvl].size(); ++c_idx) {
+        String au_cname = au_chains[chain_intvl][c_idx];
         ost::mol::ChainHandle asu_ch = asu.FindChain(au_cname);
-        if(!asu_ch.IsValid()) {
-          std::stringstream ss;
-          ss << "Cannot construct biounit with asu chain "<<au_cname;
-          ss << ". Specified interval only has: " <<au_chains[chain_intvl][0];
-          for(uint i = 1; i < au_chains[chain_intvl].size(); ++i) {
-            ss << ',' << au_chains[chain_intvl][i];
-          }
-          throw ost::Error(ss.str());
-        }
-        ost::mol::ChainHandle bu_ch = ed.InsertChain(bu_cname_ss.str());
+        String bu_cname = bu_chains[chain_intvl][t_idx][c_idx];
+        ost::mol::ChainHandle bu_ch = ed.InsertChain(bu_cname);
         ed.SetChainType(bu_ch, asu_ch.GetType());
         ost::mol::ResidueHandleList au_res_list = asu_ch.GetResidueList();
         for(auto res_it = au_res_list.begin();
@@ -347,7 +378,6 @@ ost::mol::EntityHandle CreateBU(const ost::mol::EntityHandle& asu,
                    atom_mapper[it->GetSecond().GetHashCode()],
                    it->GetBondOrder());
       }
-
     }
   }
   return ent;

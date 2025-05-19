@@ -3,12 +3,10 @@ import numpy as np
 import networkx
 
 import ost
-from ost import io
 from ost import mol
 from ost import conop
 from ost import LogWarning, LogScript, LogInfo, LogVerbose, LogDebug, GetVerbosityLevel, PushVerbosityLevel, PopVerbosityLevel
 from ost.mol.alg import chain_mapping
-
 
 @contextmanager
 def _SinkVerbosityLevel(n=1):
@@ -50,169 +48,6 @@ def _QualifiedResidueNotation(r):
         ins_code=resnum.ins_code.strip("\u0000"),
     )
 
-
-def CleanHydrogens(ent, clib):
-    """ Ligand scoring helper - Returns copy of *ent* without hydrogens
-
-    Non-standard hydrogen naming can cause trouble in residue property
-    assignment which is done by the :class:`ost.conop.RuleBasedProcessor` when
-    loading. In fact, residue property assignment is not done for every residue
-    that has unknown atoms according to the chemical component dictionary. This
-    function therefore re-processes the entity after removing hydrogens.
-
-    :param ent: Entity to clean
-    :type ent: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
-    :param clib: Compound library to perform re-processing after hydrogen
-                 removal.
-    :type clib: :class:`ost.conop.CompoundLib`
-    :returns: Cleaned and re-processed ent
-    """
-    cleaned_ent = mol.CreateEntityFromView(ent.Select(
-        "ele != H and ele != D"), include_exlusive_atoms=False)
-    # process again to set missing residue properties due to non standard
-    # hydrogens
-    processor = conop.RuleBasedProcessor(clib)
-    processor.Process(cleaned_ent)
-    return cleaned_ent
-
-
-def MMCIFPrep(mmcif_path, biounit=None, extract_nonpoly=False,
-              fault_tolerant=False):
-    """ Ligand scoring helper - Prepares :class:`LigandScorer` input from mmCIF
-
-    Only performs gentle cleanup of hydrogen atoms. Further cleanup is delegated
-    to :class:`LigandScorer`.
-
-    :param mmcif_path: Path to mmCIF file that contains polymer and optionally
-                       non-polymer entities
-    :type mmcif_path: :class:`str`
-    :param biounit: If given, construct specified biounit from mmCIF AU
-    :type biounit: :class:`str`
-    :param extract_nonpoly: Additionally returns a list of
-                            :class:`ost.mol.EntityHandle`
-                            objects representing all non-polymer (ligand)
-                            entities.
-    :type extract_nonpoly: :class:`bool`
-    :param fault_tolerant: Passed as parameter to :func:`ost.io.LoadMMCIF`
-    :type fault_tolerant: :class:`bool`
-    :returns: :class:`ost.mol.EntityHandle` which only contains polymer
-              entities representing the receptor structure. If *extract_nonpoly*
-              is True, a tuple is returned which additionally contains a
-              :class:`list` of :class:`ost.mol.EntityHandle`, where each
-              :class:`ost.mol.EntityHandle` represents a non-polymer (ligand).
-    """
-    clib = conop.GetDefaultLib()
-    if not clib:
-        ost.LogError("A compound library is required. "
-                     "Please refer to the OpenStructure website: "
-                     "https://openstructure.org/docs/conop/compoundlib/.")
-        raise RuntimeError("No compound library found")
-
-    mmcif_entity, mmcif_info = io.LoadMMCIF(mmcif_path, info=True,
-                                            fault_tolerant=fault_tolerant)
-    mmcif_entity = CleanHydrogens(mmcif_entity, clib)
-
-    # get AU chain names representing polymer entities
-    polymer_entity_ids = mmcif_info.GetEntityIdsOfType("polymer")
-    polymer_chain_names = list()
-    for ch in mmcif_entity.chains:
-        if mmcif_info.GetMMCifEntityIdTr(ch.name) in polymer_entity_ids:
-            polymer_chain_names.append(ch.name)
-
-    # get AU chain names representing non-polymer entities
-    non_polymer_entity_ids = mmcif_info.GetEntityIdsOfType("non-polymer")
-    non_polymer_chain_names = list()
-    for ch in mmcif_entity.chains:
-        if mmcif_info.GetMMCifEntityIdTr(ch.name) in non_polymer_entity_ids:
-            non_polymer_chain_names.append(ch.name)
-
-    # construct biounit if necessary
-    if biounit is not None:
-        biounit_found = False
-        for bu in mmcif_info.biounits:
-            if bu.id == biounit:
-                mmcif_entity = mol.alg.CreateBU(mmcif_entity, bu)
-                biounit_found = True
-                break
-        if not biounit_found:
-            raise RuntimeError(f"Specified biounit '{biounit}' not in "
-                               f"{mmcif_path}")
-
-    # assign generic properties for selection later on
-    non_poly_id = 0
-    for ch in mmcif_entity.chains:
-        cname = None
-        if biounit is not None:
-            # if a biounit is constructed, you get chain names like: 1.YOLO
-            # we cannot simply split by '.' since '.' is an allowed character
-            # in chain names. => split by first occurence
-            dot_index = ch.name.find('.')
-            if dot_index == -1:
-                cname = ch.name
-            else:
-                cname = ch.name[dot_index+1:]
-        else:
-            cname = ch.name
-        
-        if cname in polymer_chain_names:
-            ch.SetIntProp("poly", 1)
-        if cname in non_polymer_chain_names:
-            ch.SetIntProp("nonpolyid", non_poly_id)
-            non_poly_id += 1
-
-    poly_sel = mmcif_entity.Select("gcpoly:0=1")
-    poly_ent = mol.CreateEntityFromView(poly_sel, True)
-
-    if extract_nonpoly == False:
-        return poly_ent
-
-    non_poly_sel = mmcif_entity.Select("gcnonpoly:0=1")
-    non_poly_entities = list()
-    for i in range(non_poly_id):
-        view = mmcif_entity.Select(f"gcnonpolyid:{non_poly_id}={i}")
-        if view.GetResidueCount() != 1:
-            raise RuntimeError(f"Expect non-polymer entities in "
-                               f"{mmcif_path} to contain exactly 1 "
-                               f"residue. Got {ch.GetResidueCount()} "
-                               f"in chain {ch.name}")
-        compound = clib.FindCompound(view.residues[0].name)
-        if compound is None:
-            raise RuntimeError(f"Can only extract non-polymer entities if "
-                               f"respective residues are available in PDB "
-                               f"component dictionary. Can't find "
-                               f"\"{view.residues[0].name}\"")
-
-        non_poly_entities.append(mol.CreateEntityFromView(view, True))
-
-    return (poly_ent, non_poly_entities)
-
-
-def PDBPrep(pdb_path, fault_tolerant=False):
-    """ Ligand scoring helper - Prepares :class:`LigandScorer` input from PDB
-
-    Only performs gentle cleanup of hydrogen atoms. Further cleanup is delegated
-    to :class:`LigandScorer`. There is no logic to extract ligands from PDB
-    files. Ligands must be provided separately as SDF files in these cases.
-
-    :param pdb_path: Path to PDB file that contains polymer entities
-    :type pdb_path: :class:`str`
-    :param fault_tolerant: Passed as parameter to :func:`ost.io.LoadPDB`
-    :type fault_tolerant: :class:`bool`
-    :returns: :class:`EntityHandle` from loaded file.
-    """
-    clib = conop.GetDefaultLib()
-    if not clib:
-        ost.LogError("A compound library is required. "
-                     "Please refer to the OpenStructure website: "
-                     "https://openstructure.org/docs/conop/compoundlib/.")
-        raise RuntimeError("No compound library found")
-
-    pdb_entity = io.LoadPDB(pdb_path, fault_tolerant=fault_tolerant)
-    pdb_entity = CleanHydrogens(pdb_entity, clib)
-
-    return pdb_entity
-
-
 class LigandScorer:
     """ Scorer to compute various small molecule ligand (non polymer) scores.
 
@@ -225,10 +60,10 @@ class LigandScorer:
 
     * :class:`ost.mol.alg.ligand_scoring_lddtpli.LDDTPLIScorer`
       that assesses the conservation of protein-ligand
-      contacts (lDDT-PLI);
+      contacts (LDDT-PLI);
     * :class:`ost.mol.alg.ligand_scoring_scrmsd.SCRMSDScorer`
       that computes a binding-site superposed, symmetry-corrected RMSD
-      (BiSyRMSD) and ligand pocket lDDT (lDDT-LP).
+      (BiSyRMSD) and ligand pocket LDDT (LDDT-LP).
 
     All versus all scores are available through the lazily computed
     :attr:`score_matrix`. However, many things can go wrong... be it even
@@ -280,14 +115,28 @@ class LigandScorer:
     structures (protein, nucleic acids) must still follow the usual rules and
     contain only residues from the compound library. Structures are cleaned up
     according to constructor documentation. We advise to
-    use the :func:`MMCIFPrep` and :func:`PDBPrep` for loading which already
+    use the :func:`ost.mol.alg.scoring_base.MMCIFPrep` and
+    :func:`ost.mol.alg.scoring_base.PDBPrep` for loading which already
     clean hydrogens and, in the case of MMCIF, optionally extract ligands ready
     to be used by the :class:`LigandScorer` based on "non-polymer" entity types.
     In case of PDB file format, ligands must be loaded separately as SDF files.
 
+    Only polymers (protein and nucleic acids) of model and target are considered
+    for ligand binding sites. The
+    :class:`ost.mol.alg.chain_mapping.ChainMapper` is used to enumerate possible
+    mappings of these chains. In short: identical chains in the target are
+    grouped based on pairwise sequence identity
+    (see pep_seqid_thr/nuc_seqid_thr param). Each model chain is assigned to
+    one of these groups (see mdl_map_pep_seqid_thr/mdl_map_nuc_seqid_thr param).
+    To avoid spurious matches, only polymers of a certain length are considered
+    in this matching procedure (see min_pep_length/min_nuc_length param).
+    Shorter polymers are never mapped and do not contribute to scoring.
+
     Here is an example of how to setup a scorer::
 
         from ost.mol.alg.ligand_scoring_scrmsd import SCRMSDScorer
+        from ost.mol.alg.scoring_base import MMCIFPrep
+        from ost.mol.alg.scoring_base import PDBPrep
 
         # Load data
         # Structure model in PDB format, containing the receptor only
@@ -312,6 +161,7 @@ class LigandScorer:
         # check cleanup in model and target structure:
         print("model cleanup:", sc.model_cleanup_log)
         print("target cleanup:", sc.target_cleanup_log)
+
 
     :param model: Model structure - a deep copy is available as :attr:`model`.
                   The model undergoes the following cleanup steps which are
@@ -357,12 +207,53 @@ class LigandScorer:
                            a target-ligand pair, it will be ignored and reported
                            as unassigned.
     :type max_symmetries: :class:`int`
+    :param min_pep_length: Relevant parameter if short peptides are involved in
+                           the polymer binding site. Minimum peptide length for
+                           a chain to be considered in chain mapping.
+                           The chain mapping algorithm first performs an all vs.
+                           all pairwise sequence alignment to identify \"equal\"
+                           chains within the target structure. We go for simple
+                           sequence identity there. Short sequences can be
+                           problematic as they may produce high sequence identity
+                           alignments by pure chance.
+    :type min_pep_length: :class:`int`
+    :param min_nuc_length: Same for nucleotides
+    :type min_nuc_length: :class:`int`
+    :param pep_seqid_thr: Parameter that affects identification of identical
+                          chains in target - see 
+                          :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type pep_seqid_thr: :class:`float`
+    :param nuc_seqid_thr: Parameter that affects identification of identical
+                          chains in target - see 
+                          :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type nuc_seqid_thr: :class:`float`
+    :param mdl_map_pep_seqid_thr: Parameter that affects mapping of model chains
+                                  to target chains - see 
+                                  :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type mdl_map_pep_seqid_thr: :class:`float`
+    :param mdl_map_nuc_seqid_thr: Parameter that affects mapping of model chains
+                                  to target chains - see 
+                                  :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type mdl_map_nuc_seqid_thr: :class:`float`
+    :param seqres: Parameter that affects identification of identical chains in
+                   target - see :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type seqres: :class:`ost.seq.SequenceList`
+    :param trg_seqres_mapping: Parameter that affects identification of identical
+                               chains in target - see 
+                               :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type trg_seqres_mapping: :class:`dict`
     """
 
     def __init__(self, model, target, model_ligands, target_ligands,
                  resnum_alignments=False, substructure_match=False,
                  coverage_delta=0.2, max_symmetries=1e5,
-                 rename_ligand_chain=False):
+                 rename_ligand_chain=False, min_pep_length = 6,
+                 min_nuc_length = 4, pep_seqid_thr = 95.,
+                 nuc_seqid_thr = 95.,
+                 mdl_map_pep_seqid_thr = 0.,
+                 mdl_map_nuc_seqid_thr = 0.,
+                 seqres = None,
+                 trg_seqres_mapping = None):
 
         if isinstance(model, mol.EntityView):
             self._model = mol.CreateEntityFromView(model, False)
@@ -435,9 +326,22 @@ class LigandScorer:
         self._substructure_match = substructure_match
         self._coverage_delta = coverage_delta
         self._max_symmetries = max_symmetries
+        self._min_pep_length = min_pep_length
+        self._min_nuc_length = min_nuc_length
+        self._pep_seqid_thr = pep_seqid_thr
+        self._nuc_seqid_thr = nuc_seqid_thr
+        self._mdl_map_pep_seqid_thr = mdl_map_pep_seqid_thr
+        self._mdl_map_nuc_seqid_thr = mdl_map_nuc_seqid_thr
+        self._seqres = seqres
+        self._trg_seqres_mapping = trg_seqres_mapping
 
         # lazily computed attributes
         self.__chain_mapper = None
+        self.__chem_mapping = None
+        self.__chem_group_alns = None
+        self.__ref_mdl_alns = None
+        self.__mdl_chains_without_chem_mapping = None
+        self.__chain_mapping_mdl = None
 
         # keep track of states
         # simple integers instead of enums - encoding available in
@@ -551,6 +455,54 @@ class LigandScorer:
         """ Given at :class:`LigandScorer` construction
         """
         return self._resnum_alignments
+
+    @property
+    def min_pep_length(self):
+        """ Given at :class:`LigandScorer` construction
+        """
+        return self._min_pep_length
+    
+    @property
+    def min_nuc_length(self):
+        """ Given at :class:`LigandScorer` construction
+        """
+        return self._min_nuc_length
+
+    @property
+    def pep_seqid_thr(self):
+        """ Given at :class:`LigandScorer` construction
+        """
+        return self._pep_seqid_thr
+    
+    @property
+    def nuc_seqid_thr(self):
+        """ Given at :class:`LigandScorer` construction
+        """
+        return self._nuc_seqid_thr
+
+    @property
+    def mdl_map_pep_seqid_thr(self):
+        """ Given at :class:`LigandScorer` construction
+        """
+        return self._mdl_map_pep_seqid_thr
+    
+    @property
+    def mdl_map_nuc_seqid_thr(self):
+        """ Given at :class:`LigandScorer` construction
+        """
+        return self._mdl_map_nuc_seqid_thr
+
+    @property
+    def seqres(self):
+        """ Given at :class:`LigandScorer` construction
+        """
+        return self._seqres
+
+    @property
+    def trg_seqres_mapping(self):
+        """ Given at :class:`LigandScorer` construction
+        """
+        return self._trg_seqres_mapping
 
     @property
     def substructure_match(self):
@@ -845,8 +797,8 @@ class LigandScorer:
         * `stoichiometry`: there was a possible assignment in the model, but
           the model ligand was already assigned to a different target ligand.
           This indicates different stoichiometries.
-        * `no_contact` (lDDT-PLI only): There were no lDDT contacts between
-          the binding site and the ligand, and lDDT-PLI is undefined.
+        * `no_contact` (LDDT-PLI only): There were no LDDT contacts between
+          the binding site and the ligand, and LDDT-PLI is undefined.
         * `target_binding_site` (SCRMSD only): no polymer residues were in
           proximity of the target ligand.
         * `model_binding_site` (SCRMSD only): the binding site was not found
@@ -929,8 +881,8 @@ class LigandScorer:
         * `stoichiometry`: there was a possible assignment in the target, but
           the model target was already assigned to a different model ligand.
           This indicates different stoichiometries.
-        * `no_contact` (lDDT-PLI only): There were no lDDT contacts between
-          the binding site and the ligand, and lDDT-PLI is undefined.
+        * `no_contact` (LDDT-PLI only): There were no LDDT contacts between
+          the binding site and the ligand, and LDDT-PLI is undefined.
         * `target_binding_site` (SCRMSD only): a potential assignment was found
           in the target, but there were no polymer residues in proximity of the
           ligand in the target.
@@ -1036,8 +988,59 @@ class LigandScorer:
                 self.__chain_mapper = \
                 chain_mapping.ChainMapper(self.target,
                                           n_max_naive=1e9,
-                                          resnum_alignments=self.resnum_alignments)
+                                          resnum_alignments=self.resnum_alignments,
+                                          min_pep_length=self.min_pep_length,
+                                          min_nuc_length=self.min_nuc_length,
+                                          pep_seqid_thr=self.pep_seqid_thr,
+                                          nuc_seqid_thr=self.nuc_seqid_thr,
+                                          mdl_map_pep_seqid_thr=self.mdl_map_pep_seqid_thr,
+                                          mdl_map_nuc_seqid_thr=self.mdl_map_nuc_seqid_thr,
+                                          seqres = self.seqres,
+                                          trg_seqres_mapping = self.trg_seqres_mapping)
         return self.__chain_mapper
+
+    @property
+    def _chem_mapping(self):
+        if self.__chem_mapping is None:
+            self.__chem_mapping, self.__chem_group_alns, \
+            self.__mdl_chains_without_chem_mapping, self.__chain_mapping_mdl = \
+            self._chain_mapper.GetChemMapping(self.model)
+        return self.__chem_mapping
+
+    @property
+    def _chem_group_alns(self):
+        if self.__chem_group_alns is None:   
+            self.__chem_mapping, self.__chem_group_alns, \
+            self.__mdl_chains_without_chem_mapping, self.__chain_mapping_mdl = \
+            self._chain_mapper.GetChemMapping(self.model)
+        return self.__chem_group_alns
+
+    @property
+    def _ref_mdl_alns(self):
+        if self.__ref_mdl_alns is None:
+            self.__ref_mdl_alns = \
+            chain_mapping._GetRefMdlAlns(self._chain_mapper.chem_groups,
+                                    self._chain_mapper.chem_group_alignments,
+                                    self._chem_mapping,
+                                    self._chem_group_alns)
+        return self.__ref_mdl_alns
+  
+    @property
+    def _chain_mapping_mdl(self):
+        if self.__chain_mapping_mdl is None:
+            with _SinkVerbosityLevel():
+                self.__chem_mapping, self.__chem_group_alns, \
+                self.__mdl_chains_without_chem_mapping, self.__chain_mapping_mdl = \
+                self._chain_mapper.GetChemMapping(self.model)
+        return self.__chain_mapping_mdl
+
+    @property
+    def _mdl_chains_without_chem_mapping(self):
+        if self.__mdl_chains_without_chem_mapping is None:
+            self.__chem_mapping, self.__chem_group_alns, \
+            self.__mdl_chains_without_chem_mapping, self.__chain_mapping_mdl = \
+            self._chain_mapper.GetChemMapping(self.model)
+        return self.__mdl_chains_without_chem_mapping
 
     def _compute_scores(self):
         """
@@ -1546,7 +1549,6 @@ class DisconnectedGraphError(Exception):
     pass
 
 # specify public interface
-__all__ = ('CleanHydrogens', 'MMCIFPrep', 'PDBPrep',
-           'LigandScorer', 'ComputeSymmetries', 'NoSymmetryError',
+__all__ = ('LigandScorer', 'ComputeSymmetries', 'NoSymmetryError',
            'NoIsomorphicSymmetryError', 'TooManySymmetriesError',
            'DisconnectedGraphError')

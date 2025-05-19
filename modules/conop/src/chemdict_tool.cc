@@ -24,7 +24,6 @@
 #include <iostream>
 #include <fstream>
 #include <boost/algorithm/string.hpp>
-#include <boost/filesystem/convenience.hpp>
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
 
@@ -93,7 +92,7 @@ int main(int argc, char const *argv[])
                 << strerror(errno) << std::endl;
       return 1;
   }
-  if (boost::iequals(".gz", boost::filesystem::extension(argv[2]))) {
+  if (boost::iequals(".gz", boost::filesystem::path(argv[2]).extension().string())) {
     filtered_istream.push(boost::iostreams::gzip_decompressor());
   }
   filtered_istream.push(istream);

@@ -76,6 +76,7 @@ BOOST_AUTO_TEST_CASE(test_string_ref)
   // rtrim
   BOOST_CHECK_EQUAL(StringRef("12", 2).rtrim(), StringRef("12", 2));
   BOOST_CHECK_EQUAL(StringRef("12 \t", 4).rtrim(), StringRef("12", 2));
+  BOOST_CHECK_EQUAL(StringRef(" \t", 2).rtrim(), StringRef("", 0));
   
   // to_int
   std::pair<bool, int> r=sr.to_int();

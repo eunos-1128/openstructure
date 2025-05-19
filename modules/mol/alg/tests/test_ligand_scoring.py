@@ -4,10 +4,11 @@ from functools import lru_cache
 import numpy as np
 
 import ost
-from ost import io, mol, geom, conop
+from ost import io, mol, geom, conop, seq
 # check if we can import: fails if numpy or scipy not available
 try:
     from ost.mol.alg.ligand_scoring_base import *
+    from ost.mol.alg import scoring_base
     from ost.mol.alg import ligand_scoring_base
     from ost.mol.alg import ligand_scoring_scrmsd
     from ost.mol.alg import ligand_scoring_lddtpli
@@ -56,10 +57,10 @@ class TestLigandScoringFancy(unittest.TestCase):
         """Test that we can extract ligands from mmCIF files.
         """
         # they're extracted in the MMCIFPrep function actually
-        trg, trg_lig = ligand_scoring_base.MMCIFPrep(_GetTestfilePath("1r8q.cif.gz"),
-                                                     extract_nonpoly=True)
-        mdl, mdl_lig = ligand_scoring_base.MMCIFPrep(_GetTestfilePath("P84080_model_02.cif.gz"),
-                                                     extract_nonpoly=True)
+        trg, trg_lig = scoring_base.MMCIFPrep(_GetTestfilePath("1r8q.cif.gz"),
+                                              extract_nonpoly=True)
+        mdl, mdl_lig = scoring_base.MMCIFPrep(_GetTestfilePath("P84080_model_02.cif.gz"),
+                                              extract_nonpoly=True)
 
 
         sc = LigandScorer(mdl, trg, mdl_lig, trg_lig)
@@ -85,9 +86,9 @@ class TestLigandScoringFancy(unittest.TestCase):
                     io.SaveEntity(lig_ent, "%s_ligand_%d.sdf" % (prefix, lig_num))
                     lig_num += 1
         """
-        mdl = ligand_scoring_base.PDBPrep(_GetTestfilePath("P84080_model_02_nolig.pdb"))
+        mdl = scoring_base.PDBPrep(_GetTestfilePath("P84080_model_02_nolig.pdb"))
         mdl_ligs = [_LoadEntity("P84080_model_02_ligand_0.sdf")]
-        trg = ligand_scoring_base.PDBPrep(_GetTestfilePath("1r8q_protein.pdb.gz"))
+        trg = scoring_base.PDBPrep(_GetTestfilePath("1r8q_protein.pdb.gz"))
         trg_ligs = [_LoadEntity("1r8q_ligand_%d.sdf" % i) for i in range(7)]
 
         # Pass entities
@@ -112,9 +113,9 @@ class TestLigandScoringFancy(unittest.TestCase):
         """Test that we reject input if multiple ligands with the same chain
          name/residue number are given.
         """
-        mdl = ligand_scoring_base.PDBPrep(_GetTestfilePath("P84080_model_02_nolig.pdb"))
+        mdl = scoring_base.PDBPrep(_GetTestfilePath("P84080_model_02_nolig.pdb"))
         mdl_ligs = [_LoadEntity("P84080_model_02_ligand_0.sdf")]
-        trg = ligand_scoring_base.PDBPrep(_GetTestfilePath("1r8q_protein.pdb.gz"))
+        trg = scoring_base.PDBPrep(_GetTestfilePath("1r8q_protein.pdb.gz"))
         trg_ligs = [_LoadEntity("1r8q_ligand_%d.sdf" % i) for i in range(7)]
 
         # Reject identical model ligands
@@ -241,9 +242,9 @@ class TestLigandScoringFancy(unittest.TestCase):
     def test_compute_rmsd_scores(self):
         """Test that _compute_scores works.
         """
-        trg, trg_lig = ligand_scoring_base.MMCIFPrep(_GetTestfilePath("1r8q.cif.gz"),
-                                                     extract_nonpoly=True)
-        mdl = ligand_scoring_base.MMCIFPrep(_GetTestfilePath("P84080_model_02.cif.gz"))
+        trg, trg_lig = scoring_base.MMCIFPrep(_GetTestfilePath("1r8q.cif.gz"),
+                                              extract_nonpoly=True)
+        mdl = scoring_base.MMCIFPrep(_GetTestfilePath("P84080_model_02.cif.gz"))
         mdl_lig = io.LoadEntity(os.path.join('testfiles', "P84080_model_02_ligand_0.sdf"))
 
         sc = ligand_scoring_scrmsd.SCRMSDScorer(mdl, trg, [mdl_lig], trg_lig)
@@ -260,10 +261,10 @@ class TestLigandScoringFancy(unittest.TestCase):
             [np.nan]]), decimal=5)
 
     def test_compute_lddtpli_scores(self):
-        trg, trg_lig = ligand_scoring_base.MMCIFPrep(_GetTestfilePath("1r8q.cif.gz"),
-                                                     extract_nonpoly=True)
+        trg, trg_lig = scoring_base.MMCIFPrep(_GetTestfilePath("1r8q.cif.gz"),
+                                              extract_nonpoly=True)
 
-        mdl = ligand_scoring_base.MMCIFPrep(_GetTestfilePath("P84080_model_02.cif.gz"))
+        mdl = scoring_base.MMCIFPrep(_GetTestfilePath("P84080_model_02.cif.gz"))
         mdl_lig = io.LoadEntity(os.path.join('testfiles', "P84080_model_02_ligand_0.sdf"))
 
 
@@ -367,10 +368,10 @@ class TestLigandScoringFancy(unittest.TestCase):
                                lig.GetAtomCount()), 5)
 
     def test_assignment(self):
-        trg, trg_lig = ligand_scoring_base.MMCIFPrep(_GetTestfilePath("1r8q.cif.gz"),
-                                                     extract_nonpoly = True)
-        mdl, mdl_lig = ligand_scoring_base.MMCIFPrep(_GetTestfilePath("P84080_model_02.cif.gz"),
-                                                     extract_nonpoly = True)
+        trg, trg_lig = scoring_base.MMCIFPrep(_GetTestfilePath("1r8q.cif.gz"),
+                                              extract_nonpoly = True)
+        mdl, mdl_lig = scoring_base.MMCIFPrep(_GetTestfilePath("P84080_model_02.cif.gz"),
+                                              extract_nonpoly = True)
         sc = ligand_scoring_scrmsd.SCRMSDScorer(mdl, trg, mdl_lig, trg_lig)
         self.assertEqual(sc.assignment, [(1, 0)])
 
@@ -381,10 +382,10 @@ class TestLigandScoringFancy(unittest.TestCase):
         """Test that the scores are computed correctly
         """
         # 4C0A has more ligands
-        trg, trg_lig = ligand_scoring_base.MMCIFPrep(_GetTestfilePath("1r8q.cif.gz"),
+        trg, trg_lig = scoring_base.MMCIFPrep(_GetTestfilePath("1r8q.cif.gz"),
                                                      extract_nonpoly = True)
 
-        trg_4c0a, trg_4c0a_lig = ligand_scoring_base.MMCIFPrep(_GetTestfilePath("4c0a.cif.gz"),
+        trg_4c0a, trg_4c0a_lig = scoring_base.MMCIFPrep(_GetTestfilePath("4c0a.cif.gz"),
                                                                extract_nonpoly = True)
         sc = ligand_scoring_scrmsd.SCRMSDScorer(trg, trg_4c0a, trg_lig, trg_4c0a_lig)
         expected_keys = {"J", "F"}
@@ -411,11 +412,11 @@ class TestLigandScoringFancy(unittest.TestCase):
         """Test that the scores are computed correctly
         """
         # 4C0A has more ligands
-        trg, trg_lig = ligand_scoring_base.MMCIFPrep(_GetTestfilePath("1r8q.cif.gz"),
-                                                     extract_nonpoly = True)
+        trg, trg_lig = scoring_base.MMCIFPrep(_GetTestfilePath("1r8q.cif.gz"),
+                                              extract_nonpoly = True)
 
-        trg_4c0a, trg_4c0a_lig = ligand_scoring_base.MMCIFPrep(_GetTestfilePath("4c0a.cif.gz"),
-                                                               extract_nonpoly = True)
+        trg_4c0a, trg_4c0a_lig = scoring_base.MMCIFPrep(_GetTestfilePath("4c0a.cif.gz"),
+                                                        extract_nonpoly = True)
 
         sc = ligand_scoring_lddtpli.LDDTPLIScorer(trg, trg_4c0a, trg_lig, trg_4c0a_lig,
                                                   add_mdl_contacts=False,
@@ -458,8 +459,8 @@ class TestLigandScoringFancy(unittest.TestCase):
          other ligands, peptides and short oligomers into account for superposition.
          When that's the case this test should be adapter
          """
-        trg, trg_lig = ligand_scoring_base.MMCIFPrep(_GetTestfilePath("1SSP.cif.gz"),
-                                                     extract_nonpoly=True)
+        trg, trg_lig = scoring_base.MMCIFPrep(_GetTestfilePath("1SSP.cif.gz"),
+                                              extract_nonpoly=True)
 
         sc = ligand_scoring_scrmsd.SCRMSDScorer(trg, trg, trg_lig, trg_lig)
         expected_bs_ref_res = ['C.GLY62', 'C.GLN63', 'C.ASP64', 'C.PRO65', 'C.TYR66', 'C.CYS76', 'C.PHE77', 'C.ASN123', 'C.HIS187']
@@ -502,9 +503,9 @@ class TestLigandScoringFancy(unittest.TestCase):
          the ligand RET was wrongly assigned to short copies of OLA that float
           around and yielded higher scores.
           Here we test that this is resolved correctly."""
-        mdl = ligand_scoring_base.PDBPrep(_GetTestfilePath("6jyf_mdl.pdb"))
-        trg, trg_lig = ligand_scoring_base.MMCIFPrep(_GetTestfilePath("6jyf_trg.cif"),
-                                                     extract_nonpoly=True)
+        mdl = scoring_base.PDBPrep(_GetTestfilePath("6jyf_mdl.pdb"))
+        trg, trg_lig = scoring_base.MMCIFPrep(_GetTestfilePath("6jyf_trg.cif"),
+                                              extract_nonpoly=True)
         mdl_lig = _LoadEntity("6jyf_RET_pred.sdf")
         mdl_lig_full = _LoadEntity("6jyf_RET_pred_complete.sdf")
 
@@ -604,8 +605,8 @@ class TestLigandScoringFancy(unittest.TestCase):
         trg = _LoadMMCIF("1r8q.cif.gz").Copy()
         
 
-        trg, trg_lig = ligand_scoring_base.MMCIFPrep(_GetTestfilePath("1r8q.cif.gz"),
-                                                     extract_nonpoly=True)
+        trg, trg_lig = scoring_base.MMCIFPrep(_GetTestfilePath("1r8q.cif.gz"),
+                                              extract_nonpoly=True)
 
         mdl = trg.Copy()
         mdl_lig = [l.Copy() for l in trg_lig]
@@ -653,28 +654,28 @@ class TestLigandScoringFancy(unittest.TestCase):
 
     def test_no_lddt_pli_contact(self):
         """
-        Test behaviour where a binding site has no lDDT-PLI contacts.
+        Test behaviour where a binding site has no LDDT-PLI contacts.
 
         We give two copies of the target ligand which have binding site atoms
         within radius=5A but no atoms at 4A. We set lddt_pli_radius=4 so that
-        there are no contacts for the lDDT-PLI computation, and lDDT is None.
+        there are no contacts for the LDDT-PLI computation, and LDDT is None.
 
         We check that:
-        - We don't get an lDDT-PLI assignment
+        - We don't get an LDDT-PLI assignment
         - Both target ligands are unassigned and have the
         - We get an RMSD assignment
         - The second copy of the target and model ligands ensure that the
-          disambiguation code (which checks for the best lDDT-PLI when 2 RMSDs
-          are identical) works in this case (where there is no lDDT-PLI to
+          disambiguation code (which checks for the best LDDT-PLI when 2 RMSDs
+          are identical) works in this case (where there is no LDDT-PLI to
           disambiguate the RMSDs).
-        - We get lDDT-PLI = None with RMSD assignment
+        - We get LDDT-PLI = None with RMSD assignment
         """
-        trg = ligand_scoring_base.PDBPrep(_GetTestfilePath("T1118v1.pdb"))
+        trg = scoring_base.PDBPrep(_GetTestfilePath("T1118v1.pdb"))
         trg_lig = _LoadEntity("T1118v1_001.sdf")
-        mdl = ligand_scoring_base.PDBPrep(_GetTestfilePath("T1118v1LG035_1.pdb"))
+        mdl = scoring_base.PDBPrep(_GetTestfilePath("T1118v1LG035_1.pdb"))
         mdl_lig = _LoadEntity("T1118v1LG035_1_1_1.sdf")
 
-        # Ensure it's unassigned in lDDT
+        # Ensure it's unassigned in LDDT
         sc = ligand_scoring_lddtpli.LDDTPLIScorer(mdl, trg, [mdl_lig, mdl_lig],
                                                   [trg_lig, trg_lig],
                                                   lddt_pli_radius=4,
@@ -686,7 +687,7 @@ class TestLigandScoringFancy(unittest.TestCase):
         self.assertEqual(sc.unassigned_model_ligands, [0, 1])
 
         expected_report = [{'state': 10, 'short desc': 'no_contact',
-                            'desc': 'There were no lDDT contacts between the binding site and the ligand, and lDDT-PLI is undefined.',
+                            'desc': 'There were no LDDT contacts between the binding site and the ligand, and LDDT-PLI is undefined.',
                             'indices': [0, 1]}]
 
         # both target ligands are expected to have the same report => no_contact
@@ -725,10 +726,10 @@ class TestLigandScoringFancy(unittest.TestCase):
 
     def test_unassigned_reasons(self):
         """Test reasons for being unassigned."""
-        trg, trg_lig = ligand_scoring_base.MMCIFPrep(_GetTestfilePath("1r8q.cif.gz"),
-                                                     extract_nonpoly=True)
-        mdl, mdl_lig = ligand_scoring_base.MMCIFPrep(_GetTestfilePath("P84080_model_02.cif.gz"),
-                                                     extract_nonpoly=True)
+        trg, trg_lig = scoring_base.MMCIFPrep(_GetTestfilePath("1r8q.cif.gz"),
+                                              extract_nonpoly=True)
+        mdl, mdl_lig = scoring_base.MMCIFPrep(_GetTestfilePath("P84080_model_02.cif.gz"),
+                                              extract_nonpoly=True)
 
         # Add interesting ligands to model and target
         mdl_lig_ent = mol.CreateEntity()
@@ -901,10 +902,10 @@ class TestLigandScoringFancy(unittest.TestCase):
 
     def test_cleanup_polymer_ent(self):
 
-        trg, trg_lig = ligand_scoring_base.MMCIFPrep(_GetTestfilePath("1r8q.cif.gz"),
-                                                     extract_nonpoly=True)
-        mdl, mdl_lig = ligand_scoring_base.MMCIFPrep(_GetTestfilePath("P84080_model_02.cif.gz"),
-                                                     extract_nonpoly=True)
+        trg, trg_lig = scoring_base.MMCIFPrep(_GetTestfilePath("1r8q.cif.gz"),
+                                              extract_nonpoly=True)
+        mdl, mdl_lig = scoring_base.MMCIFPrep(_GetTestfilePath("P84080_model_02.cif.gz"),
+                                              extract_nonpoly=True)
 
         # check hydrogen cleanup
         trg_with_h = trg.Copy()
@@ -1003,6 +1004,70 @@ class TestLigandScoringFancy(unittest.TestCase):
         self.assertEqual(sc.model.GetAtomCount(), N)
         self.assertEqual(sc.model.GetResidueCount(), N_res)
         self.assertEqual(sc.model_cleanup_log["cleaned_atoms"]["unknown_atoms"], ["A.2..yolo"]) 
+
+    def test_seqres(self):
+        # the tested structures are absolutely irrelevant for ligands
+        # we're simply checking if the seqres info gets propagated to
+        # the chain mapper
+        mdl = _LoadPDB("1eud_mdl_partial-dimer.pdb")
+        trg = _LoadPDB("1eud_ref.pdb")
+        mdl_lig = []
+        trg_lig = []
+        fake_lig = mol.CreateEntity()
+        ed = fake_lig.EditXCS()
+        ch=ed.InsertChain("A")
+        r=ed.AppendResidue(ch, "LIG")
+        a=ed.InsertAtom(r, "A", geom.Vec3())
+        trg_lig.append(fake_lig)
+        sc = ligand_scoring_scrmsd.SCRMSDScorer(mdl, trg, mdl_lig, trg_lig)
+        self.assertTrue(sc._chain_mapper.seqres is None)
+        self.assertTrue(sc._chain_mapper.trg_seqres_mapping is None)
+        sc = ligand_scoring_lddtpli.LDDTPLIScorer(mdl, trg, mdl_lig, trg_lig)
+        self.assertTrue(sc._chain_mapper.seqres is None)
+        self.assertTrue(sc._chain_mapper.trg_seqres_mapping is None)
+
+
+        seqres = seq.CreateSequenceList()
+        seqres.AddSequence(seq.CreateSequence("1", "MAIRHCSYTASRKHLYVDKNTKVICQGFTGK"
+                                                   "QGTFHSQQALEYGTNLVGGTTPGKGGKTHLGL"
+                                                   "PVFNTVKEAKEQTGATASVIYVPPPFAAAAIN"
+                                                   "EAIDAEVPLVVCITEGIPQQDMVRVKHRLLRQ"
+                                                   "GKTRLIGPNCPGVINPGECKIGIMPGHIHKKG"
+                                                   "RIGIVSRSGTLTYEAVHQTTQVGLGQSLCVGI"
+                                                   "GGDPFNGTDFTDCLEIFLNDPATEGIILIGEI"
+                                                   "GGNAEENAAEFLKQHNSGPKSKPVVSFIAGLT"
+                                                   "APPGRRMGHAGAIIAGGKGGAKEKITALQSAG"
+                                                   "VVVSMSPAQLGTTIYKEFEKRKML"))
+        seqres.AddSequence(seq.CreateSequence("2", "MVNLQEYQSKKLMSDNGVKVQRFFVADTANEA"
+                                                   "LEAAKRLNAKEIVLKAQILAGGRGKGVFSSGL"
+                                                   "KGGVHLTKDPEVVGQLAKQMIGYNLATKQTPK"
+                                                   "EGVKVNKVMVAEALDISRETYLAILMDRSCNG"
+                                                   "PVLVGSPQGGVDIEEVAASNPELIFKEQIDII"
+                                                   "EGIKDSQAQRMAENLGFLGPLQNQAADQIKKL"
+                                                   "YNLFLKIDATQVEVNPFGETPEGQVVCFDAKI"
+                                                   "NFDDNAEFRQKDIFAMDDKSENEPIENEAAKY"
+                                                   "DLKYIGLDGNIACFVNGAGLAMATCDIIFLNG"
+                                                   "GKPANFLDLGGGVKESQVYQAFKLLTADPKVE"
+                                                   "AILVNIFGGIVNCAIIANGITKACRELELKVP"
+                                                   "LVVRLEGTNVHEAQNILTNSGLPITSAVDLED"
+                                                   "AAKKAVASVTKK"))
+
+        trg_seqres_mapping = {"A": "1",
+                              "B": "2"}
+
+        # we simply check if the parameters are propagated to the chain mapper
+        sc = ligand_scoring_scrmsd.SCRMSDScorer(mdl, trg, mdl_lig, trg_lig,
+                                                seqres=seqres,
+                                                trg_seqres_mapping=trg_seqres_mapping,
+                                                resnum_alignments=True)
+        self.assertFalse(sc._chain_mapper.seqres is None)
+        self.assertFalse(sc._chain_mapper.trg_seqres_mapping is None)
+        sc = ligand_scoring_lddtpli.LDDTPLIScorer(mdl, trg, mdl_lig, trg_lig,
+                                                  seqres=seqres,
+                                                  trg_seqres_mapping=trg_seqres_mapping,
+                                                  resnum_alignments=True)
+        self.assertFalse(sc._chain_mapper.seqres is None)
+        self.assertFalse(sc._chain_mapper.trg_seqres_mapping is None)
 
 
 if __name__ == "__main__":

@@ -212,6 +212,13 @@ public:
     return this->GetAUChain(name);
   }
 
+  OMFPtr ToAssembly(const std::vector<std::vector<String> >& au_chains,
+                    const std::vector<std::vector<geom::Mat4> >& transformations,
+                    const std::vector<std::vector<std::vector<String> > >& bu_chains) const;
+
+  void Trace(const String& cname, const String& aname,
+             std::vector<int>& rnums, geom::Vec3List& pos) const;
+
   int GetVersion() const { return version_; }
 
   static int GetCurrentOMFVersion() { return OMF_VERSION; }
@@ -231,7 +238,20 @@ public:
 
   std::vector<Real> GetAvgBFactors(const String& cname) const;
 
+  const std::vector<Real>& GetOccupancies(const String& cname) const;
+
   String GetSequence(const String& cname) const;
+
+  const std::vector<int>& GetRNums(const String& cname) const;
+
+  // raw data access - pros only...
+  const std::vector<ResidueDefinition>& GetResidueDefinitions() const {
+    return residue_definitions_;
+  }
+
+  ChainDataPtr GetChainData(const std::string& cname) const {
+    return chain_data_.at(cname);
+  }
 
 private:
   // only construct with static functions

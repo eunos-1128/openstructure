@@ -36,6 +36,7 @@ set(OST_MOL_ALG_PYMOD_MODULES
   ligand_scoring_scrmsd.py
   ligand_scoring_lddtpli.py
   bb_lddt.py
+  scoring_base.py
 )
 
 if (NOT ENABLE_STATIC)

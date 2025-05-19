@@ -24,16 +24,25 @@
 #include <ost/mol/entity_handle.hh>
 #include <ost/io/mmcif_reader.hh>
 #include <ost/io/mol/io_profile.hh>
+#include <ost/io/mmcif_writer.hh>
+#include <ost/io/mol/omf.hh>
 
 namespace ost { namespace io {
 
 String DLLEXPORT_OST_IO
 EntityToMMCifString(const ost::mol::EntityHandle& ent, const String& data_name,
-                    ost::conop::CompoundLibPtr compound_lib, bool mmcif_conform);
+                    ost::conop::CompoundLibPtr compound_lib, bool mmcif_conform,
+                    const std::vector<MMCifWriterEntity>& entity_info = std::vector<MMCifWriterEntity>());
 
 String DLLEXPORT_OST_IO
 EntityToMMCifString(const ost::mol::EntityView& ent, const String& data_name,
-                    ost::conop::CompoundLibPtr compound_lib, bool mmcif_conform);
+                    ost::conop::CompoundLibPtr compound_lib, bool mmcif_conform,
+                    const std::vector<MMCifWriterEntity>& entity_info = std::vector<MMCifWriterEntity>());
+
+String DLLEXPORT_OST_IO
+OMFToMMCifString(const ost::io::OMF& omf, const String& data_name,
+                 ost::conop::CompoundLibPtr compound_lib, bool mmcif_conform,
+                 const std::vector<MMCifWriterEntity>& entity_info = std::vector<MMCifWriterEntity>());
 
 std::tuple<mol::EntityHandle, MMCifInfo, ost::seq::SequenceList> DLLEXPORT_OST_IO
 MMCifStringToEntity(const String& mmcif, const IOProfile& profile, bool process);

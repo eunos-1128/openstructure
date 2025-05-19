@@ -2119,7 +2119,7 @@ Here is an example with pre-defined mmCIF entities:
     Structure. Calling this function more than once raises an error.
 
     :param ent: The stucture to write
-    :type ent: :class:`ost.mol.EntityHandle`/ :class:`ost.mol.EntityView`
+    :type ent: :class:`ost.mol.EntityHandle`/ :class:`ost.mol.EntityView`/ :class:`ost.io.OMF`
     :param compound_lib: The compound library
     :type compound_lib: :class:`ost.conop.CompoundLib`
     :param mmcif_conform: Determines data extraction strategy as described above

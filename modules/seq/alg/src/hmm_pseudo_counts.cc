@@ -1,7 +1,6 @@
 #include <ost/seq/alg/hmm_pseudo_counts.hh>
 
 #include <boost/algorithm/string/predicate.hpp>
-#include <boost/filesystem/convenience.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
 #include <boost/iostreams/filtering_stream.hpp>
@@ -143,7 +142,7 @@ ContextProfileDBPtr ContextProfileDB::FromCRF(const String& filename) {
     throw Error("Could not open " + filename);
   }
   // add unzip if necessary
-  if(boost::iequals(".gz", boost::filesystem::extension(filename))) {
+  if(boost::iequals(".gz", boost::filesystem::path(filename).extension().string())) {
     in.push(boost::iostreams::gzip_decompressor());
   }
   in.push(stream);

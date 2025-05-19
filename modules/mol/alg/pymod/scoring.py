@@ -22,11 +22,53 @@ from ost.bindings import cadscore
 from ost.bindings import tmtools
 import numpy as np
 
+def _GetAlignedResidues(aln, s1_ent, s2_ent):
+    """ Yields aligned residues
+
+    :param aln: The alignment with 2 sequences defining a residue-by-residue
+                relationship.
+    :type aln: :class:`ost.seq.AlignmentHandle`
+    :param s1_ent: Structure representing first sequence in *aln*. 
+                   One chain must be named after the first sequence and the
+                   number of residues must match the number of non-gap
+                   characters.
+    :type s1_ent: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
+    :param s2_ent: Same for second sequence in *aln*.
+    :type s2_ent: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
+    """
+    s1_ch = s1_ent.FindChain(aln.GetSequence(0).GetName())
+    s2_ch = s2_ent.FindChain(aln.GetSequence(1).GetName())
+
+    if not s1_ch.IsValid():
+        raise RuntimeError("s1_ent lacks required chain in _GetAlignedResidues")
+
+    if not s2_ch.IsValid():
+        raise RuntimeError("s2_ent lacks required chain in _GetAlignedResidues")
+
+    if len(aln.GetSequence(0).GetGaplessString()) != s1_ch.GetResidueCount():
+        raise RuntimeError("aln/chain mismatch in _GetAlignedResidues")
+    if len(aln.GetSequence(1).GetGaplessString()) != s2_ch.GetResidueCount():
+        raise RuntimeError("aln/chain mismatch in _GetAlignedResidues")
+
+    s1_res = s1_ch.residues
+    s2_res = s2_ch.residues
+
+    s1_res_idx = 0
+    s2_res_idx = 0
+
+    for col in aln:
+        if col[0] != '-' and col[1] != '-':
+            yield (s1_res[s1_res_idx], s2_res[s2_res_idx])
+        if col[0] != '-':
+            s1_res_idx += 1
+        if col[1] != '-':
+            s2_res_idx += 1
+
 class lDDTBSScorer:
     """Scorer specific for a reference/model pair
 
     Finds best possible binding site representation of reference in model given
-    lDDT score. Uses :class:`ost.mol.alg.chain_mapping.ChainMapper` to deal with
+    LDDT score. Uses :class:`ost.mol.alg.chain_mapping.ChainMapper` to deal with
     chain mapping.
 
     :param reference: Reference structure
@@ -44,8 +86,8 @@ class lDDTBSScorer:
         self.mdl = model
 
     def ScoreBS(self, ligand, radius = 4.0, lddt_radius=10.0):
-        """Computes binding site lDDT score given *ligand*. Best possible
-        binding site representation is selected by lDDT but other scores such as
+        """Computes binding site LDDT score given *ligand*. Best possible
+        binding site representation is selected by LDDT but other scores such as
         CA based RMSD and GDT are computed too and returned.
 
         :param ligand: Defines the scored binding site, i.e. provides positions
@@ -58,7 +100,7 @@ class lDDTBSScorer:
                             :class:`ost.mol.alg.lddt.lDDTScorer`
         :type lddt_radius: :class:`float`
         :returns: Object of type :class:`ost.mol.alg.chain_mapping.ReprResult`
-                  containing all atom lDDT score and mapping information.
+                  containing all atom LDDT score and mapping information.
                   None if no representation could be found.
         """
 
@@ -136,7 +178,7 @@ class Scorer:
                          TM-score. If not given, TM-score will be computed
                          with OpenStructure internal copy of USalign code.
     :type usalign_exec: :class:`str`
-    :param lddt_no_stereochecks: Whether to compute lDDT without stereochemistry
+    :param lddt_no_stereochecks: Whether to compute LDDT without stereochemistry
                                 checks
     :type lddt_no_stereochecks: :class:`bool`
     :param n_max_naive: Parameter for chain mapping. If the number of possible
@@ -172,8 +214,8 @@ class Scorer:
                            produce high sequence identity alignments by pure
                            chance.
     :type min_nuc_length: :class:`int`
-    :param lddt_add_mdl_contacts: lDDT specific flag. Only using contacts in
-                                  lDDT that are within a certain distance 
+    :param lddt_add_mdl_contacts: LDDT specific flag. Only using contacts in
+                                  LDDT that are within a certain distance
                                   threshold in the target does not penalize
                                   for added model contacts. If set to True, this
                                   flag will also consider target contacts
@@ -202,9 +244,32 @@ class Scorer:
                                 scores.
     :type dockq_capri_peptide: :class:`bool`
     :param lddt_symmetry_settings: Passed as *symmetry_settings* parameter to
-                                   lDDT scorer. Default: None
+                                   LDDT scorer. Default: None
     :type lddt_symmetry_settings: :class:`ost.mol.alg.lddt.SymmetrySettings`
-    :param lddt_inclusion_radius: lDDT inclusion radius.
+    :param lddt_inclusion_radius: LDDT inclusion radius.
+    :param pep_seqid_thr: Parameter that affects identification of identical
+                          chains in target - see 
+                          :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type pep_seqid_thr: :class:`float`
+    :param nuc_seqid_thr: Parameter that affects identification of identical
+                          chains in target - see 
+                          :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type nuc_seqid_thr: :class:`float`
+    :param mdl_map_pep_seqid_thr: Parameter that affects mapping of model chains
+                                  to target chains - see 
+                                  :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type mdl_map_pep_seqid_thr: :class:`float`
+    :param mdl_map_nuc_seqid_thr: Parameter that affects mapping of model chains
+                                  to target chains - see 
+                                  :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type mdl_map_nuc_seqid_thr: :class:`float`
+    :param seqres: Parameter that affects identification of identical chains in
+                   target - see :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type seqres: :class:`ost.seq.SequenceList`
+    :param trg_seqres_mapping: Parameter that affects identification of identical
+                               chains in target - see 
+                               :class:`ost.mol.alg.chain_mapping.ChainMapper`
+    :type trg_seqres_mapping: :class:`dict`
     """
     def __init__(self, model, target, resnum_alignments=False,
                  molck_settings = None, cad_score_exec = None,
@@ -213,10 +278,19 @@ class Scorer:
                  n_max_naive=40320, oum=False, min_pep_length = 6,
                  min_nuc_length = 4, lddt_add_mdl_contacts=False,
                  dockq_capri_peptide=False, lddt_symmetry_settings = None,
-                 lddt_inclusion_radius = 15.0):
+                 lddt_inclusion_radius = 15.0,
+                 pep_seqid_thr = 95., nuc_seqid_thr = 95.,
+                 mdl_map_pep_seqid_thr = 0.,
+                 mdl_map_nuc_seqid_thr = 0.,
+                 seqres = None,
+                 trg_seqres_mapping = None):
 
         self._target_orig = target
         self._model_orig = model
+
+        # lazily computed versions of target_orig and model_orig
+        self._pepnuc_target = None
+        self._pepnuc_model = None
 
         if isinstance(self._model_orig, mol.EntityView):
             self._model = mol.CreateEntityFromView(self._model_orig, False)
@@ -319,6 +393,12 @@ class Scorer:
         self.dockq_capri_peptide = dockq_capri_peptide
         self.lddt_symmetry_settings = lddt_symmetry_settings
         self.lddt_inclusion_radius = lddt_inclusion_radius
+        self.pep_seqid_thr = pep_seqid_thr
+        self.nuc_seqid_thr = nuc_seqid_thr
+        self.mdl_map_pep_seqid_thr = mdl_map_pep_seqid_thr
+        self.mdl_map_nuc_seqid_thr = mdl_map_nuc_seqid_thr
+        self.seqres = seqres
+        self.trg_seqres_mapping = trg_seqres_mapping
 
         # lazily evaluated attributes
         self._stereochecked_model = None
@@ -471,6 +551,19 @@ class Scorer:
         return self._model_orig
 
     @property
+    def pepnuc_model(self):
+        """ A selection of :attr:`~model_orig`
+
+        Only contains peptide and nucleotide residues
+
+        :type: :class:`ost.mol.EntityView`
+        """
+        if self._pepnuc_model is None:
+            query = "peptide=true or nucleotide=true"
+            self._pepnuc_model = self.model_orig.Select(query)
+        return self._pepnuc_model
+
+    @property
     def target(self):
         """ Target with Molck cleanup
 
@@ -485,6 +578,19 @@ class Scorer:
         :type: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
         """
         return self._target_orig
+
+    @property
+    def pepnuc_target(self):
+        """ A selection of :attr:`~target_orig`
+
+        Only contains peptide and nucleotide residues
+
+        :type: :class:`ost.mol.EntityView`
+        """
+        if self._pepnuc_target is None:
+            query = "peptide=true or nucleotide=true"
+            self._pepnuc_target = self.target_orig.Select(query)
+        return self._pepnuc_target
 
     @property
     def aln(self):
@@ -653,7 +759,13 @@ class Scorer:
                                                            n_max_naive=1e9,
                                                            resnum_alignments=self.resnum_alignments,
                                                            min_pep_length=self.min_pep_length,
-                                                           min_nuc_length=self.min_nuc_length)
+                                                           min_nuc_length=self.min_nuc_length,
+                                                           pep_seqid_thr=self.pep_seqid_thr,
+                                                           nuc_seqid_thr=self.nuc_seqid_thr,
+                                                           mdl_map_pep_seqid_thr=self.mdl_map_pep_seqid_thr,
+                                                           mdl_map_nuc_seqid_thr=self.mdl_map_nuc_seqid_thr,
+                                                           seqres=self.seqres,
+                                                           trg_seqres_mapping=self.trg_seqres_mapping)
         return self._chain_mapper
 
     @property
@@ -714,7 +826,7 @@ class Scorer:
 
     @property
     def lddt_scorer(self):
-        """ lDDT scorer for :attr:`~target`/:attr:`~stereochecked_target`
+        """ LDDT scorer for :attr:`~target`/:attr:`~stereochecked_target`
 
         Depending on :attr:`~lddt_no_stereocheck` and
         :attr:`~lddt_symmetry_settings`.
@@ -734,9 +846,10 @@ class Scorer:
 
     @property
     def bb_lddt_scorer(self):
-        """ Backbone only lDDT scorer for :attr:`~target`
+        """ LDDT scorer for :attr:`~target`, restricted to representative
+        backbone atoms
 
-        No stereochecks applied for bb only lDDT which considers CA atoms
+        No stereochecks applied for bb only LDDT which considers CA atoms
         for peptides and C3' atoms for nucleotides.
 
         :type: :class:`ost.mol.alg.lddt.lDDTScorer`
@@ -777,7 +890,7 @@ class Scorer:
 
     @property
     def lddt(self):
-        """ Global lDDT score in range [0.0, 1.0]
+        """ Global LDDT score in range [0.0, 1.0]
 
         Computed based on :attr:`~stereochecked_model`. In case of oligomers,
         :attr:`~mapping` is used.
@@ -790,7 +903,7 @@ class Scorer:
     
     @property
     def local_lddt(self):
-        """ Per residue lDDT scores in range [0.0, 1.0]
+        """ Per residue LDDT scores in range [0.0, 1.0]
 
         Computed based on :attr:`~stereochecked_model` but scores for all 
         residues in :attr:`~model` are reported. If a residue has been removed
@@ -807,7 +920,7 @@ class Scorer:
 
     @property
     def aa_local_lddt(self):
-        """ Per atom lDDT scores in range [0.0, 1.0]
+        """ Per atom LDDT scores in range [0.0, 1.0]
 
         Computed based on :attr:`~stereochecked_model` but scores for all
         atoms in :attr:`~model` are reported. If an atom has been removed
@@ -824,11 +937,12 @@ class Scorer:
 
     @property
     def bb_lddt(self):
-        """ Backbone only global lDDT score in range [0.0, 1.0]
+        """ Global LDDT score restricted to representative backbone atoms in
+        range [0.0, 1.0]
 
-        Computed based on :attr:`~model` on backbone atoms only. This is CA for
-        peptides and C3' for nucleotides. No stereochecks are performed. In case
-        of oligomers, :attr:`~mapping` is used.
+        Computed based on :attr:`~model` on representative backbone atoms only.
+        This is CA for peptides and C3' for nucleotides. No stereochecks are
+        performed. In case of oligomers, :attr:`~mapping` is used.
 
         :type: :class:`float`
         """
@@ -838,13 +952,15 @@ class Scorer:
     
     @property
     def bb_local_lddt(self):
-        """ Backbone only per residue lDDT scores in range [0.0, 1.0]
+        """ Per residue LDDT scores restricted to representative backbone atoms
+        in range [0.0, 1.0]
 
-        Computed based on :attr:`~model` on backbone atoms only. This is CA for
-        peptides and C3' for nucleotides. No stereochecks are performed. If a
-        residue is not covered by the target or is in a chain skipped by the
-        chain mapping procedure (happens for super short chains), the respective
-        score is set to None. In case of oligomers, :attr:`~mapping` is used.
+        Computed based on :attr:`~model` on representative backbone atoms only.
+        This is CA for peptides and C3' for nucleotides. No stereochecks are
+        performed. If a residue is not covered by the target or is in a chain
+        skipped by the chain mapping procedure (happens for super short
+        chains), the respective score is set to None. In case of oligomers,
+        :attr:`~mapping` is used.
 
         :type: :class:`dict`
         """
@@ -854,9 +970,9 @@ class Scorer:
 
     @property
     def ilddt(self):
-        """ Global interface lDDT score in range [0.0, 1.0]
+        """ Global interface LDDT score in range [0.0, 1.0]
 
-        This is lDDT only based on inter-chain contacts. Value is None if no
+        This is LDDT only based on inter-chain contacts. Value is None if no
         such contacts are present. For example if we're dealing with a monomer.
         Computed based on :attr:`~stereochecked_model` and :attr:`~mapping` for
         chain mapping.
@@ -2013,14 +2129,12 @@ class Scorer:
             cname = ch.GetName()
             s = ''.join([r.one_letter_code for r in ch.residues])
             s = seq.CreateSequence(ch.GetName(), s)
-            s.AttachView(target.Select(f"cname={mol.QueryQuoteName(cname)}"))
             trg_seqs[ch.GetName()] = s
         mdl_seqs = dict()
         for ch in model.chains:
             cname = ch.GetName()
             s = ''.join([r.one_letter_code for r in ch.residues])
             s = seq.CreateSequence(cname, s)
-            s.AttachView(model.Select(f"cname={mol.QueryQuoteName(cname)}"))
             mdl_seqs[ch.GetName()] = s
 
         alns = list()
@@ -2037,36 +2151,80 @@ class Scorer:
                 else:
                     raise RuntimeError("Chain name inconsistency... ask "
                                        "Gabriel")
-                alns.append(self.chain_mapper.Align(trg_seqs[trg_ch],
+                if self.resnum_alignments:
+                    aln = self.chain_mapper.ResNumAlign(trg_seqs[trg_ch],
+                                                        mdl_seqs[mdl_ch],
+                                                        target, model)
+                else:
+                    aln = self.chain_mapper.NWAlign(trg_seqs[trg_ch],
                                                     mdl_seqs[mdl_ch],
-                                                    stype))
-                alns[-1].AttachView(0, trg_seqs[trg_ch].GetAttachedView())
-                alns[-1].AttachView(1, mdl_seqs[mdl_ch].GetAttachedView())
-        return alns
+                                                    stype)
 
-    def _compute_pepnuc_aln(self):
-        query = "peptide=true or nucleotide=true"
-        pep_nuc_target = self.target_orig.Select(query)
-        pep_nuc_model = self.model_orig.Select(query)
-        self._pepnuc_aln = self._aln_helper(pep_nuc_target, pep_nuc_model)
+                alns.append(aln)
+        return alns
 
     def _compute_aln(self):
         self._aln = self._aln_helper(self.target, self.model)
 
     def _compute_stereochecked_aln(self):
-        self._stereochecked_aln = self._aln_helper(self.stereochecked_target,
-                                                   self.stereochecked_model)
+        # lets not redo the alignment and derive it from self.aln
+        alns = list()
+        for a in self.aln:
+            trg_s = a.GetSequence(0)
+            mdl_s = a.GetSequence(1)
+            trg_ch = self.target.FindChain(trg_s.name)
+            mdl_ch = self.model.FindChain(mdl_s.name)
+
+            sc_trg_olc = ['-'] * len(trg_s)
+            sc_mdl_olc = ['-'] * len(mdl_s)
+
+            sc_trg_ch = self.stereochecked_target.FindChain(trg_s.name)
+            if sc_trg_ch.IsValid():
+                # there is the theoretical possibility that the full chain
+                # has been removed in stereochemistry checks...
+                trg_residues = trg_ch.residues
+                res_idx = 0
+                for olc_idx, olc in enumerate(trg_s):
+                    if olc != '-':
+                        r = trg_residues[res_idx]
+                        sc_r = sc_trg_ch.FindResidue(r.GetNumber())
+                        if sc_r.IsValid():
+                            sc_trg_olc[olc_idx] = sc_r.one_letter_code
+                        res_idx += 1
+
+            sc_mdl_ch = self.stereochecked_model.FindChain(mdl_s.name)
+            if sc_mdl_ch.IsValid():
+                # there is the theoretical possibility that the full chain
+                # has been removed in stereochemistry checks...
+                mdl_residues = mdl_ch.residues
+                res_idx = 0
+                for olc_idx, olc in enumerate(mdl_s):
+                    if olc != '-':
+                        r = mdl_residues[res_idx]
+                        sc_r = sc_mdl_ch.FindResidue(r.GetNumber())
+                        if sc_r.IsValid():
+                            sc_mdl_olc[olc_idx] = sc_r.one_letter_code
+                        res_idx += 1
+
+            sc_trg_s = seq.CreateSequence(trg_s.name, ''.join(sc_trg_olc))
+            sc_mdl_s = seq.CreateSequence(mdl_s.name, ''.join(sc_mdl_olc))
+            new_a = seq.CreateAlignment()
+            new_a.AddSequence(sc_trg_s)
+            new_a.AddSequence(sc_mdl_s)
+            alns.append(new_a)
+
+        self._stereochecked_aln = alns
+
+    def _compute_pepnuc_aln(self):
+        self._pepnuc_aln = self._aln_helper(self.pepnuc_target,
+                                            self.pepnuc_model)
 
     def _compute_lddt(self):
-        LogScript("Computing all-atom lDDT")
-        # lDDT requires a flat mapping with mdl_ch as key and trg_ch as value
+        LogScript("Computing all-atom LDDT")
+        # LDDT requires a flat mapping with mdl_ch as key and trg_ch as value
         flat_mapping = self.mapping.GetFlatMapping(mdl_as_key=True)
 
         # make alignments accessible by mdl seq name
-        stereochecked_alns = dict()
-        for aln in self.stereochecked_aln:
-            mdl_seq = aln.GetSequence(1)
-            stereochecked_alns[mdl_seq.name] = aln
         alns = dict()
         for aln in self.aln:
             mdl_seq = aln.GetSequence(1)
@@ -2122,10 +2280,25 @@ class Scorer:
 
 
         else:
+            # keep track what chains we have in the stereochecked model
+            # there might be really wild cases where a full model
+            # chain is removed in the stereochemistry checks.
+            # We need to adapt lddt chain mapping in these cases
+            mdl_chains = set([ch.name for ch in self.stereochecked_model.chains])
+
+            # make alignments accessible by mdl seq name
+            stereochecked_alns = dict()
+            for aln in self.stereochecked_aln:
+                mdl_seq = aln.GetSequence(1)
+                if mdl_seq.GetName() in mdl_chains:
+                    stereochecked_alns[mdl_seq.name] = aln
+
             lddt_chain_mapping = dict()
             for mdl_ch, trg_ch in flat_mapping.items():
                 if mdl_ch in stereochecked_alns:
                     lddt_chain_mapping[mdl_ch] = trg_ch
+
+
             lddt_score = self.lddt_scorer.lDDT(self.stereochecked_model,
                                                chain_mapping = lddt_chain_mapping,
                                                residue_mapping = stereochecked_alns,
@@ -2136,10 +2309,12 @@ class Scorer:
             local_lddt = dict()
             aa_local_lddt = dict()
             for r in self.model.residues:
+
                 cname = r.GetChain().GetName()
                 if cname not in local_lddt:
                     local_lddt[cname] = dict()
                     aa_local_lddt[cname] = dict()
+
                 rnum = r.GetNumber()
                 if rnum not in aa_local_lddt[cname]:
                     aa_local_lddt[cname][rnum] = dict()
@@ -2148,8 +2323,8 @@ class Scorer:
                     score = round(r.GetFloatProp("lddt"), 3)
                     local_lddt[cname][rnum] = score
 
-                    trg_r = None
-                    mdl_r = None
+                    trg_r = None # represents stereochecked trg res
+                    mdl_r = None # represents stereochecked mdl res
 
                     for a in r.atoms:
                         if a.HasProp("lddt"):
@@ -2164,18 +2339,24 @@ class Scorer:
                             #        stereochecks but is there in stereochecked
                             #        target => 0.0
                             if trg_r is None:
+                                # let's first see if we find that target residue
+                                # in the non-stereochecked target
+                                tmp = None
                                 if cname in flat_mapping:
-                                    for col in alns[cname]:
-                                        if col[0] != '-' and col[1] != '-':
-                                            if col.GetResidue(1).number == r.number:
-                                                trg_r = col.GetResidue(0)
-                                                break
-                                if trg_r is not None:
-                                    trg_cname = trg_r.GetChain().GetName()
-                                    trg_rnum = trg_r.GetNumber()
-                                    tmp = self.stereochecked_target.FindResidue(trg_cname,
-                                                                                trg_rnum)
+                                    for x, y in _GetAlignedResidues(alns[cname],
+                                                                    self.target,
+                                                                    self.model):
+                                        if y.number == r.number:
+                                            tmp = x
+                                            break
+                                if tmp is not None:
+                                    # we have it in the non-stereochecked target!
+                                    tmp_cname = tmp.GetChain().GetName()
+                                    tmp_rnum = tmp.GetNumber()
+                                    tmp = self.stereochecked_target.FindResidue(tmp_cname,
+                                                                                tmp_rnum)
                                     if tmp.IsValid():
+                                        # And it's there in the stereochecked target too!
                                         trg_r = tmp
 
                             if mdl_r is None:
@@ -2183,12 +2364,23 @@ class Scorer:
                                 if tmp.IsValid():
                                     mdl_r = tmp
 
-                            if trg_r is not None and not trg_r.FindAtom(a.GetName()).IsValid():
-                                # opt 1
+                            if trg_r is None:
+                                # opt 1 - the whole target residue is not there
+                                # this is actually an impossibility, as we have
+                                # a score for the full mdl residue set
+                                aa_local_lddt[cname][rnum][a.GetName()] = None                                
+                            elif trg_r is not None and not trg_r.FindAtom(a.GetName()).IsValid():
+                                # opt 1 - the target residue is there but not the atom
                                 aa_local_lddt[cname][rnum][a.GetName()] = None
                             elif trg_r is not None and trg_r.FindAtom(a.GetName()).IsValid() and \
+                                 mdl_r is None:
+                                # opt 2 - trg atom is there but full model residue is removed
+                                # this is actuall an impossibility, as we have
+                                # a score for the full mdl residue set
+                                aa_local_lddt[cname][rnum][a.GetName()] = 0.0
+                            elif trg_r is not None and trg_r.FindAtom(a.GetName()).IsValid() and \
                                  mdl_r is not None and not mdl_r.FindAtom(a.GetName()).IsValid():
-                                # opt 2
+                                # opt 2 - trg atom is there but model atom is removed
                                 aa_local_lddt[cname][rnum][a.GetName()] = 0.0
                             else:
                                 # unknown issue
@@ -2206,20 +2398,25 @@ class Scorer:
                         # opt 1: removed by stereochecks => assign 0.0
                         # opt 2: removed by stereochecks AND not covered by ref
                         #        => assign None
+
                         # fetch trg residue from non-stereochecked aln
                         trg_r = None
                         if cname in flat_mapping:
-                            for col in alns[cname]:
-                                if col[0] != '-' and col[1] != '-':
-                                    if col.GetResidue(1).number == r.number:
-                                        trg_r = col.GetResidue(0)
-                                        break
-                            if trg_r is not None:
-                                trg_cname = trg_r.GetChain().GetName()
-                                trg_rnum = trg_r.GetNumber()
-                                tmp = self.stereochecked_target.FindResidue(trg_cname,
-                                                                            trg_rnum)
+                            tmp = None
+                            for x, y in _GetAlignedResidues(alns[cname],
+                                                            self.target,
+                                                            self.model):
+                                if y.number == r.number:
+                                    tmp = x
+                                    break
+                            if tmp is not None:
+                                # we have it in the non-stereochecked target!
+                                tmp_cname = tmp.GetChain().GetName()
+                                tmp_rnum = tmp.GetNumber()
+                                tmp = self.stereochecked_target.FindResidue(tmp_cname,
+                                                                            tmp_rnum)
                                 if tmp.IsValid():
+                                    # And it's there in the stereochecked target too!
                                     trg_r = tmp
 
                         if trg_r is None:
@@ -2239,14 +2436,14 @@ class Scorer:
         self._aa_local_lddt = aa_local_lddt
 
     def _compute_bb_lddt(self):
-        LogScript("Computing backbone lDDT")
+        LogScript("Computing backbone LDDT")
         # make alignments accessible by mdl seq name
         alns = dict()
         for aln in self.aln:
             mdl_seq = aln.GetSequence(1)
             alns[mdl_seq.name] = aln
 
-        # lDDT requires a flat mapping with mdl_ch as key and trg_ch as value
+        # LDDT requires a flat mapping with mdl_ch as key and trg_ch as value
         flat_mapping = self.mapping.GetFlatMapping(mdl_as_key=True)
         lddt_chain_mapping = dict()
         for mdl_ch, trg_ch in flat_mapping.items():
@@ -2276,8 +2473,8 @@ class Scorer:
         self._bb_local_lddt = local_lddt
 
     def _compute_ilddt(self):
-        LogScript("Computing all-atom ilDDT")
-        # lDDT requires a flat mapping with mdl_ch as key and trg_ch as value
+        LogScript("Computing all-atom iLDDT")
+        # LDDT requires a flat mapping with mdl_ch as key and trg_ch as value
         flat_mapping = self.mapping.GetFlatMapping(mdl_as_key=True)
 
         if self.lddt_no_stereochecks:
@@ -2297,17 +2494,28 @@ class Scorer:
                                                 add_mdl_contacts = self.lddt_add_mdl_contacts,
                                                 no_intrachain=True)[0]
         else:
-            alns = dict()
+
+            # keep track what chains we have in the stereochecked model
+            # there might be really wild cases where a full model
+            # chain is removed in the stereochemistry checks.
+            # We need to adapt lddt chain mapping in these cases
+            mdl_chains = set([ch.name for ch in self.stereochecked_model.chains])
+
+            # make alignments accessible by mdl seq name
+            stereochecked_alns = dict()
             for aln in self.stereochecked_aln:
                 mdl_seq = aln.GetSequence(1)
-                alns[mdl_seq.name] = aln
+                if mdl_seq.GetName() in mdl_chains:
+                    stereochecked_alns[mdl_seq.name] = aln
+
             lddt_chain_mapping = dict()
             for mdl_ch, trg_ch in flat_mapping.items():
-                if mdl_ch in alns:
+                if mdl_ch in stereochecked_alns:
                     lddt_chain_mapping[mdl_ch] = trg_ch
+
             self._ilddt = self.lddt_scorer.lDDT(self.stereochecked_model,
                                                 chain_mapping = lddt_chain_mapping,
-                                                residue_mapping = alns,
+                                                residue_mapping = stereochecked_alns,
                                                 check_resnames=False,
                                                 local_lddt_prop="lddt",
                                                 add_mdl_contacts = self.lddt_add_mdl_contacts,
@@ -2586,30 +2794,30 @@ class Scorer:
         for trg_ch, mdl_ch in self.mapping.GetFlatMapping().items():
             processed_trg_chains.add(trg_ch)
             aln = self.mapping.alns[(trg_ch, mdl_ch)]
-            for col in aln:
-                if col[0] != '-' and col[1] != '-':
-                    trg_res = col.GetResidue(0)
-                    mdl_res = col.GetResidue(1)
-                    trg_at = trg_res.FindAtom("CA")
-                    mdl_at = mdl_res.FindAtom("CA")
-                    if not trg_at.IsValid():
-                        trg_at = trg_res.FindAtom("C3'")
-                    if not mdl_at.IsValid():
-                        mdl_at = mdl_res.FindAtom("C3'")
-                    self._mapped_target_pos.append(trg_at.GetPos())
-                    self._mapped_model_pos.append(mdl_at.GetPos())
-                elif col[0] != '-':
-                    self._n_target_not_mapped += 1
+            n_mapped = 0
+            for trg_res, mdl_res in _GetAlignedResidues(aln,
+                                                        self.mapping.target,
+                                                        self.mapping.model):
+                trg_at = trg_res.FindAtom("CA")
+                mdl_at = mdl_res.FindAtom("CA")
+                if not trg_at.IsValid():
+                    trg_at = trg_res.FindAtom("C3'")
+                if not mdl_at.IsValid():
+                    mdl_at = mdl_res.FindAtom("C3'")
+                self._mapped_target_pos.append(trg_at.GetPos())
+                self._mapped_model_pos.append(mdl_at.GetPos())
+                n_mapped += 1
+            self._n_target_not_mapped += (len(aln.GetSequence(0).GetGaplessString())-n_mapped)
         # count number of trg residues from non-mapped chains
         for ch in self.mapping.target.chains:
             if ch.GetName() not in processed_trg_chains:
-                self._n_target_not_mapped += len(ch.residues)
+                self._n_target_not_mapped += ch.GetResidueCount()
 
     def _extract_mapped_pos_full_bb(self):
         self._mapped_target_pos_full_bb = geom.Vec3List()
         self._mapped_model_pos_full_bb = geom.Vec3List()
         exp_pep_atoms = ["N", "CA", "C"]
-        exp_nuc_atoms = ["\"O5'\"", "\"C5'\"", "\"C4'\"", "\"C3'\"", "\"O3'\""]
+        exp_nuc_atoms = ["O5'", "C5'", "C4'", "C3'", "O3'"]
         trg_pep_chains = [s.GetName() for s in self.chain_mapper.polypep_seqs]
         trg_nuc_chains = [s.GetName() for s in self.chain_mapper.polynuc_seqs]
         for trg_ch, mdl_ch in self.mapping.GetFlatMapping().items():
@@ -2622,19 +2830,18 @@ class Scorer:
             else:
                 # this should be guaranteed by the chain mapper
                 raise RuntimeError("Unexpected error - contact OST developer")
-            for col in aln:
-                if col[0] != '-' and col[1] != '-':
-                    trg_res = col.GetResidue(0)
-                    mdl_res = col.GetResidue(1)
-                    for aname in exp_atoms:
-                        trg_at = trg_res.FindAtom(aname)
-                        mdl_at = mdl_res.FindAtom(aname)
-                        if not (trg_at.IsValid() and mdl_at.IsValid()):
-                            # this should be guaranteed by the chain mapper
-                            raise RuntimeError("Unexpected error - contact OST "
-                                               "developer")
-                        self._mapped_target_pos_full_bb.append(trg_at.GetPos())
-                        self._mapped_model_pos_full_bb.append(mdl_at.GetPos())
+            for trg_res, mdl_res in _GetAlignedResidues(aln,
+                                                        self.mapping.target,
+                                                        self.mapping.model):
+                for aname in exp_atoms:
+                    trg_at = trg_res.FindAtom(aname)
+                    mdl_at = mdl_res.FindAtom(aname)
+                    if not (trg_at.IsValid() and mdl_at.IsValid()):
+                        # this should be guaranteed by the chain mapper
+                        raise RuntimeError("Unexpected error - contact OST "
+                                           "developer")
+                    self._mapped_target_pos_full_bb.append(trg_at.GetPos())
+                    self._mapped_model_pos_full_bb.append(mdl_at.GetPos())
 
 
     def _extract_rigid_mapped_pos(self):
@@ -2645,34 +2852,35 @@ class Scorer:
         for trg_ch, mdl_ch in self.rigid_mapping.GetFlatMapping().items():
             processed_trg_chains.add(trg_ch)
             aln = self.rigid_mapping.alns[(trg_ch, mdl_ch)]
-            for col in aln:
-                if col[0] != '-' and col[1] != '-':
-                    trg_res = col.GetResidue(0)
-                    mdl_res = col.GetResidue(1)
-                    trg_at = trg_res.FindAtom("CA")
-                    mdl_at = mdl_res.FindAtom("CA")
-                    if not trg_at.IsValid():
-                        trg_at = trg_res.FindAtom("C3'")
-                    if not mdl_at.IsValid():
-                        mdl_at = mdl_res.FindAtom("C3'")
-                    self._rigid_mapped_target_pos.append(trg_at.GetPos())
-                    self._rigid_mapped_model_pos.append(mdl_at.GetPos())
-                elif col[0] != '-':
-                    self._rigid_n_target_not_mapped += 1
+            n_mapped = 0
+            for trg_res, mdl_res in _GetAlignedResidues(aln,
+                                                        self.rigid_mapping.target,
+                                                        self.rigid_mapping.model):
+                trg_at = trg_res.FindAtom("CA")
+                mdl_at = mdl_res.FindAtom("CA")
+                if not trg_at.IsValid():
+                    trg_at = trg_res.FindAtom("C3'")
+                if not mdl_at.IsValid():
+                    mdl_at = mdl_res.FindAtom("C3'")
+                self._rigid_mapped_target_pos.append(trg_at.GetPos())
+                self._rigid_mapped_model_pos.append(mdl_at.GetPos())
+                n_mapped += 1
+
+            self._rigid_n_target_not_mapped += (len(aln.GetSequence(0).GetGaplessString())-n_mapped)
         # count number of trg residues from non-mapped chains
         for ch in self.rigid_mapping.target.chains:
             if ch.GetName() not in processed_trg_chains:
-                self._rigid_n_target_not_mapped += len(ch.residues)
+                self._rigid_n_target_not_mapped += ch.GetResidueCount()
 
     def _extract_rigid_mapped_pos_full_bb(self):
         self._rigid_mapped_target_pos_full_bb = geom.Vec3List()
         self._rigid_mapped_model_pos_full_bb = geom.Vec3List()
         exp_pep_atoms = ["N", "CA", "C"]
-        exp_nuc_atoms = ["\"O5'\"", "\"C5'\"", "\"C4'\"", "\"C3'\"", "\"O3'\""]
+        exp_nuc_atoms = ["O5'", "C5'", "C4'", "C3'", "O3'"]
         trg_pep_chains = [s.GetName() for s in self.chain_mapper.polypep_seqs]
         trg_nuc_chains = [s.GetName() for s in self.chain_mapper.polynuc_seqs]
         for trg_ch, mdl_ch in self.rigid_mapping.GetFlatMapping().items():
-            aln = self.mapping.alns[(trg_ch, mdl_ch)]
+            aln = self.rigid_mapping.alns[(trg_ch, mdl_ch)]
             trg_ch = aln.GetSequence(0).GetName()
             if trg_ch in trg_pep_chains:
                 exp_atoms = exp_pep_atoms
@@ -2681,19 +2889,18 @@ class Scorer:
             else:
                 # this should be guaranteed by the chain mapper
                 raise RuntimeError("Unexpected error - contact OST developer")
-            for col in aln:
-                if col[0] != '-' and col[1] != '-':
-                    trg_res = col.GetResidue(0)
-                    mdl_res = col.GetResidue(1)
-                    for aname in exp_atoms:
-                        trg_at = trg_res.FindAtom(aname)
-                        mdl_at = mdl_res.FindAtom(aname)
-                        if not (trg_at.IsValid() and mdl_at.IsValid()):
-                            # this should be guaranteed by the chain mapper
-                            raise RuntimeError("Unexpected error - contact OST "
-                                               "developer")
-                        self._rigid_mapped_target_pos_full_bb.append(trg_at.GetPos())
-                        self._rigid_mapped_model_pos_full_bb.append(mdl_at.GetPos())
+            for trg_res, mdl_res in _GetAlignedResidues(aln,
+                                                        self.rigid_mapping.target,
+                                                        self.rigid_mapping.model):
+                for aname in exp_atoms:
+                    trg_at = trg_res.FindAtom(aname)
+                    mdl_at = mdl_res.FindAtom(aname)
+                    if not (trg_at.IsValid() and mdl_at.IsValid()):
+                        # this should be guaranteed by the chain mapper
+                        raise RuntimeError("Unexpected error - contact OST "
+                                           "developer")
+                    self._rigid_mapped_target_pos_full_bb.append(trg_at.GetPos())
+                    self._rigid_mapped_model_pos_full_bb.append(mdl_at.GetPos())
 
     def _compute_cad_score(self):
         if not self.resnum_alignments:
@@ -2782,11 +2989,11 @@ class Scorer:
 
         a, b, c, d = stereochemistry.StereoCheck(self.target, stereo_data = data,
                                                  stereo_link_data = l_data)
+
         self._stereochecked_target = a
         self._target_clashes = b
         self._target_bad_bonds = c
         self._target_bad_angles = d
-
 
     def _get_interface_patches(self, mdl_ch, mdl_rnum):
         """ Select interface patches representative for specified residue
@@ -2866,34 +3073,38 @@ class Scorer:
         # transfer mdl residues to trg
         flat_mapping = self.mapping.GetFlatMapping(mdl_as_key=True)
         full_trg_coverage = True
-        trg_patch_one = self.target.CreateEmptyView()
+        trg_patch_one = self.mapping.target.CreateEmptyView()
         for r in mdl_patch_one.residues:
             trg_r = None
             mdl_cname = r.GetChain().GetName()
             if mdl_cname in flat_mapping:
                 aln = self.mapping.alns[(flat_mapping[mdl_cname], mdl_cname)]
-                for col in aln:
-                    if col[0] != '-' and col[1] != '-':
-                        if col.GetResidue(1).GetNumber() == r.GetNumber():
-                            trg_r = col.GetResidue(0)
-                            break
+                for x,y in _GetAlignedResidues(aln,
+                                               self.mapping.target,
+                                               self.mapping.model):
+                    if y.GetNumber() == r.GetNumber():
+                        trg_r = x
+                        break
+
             if trg_r is not None:
                 trg_patch_one.AddResidue(trg_r.handle,
                                          mol.ViewAddFlag.INCLUDE_ALL)
             else:
                 full_trg_coverage = False
     
-        trg_patch_two = self.target.CreateEmptyView()
+        trg_patch_two = self.mapping.target.CreateEmptyView()
         for r in mdl_patch_two.residues:
             trg_r = None
             mdl_cname = r.GetChain().GetName()
             if mdl_cname in flat_mapping:
                 aln = self.mapping.alns[(flat_mapping[mdl_cname], mdl_cname)]
-                for col in aln:
-                    if col[0] != '-' and col[1] != '-':
-                        if col.GetResidue(1).GetNumber() == r.GetNumber():
-                            trg_r = col.GetResidue(0)
-                            break
+                for x,y in _GetAlignedResidues(aln,
+                                               self.mapping.target,
+                                               self.mapping.model):
+                    if y.GetNumber() == r.GetNumber():
+                        trg_r = x
+                        break
+
             if trg_r is not None:
                 trg_patch_two.AddResidue(trg_r.handle,
                                          mol.ViewAddFlag.INCLUDE_ALL)
@@ -3035,7 +3246,7 @@ class Scorer:
         LogInfo("Setting custom chain mapping")
 
         chain_mapper = self.chain_mapper
-        chem_mapping, chem_group_alns, mdl = \
+        chem_mapping, chem_group_alns, mdl_chains_without_chem_mapping, mdl = \
         chain_mapper.GetChemMapping(self.model)
 
         # now that we have a chem mapping, lets do consistency checks
@@ -3119,6 +3330,7 @@ class Scorer:
         return chain_mapping.MappingResult(chain_mapper.target, mdl,
                                            chain_mapper.chem_groups,
                                            chem_mapping,
+                                           mdl_chains_without_chem_mapping,
                                            final_mapping, alns)
 
     def _compute_tmscore(self):

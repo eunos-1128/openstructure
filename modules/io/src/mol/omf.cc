@@ -5336,7 +5336,7 @@ ost::mol::EntityHandle OMF::GetAU() const{
     ost::mol::ChainHandle chain_one = ent.FindChain(bond_chain_names_[i*2]);
     ost::mol::ChainHandle chain_two = ent.FindChain(bond_chain_names_[i*2+1]);
     ost::mol::AtomHandle at_one = chain_one.GetAtomList()[bond_atoms_[2*i]];
-    ost::mol::AtomHandle at_two = chain_two.GetAtomList()[bond_atoms_[2*i]];
+    ost::mol::AtomHandle at_two = chain_two.GetAtomList()[bond_atoms_[2*i+1]];
     ed.Connect(at_one, at_two, bond_orders_[i]);
   }
   return ent;
@@ -5355,6 +5355,118 @@ ost::mol::EntityHandle OMF::GetAUChain(const String& name) const{
   ost::mol::ChainHandle ch = ed.InsertChain(name);  
   this->FillChain(chain_data_.at(name), ed, ch);
   return ent;
+}
+
+OMFPtr OMF::ToAssembly(const std::vector<std::vector<String> >& au_chains,
+                       const std::vector<std::vector<geom::Mat4> >& transformations,
+                       const std::vector<std::vector<std::vector<String> > >& bu_chains) const {
+
+  // check input data consistency
+  if(au_chains.size() != transformations.size() ||
+     au_chains.size() != bu_chains.size()) {
+    throw ost::Error("au_chains, transformations and bu_chains must all have "
+                     "the same length");
+  }
+  for(uint interval_idx = 0; interval_idx < au_chains.size(); ++interval_idx) {
+    // check if all these ASU chains are available
+    for(uint c_idx = 0; c_idx < au_chains[interval_idx].size(); ++c_idx) {
+      String au_cname = au_chains[interval_idx][c_idx];
+      if(chain_data_.find(au_cname) == chain_data_.end()) {
+        std::stringstream ss;
+        ss << "Cannot construct biounit with missing asu chain "<<au_cname<<".";
+        throw ost::Error(ss.str());
+      }
+    }
+    // for each transformation, we need a full list of bu_chains
+    if(transformations[interval_idx].size() != bu_chains[interval_idx].size()) {
+      throw ost::Error("Given a set of AU chains, we have N transformations. "
+                       "We need exactly N lists of bu chains and thats not the "
+                       "case.");
+    }
+    // and each of these lists must have exactly one element per ASU chain
+    for(uint t_idx = 0; t_idx < transformations[interval_idx].size(); ++t_idx) {
+      if(au_chains[interval_idx].size() != bu_chains[interval_idx][t_idx].size()) {
+        throw ost::Error("Each set of BU chains must have the same size as "
+                         "the respective AU chains.");
+      }
+    }
+  }
+
+  OMFPtr omf_ptr(new OMF);
+
+  // copy common attributes
+  omf_ptr->name_ = name_;
+  omf_ptr->max_error_ = max_error_;
+  omf_ptr->residue_definitions_ = residue_definitions_;
+  omf_ptr->options_ = options_;
+  omf_ptr->version_ = version_;
+
+  for(uint chain_intvl = 0; chain_intvl < au_chains.size(); ++chain_intvl) {
+    if(au_chains[chain_intvl].empty()) continue;
+    for(uint t_idx = 0; t_idx < transformations[chain_intvl].size(); ++t_idx) {
+      const geom::Mat4& m = transformations[chain_intvl][t_idx];
+      for(uint c_idx = 0; c_idx < au_chains[chain_intvl].size(); ++c_idx) {
+        String au_cname = au_chains[chain_intvl][c_idx];
+        String bu_cname = bu_chains[chain_intvl][t_idx][c_idx];
+        auto it = chain_data_.find(au_cname);
+        ChainDataPtr p = ChainDataPtr(new ChainData(*it->second));
+        p->ch_name = bu_cname;
+        p->positions.ApplyTransform(m);
+        omf_ptr->chain_data_[bu_cname] = p;
+      }
+      // deal with interchain bonds
+      if(bond_chain_names_.empty()) {
+        std::map<String, String> cmap;
+        for(uint c_idx = 0; c_idx < au_chains[chain_intvl].size(); ++c_idx) {
+          String au_cname = au_chains[chain_intvl][c_idx];
+          String bu_cname = bu_chains[chain_intvl][t_idx][c_idx];
+          cmap[au_cname] = bu_cname;
+        }
+        int n_bonds = bond_chain_names_.size() / 2;
+        for(int i = 0; i < n_bonds; ++i) {
+          // we only care for interchain bonds where both atoms come
+          // from chains that are relevant for this chain_intvl
+          if(cmap.find(bond_chain_names_[2*i]) != cmap.end() &&
+             cmap.find(bond_chain_names_[2*i+1]) != cmap.end()) {
+            omf_ptr->bond_chain_names_.push_back(cmap[bond_chain_names_[2*i]]);
+            omf_ptr->bond_chain_names_.push_back(cmap[bond_chain_names_[2*i+1]]);
+            omf_ptr->bond_atoms_.push_back(bond_atoms_[2*i]);
+            omf_ptr->bond_atoms_.push_back(bond_atoms_[2*i+1]);
+            omf_ptr->bond_orders_.push_back(bond_orders_[i]);
+          }
+        }
+      }
+    }
+  }
+  return omf_ptr;
+}
+
+void OMF::Trace(const String& cname, const String& aname,
+                std::vector<int>& rnums, geom::Vec3List& pos) const {
+
+  rnums.clear();
+  pos.clear();
+
+  auto it = chain_data_.find(cname);
+  if(it == chain_data_.end()) {
+    std::stringstream ss;
+    ss << "Cannot get Trace from non-existent chain '"<<cname<<"'.";
+    throw ost::Error(ss.str());
+  }
+  ChainDataPtr chain_data = it->second;
+
+  int res_idx = 0;
+  int pos_idx = 0;
+  for(auto res_def_idx: chain_data->res_def_indices) {
+    const ResidueDefinition& res_def = residue_definitions_[res_def_idx];
+    int a_idx = res_def.GetIdx(aname);
+    if(a_idx != -1) {
+      rnums.push_back(chain_data->rnums[res_idx]);
+      pos.push_back(chain_data->positions[pos_idx + a_idx]);
+    }
+    ++res_idx;
+    pos_idx += res_def.anames.size();
+  }
 }
 
 void OMF::ToStream(std::ostream& stream) const {
@@ -5544,6 +5656,14 @@ std::vector<Real> OMF::GetAvgBFactors(const String& cname) const {
   return avg_bfactors;
 }
 
+const std::vector<Real>& OMF::GetOccupancies(const String& cname) const {
+  auto it = chain_data_.find(cname);
+  if(it == chain_data_.end()) {
+    throw ost::Error("Provided chain name not in OMF structure");
+  }
+  return it->second->occupancies;
+}
+
 String OMF::GetSequence(const String& cname) const {
   auto it = chain_data_.find(cname);
   if(it == chain_data_.end()) {
@@ -5555,6 +5675,14 @@ String OMF::GetSequence(const String& cname) const {
     sequence[i] = residue_definitions_[indices[i]].olc;
   }
   return sequence;
+}
+
+const std::vector<int>& OMF::GetRNums(const String& cname) const {
+  auto it = chain_data_.find(cname);
+  if(it == chain_data_.end()) {
+    throw ost::Error("Provided chain name not in OMF structure");
+  }
+  return it->second->rnums;
 }
 
 }} //ns

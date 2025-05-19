@@ -116,8 +116,8 @@ ost::conop::CompoundLibPtr load_compound_lib(const String& custom_path)
              "look for compounds.chemlib in the current working directory");
   } else {
     fs::path path_and_exe(exe_path);
-    fs::path path_only=path_and_exe.branch_path();
-    fs::path share_path = path_only.branch_path();
+    fs::path path_only=path_and_exe.parent_path();
+    fs::path share_path = path_only.parent_path();
     share_path = share_path / "share" / "openstructure" / "compounds.chemlib";
 
     String share_path_string=BFPathToString(share_path);

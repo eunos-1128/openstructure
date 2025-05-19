@@ -129,8 +129,17 @@ void fill_values(const GlobalRDMap& glob_dist_list,
     rnum_one = i->first;
     res_positions_one = positions.find(rnum_one);
     if(res_positions_one == positions.end()){
-      //this residue is missing, so we give it the full penalty
-      drmsd_values[rnum_one] = std::make_pair(i->second.size()*squared_cap_distance,i->second.size());
+      // this residue is missing, count how many interactions there are
+      // towards residues that fulfill sequence separation threshold
+      int n = 0;
+      for(ResidueRDMap::const_iterator j = i->second.begin(); j != i->second.end(); ++j){
+        //check sequence separation
+        rnum_two = j->first.second.GetResNum();
+        if(std::abs(rnum_one.GetNum() - rnum_two.GetNum()) > sequence_separation){
+          ++n;
+        }
+      }
+      drmsd_values[rnum_one] = std::make_pair(n*squared_cap_distance,n);
       continue;
     }
 

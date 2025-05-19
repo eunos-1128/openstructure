@@ -28,8 +28,8 @@ Real SequenceSimilarity(const AlignmentHandle& aln, SubstWeightMatrixPtr subst,
   int non_gap_count=0;
   int similarity_score = 0;
 
-  const String& sa=aln.GetSequence(seq_a).GetString();
-  const String& sb=aln.GetSequence(seq_b).GetString();  
+  String sa=aln.GetSequence(seq_a).GetString();
+  String sb=aln.GetSequence(seq_b).GetString();  
 
   for (String::const_iterator 
        i=sa.begin(), e=sa.end(), j=sb.begin(); i!=e; ++i, ++j) {

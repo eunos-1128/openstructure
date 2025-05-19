@@ -17,20 +17,37 @@ Loads the structures and performs basic cleanup:
 The cleaned structures are optionally dumped using -d/--dump-structures
 
 Output is written in JSON format (default: out.json). In case of no additional
-options, this is a dictionary with 8 keys describing model/reference comparison:
+options, this is a dictionary with the following keys describing model/reference
+comparison:
 
  * "reference_chains": Chain names of reference
  * "model_chains": Chain names of model
  * "chem_groups": Groups of polypeptides/polynucleotides from reference that
-   are considered chemically equivalent. You can derive stoichiometry from this.
-   Contains only chains that are considered in chain mapping, i.e. pass a
-   size threshold (defaults: 6 for peptides, 4 for nucleotides).
+   are considered chemically equivalent. Predefined if the reference is an mmCIF
+   file or if "seqres"/"trg-seqres-mapping" are provided manually. Alignments
+   of structure to SEQRES are established using residue numbers in these cases
+   and matching structure one letter codes and SEQRES are enforced.
+   In case of a PDB reference without predefined SEQRES, groups are established
+   using clustering based on pairwise alignments. Chains within
+   "chem_group_seqid_thresh" are considered equivalent and alignments are
+   established using residue numbers or Needleman-Wunsch
+   (see "residue-number-alignments" flag)
+   You can derive stoichiometry from this. Contains only chains that are
+   considered in chain mapping, i.e. pass a size threshold (defaults: 6 for
+   peptides, 4 for nucleotides).
  * "chem_mapping": List of same length as "chem_groups". Assigns model chains to
    the respective chem group. Again, only contains chains that are considered
-   in chain mapping.
+   in chain mapping. That is 1) pass the same size threshold as for chem_groups
+   2) can be aligned to any of the chem groups with a sequence identity
+   threshold that can be controlled by --chem-map-seqid-thresh.
+ * "mdl_chains_without_chem_mapping": Model chains that could be considered in
+   chain mapping, i.e. are long enough, but could not be mapped to any chem
+   group. Depends on --chem-map-seqid-thresh. A mapping for each model chain can
+   be enforced by setting it to 0.
  * "chain_mapping": A dictionary with reference chain names as keys and the
    mapped model chain names as values. Missing chains are either not mapped
-   (but present in "chem_groups", "chem_mapping") or were not considered in
+   (but present in "chem_groups", "chem_mapping"), were not mapped to any chem
+   group (present in "mdl_chains_without_chem_mapping") or were not considered in
    chain mapping (short peptides etc.)
  * "aln": Pairwise sequence alignment for each pair of mapped chains in fasta
    format.
@@ -43,26 +60,9 @@ options, this is a dictionary with 8 keys describing model/reference comparison:
  * "status": SUCCESS if everything ran through. In case of failure, the only
    content of the JSON output will be \"status\" set to FAILURE and an
    additional key: "traceback".
+ * "ost_version": The OpenStructure version used for computation.
 
-The following additional keys store relevant input parameters to reproduce
-results:
-
- * "model"
- * "reference"
- * "fault_tolerant"
- * "model_biounit"
- * "reference_biounit"
- * "residue_number_alignment"
- * "enforce_consistency"
- * "cad_exec"
- * "usalign_exec"
- * "lddt_no_stereochecks"
- * "min_pep_length"
- * "min_nuc_length"
- * "lddt_add_mdl_contacts"
- * "lddt_inclusion_radius"
- * "dockq_capri_peptide"
- * "ost_version"
+Additional keys represent input options.
 
 The pairwise sequence alignments are computed with Needleman-Wunsch using
 BLOSUM62 (NUC44 for nucleotides). Many benchmarking scenarios preprocess the
@@ -71,7 +71,7 @@ enabling -rna/--residue-number-alignment is recommended.
 
 Each score is opt-in and can be enabled with optional arguments.
 
-Example to compute global and per-residue lDDT values as well as QS-score:
+Example to compute global and per-residue LDDT values as well as QS-score:
 
 ost compare-structures -m model.pdb -r reference.cif --lddt --local-lddt \
 --qs-score
@@ -91,6 +91,7 @@ import math
 import ost
 from ost import io
 from ost.mol.alg import scoring
+from ost.mol.alg import scoring_base
 
 def _ParseArgs():
     parser = argparse.ArgumentParser(description = __doc__,
@@ -225,9 +226,9 @@ def _ParseArgs():
         dest="lddt",
         default=False,
         action="store_true",
-        help=("Compute global lDDT score with default parameterization and "
+        help=("Compute global LDDT score with default parameterization and "
               "store as key \"lddt\". Stereochemical irregularities affecting "
-              "lDDT are reported as keys \"model_clashes\", "
+              "LDDT are reported as keys \"model_clashes\", "
               "\"model_bad_bonds\", \"model_bad_angles\" and the respective "
               "reference counterparts."))
 
@@ -236,13 +237,13 @@ def _ParseArgs():
         dest="local_lddt",
         default=False,
         action="store_true",
-        help=("Compute per-residue lDDT scores with default parameterization "
+        help=("Compute per-residue LDDT scores with default parameterization "
               "and store as key \"local_lddt\". Score for each residue is "
               "accessible by key <chain_name>.<resnum>.<resnum_inscode>. "
               "Residue with number 42 in chain X can be extracted with: "
               "data[\"local_lddt\"][\"X.42.\"]. If there is an insertion "
               "code, lets say A, the residue key becomes \"X.42.A\". "
-              "Stereochemical irregularities affecting lDDT are reported as "
+              "Stereochemical irregularities affecting LDDT are reported as "
               "keys \"model_clashes\", \"model_bad_bonds\", "
               "\"model_bad_angles\" and the respective reference "
               "counterparts. Atoms specified in there follow the following "
@@ -253,7 +254,7 @@ def _ParseArgs():
         dest="aa_local_lddt",
         default=False,
         action="store_true",
-        help=("Compute per-atom lDDT scores with default parameterization "
+        help=("Compute per-atom LDDT scores with default parameterization "
               "and store as key \"aa_local_lddt\". Score for each atom is "
               "accessible by key "
               "<chain_name>.<resnum>.<resnum_inscode>.<aname>. "
@@ -261,7 +262,7 @@ def _ParseArgs():
               "extracted with: data[\"aa_local_lddt\"][\"X.42..CA\"]. "
               "If there is a residue insertion code, lets say A, the atom key "
               "becomes \"X.42.A.CA\". "
-              "Stereochemical irregularities affecting lDDT are reported as "
+              "Stereochemical irregularities affecting LDDT are reported as "
               "keys \"model_clashes\", \"model_bad_bonds\", "
               "\"model_bad_angles\" and the respective reference "
               "counterparts. Atoms specified in there follow the following "
@@ -272,8 +273,8 @@ def _ParseArgs():
         dest="bb_lddt",
         default=False,
         action="store_true",
-        help=("Compute global lDDT score with default parameterization and "
-              "store as key \"bb_lddt\". lDDT in this case is only computed on "
+        help=("Compute global LDDT score with default parameterization and "
+              "store as key \"bb_lddt\". LDDT in this case is only computed on "
               "backbone atoms: CA for peptides and C3' for nucleotides"))
 
     parser.add_argument(
@@ -281,8 +282,8 @@ def _ParseArgs():
         dest="bb_local_lddt",
         default=False,
         action="store_true",
-        help=("Compute per-residue lDDT scores with default parameterization "
-              "and store as key \"bb_local_lddt\". lDDT in this case is only "
+        help=("Compute per-residue LDDT scores with default parameterization "
+              "and store as key \"bb_local_lddt\". LDDT in this case is only "
               "computed on backbone atoms: CA for peptides and C3' for "
               "nucleotides. Per-residue scores are accessible as described for "
               "local_lddt."))
@@ -292,7 +293,7 @@ def _ParseArgs():
         dest="ilddt",
         default=False,
         action="store_true",
-        help=("Compute global lDDT score which is solely based on inter-chain "
+        help=("Compute global LDDT score which is solely based on inter-chain "
               "contacts and store as key \"ilddt\". Same stereochemical "
               "irregularities as for lddt apply."))
 
@@ -509,7 +510,7 @@ def _ParseArgs():
               "transformation matrix that superposes model onto reference, "
               "\"rigid_chain_mapping\": equivalent of \"chain_mapping\" which "
               "is used for rigid scores (optimized for RMSD instead of "
-              "QS-score/lDDT)."))
+              "QS-score/LDDT)."))
 
     parser.add_argument(
         "--patch-scores",
@@ -544,7 +545,7 @@ def _ParseArgs():
         dest="lddt_no_stereochecks",
         default=False,
         action="store_true",
-        help=("Disable stereochecks for lDDT computation"))
+        help=("Disable stereochecks for LDDT computation"))
 
     parser.add_argument(
         "--n-max-naive",
@@ -630,7 +631,7 @@ def _ParseArgs():
         dest="lddt_add_mdl_contacts",
         default=False,
         action="store_true",
-        help=("Only using contacts in lDDT that "
+        help=("Only using contacts in LDDT that "
               "are within a certain distance threshold in the "
               "reference does not penalize for added model "
               "contacts. If set to True, this flag will also "
@@ -645,8 +646,67 @@ def _ParseArgs():
         dest="lddt_inclusion_radius",
         type = float,
         default=15.0,
-        help=("Passed to lDDT scorer. Affects all lDDT scores but not "
+        help=("Passed to LDDT scorer. Affects all LDDT scores but not "
               "chain mapping."))
+
+    parser.add_argument(
+        "--chem-group-seqid-thresh",
+        dest="chem_group_seqid_thresh",
+        type = float,
+        default = 95.,
+        help=("Default: 95 - Sequence identity threshold used to group "
+              "identical chains in reference structure in the chain mapping "
+              "step. The same threshold is applied to peptide and nucleotide "
+              "chains.")
+    )
+
+    parser.add_argument(
+        "--chem-map-seqid-thresh",
+        dest="chem_map_seqid_thresh",
+        type = float,
+        default = 70.,
+        help=("Default: 70 - Sequence identity threshold used to map model "
+              "chains to groups derived in the chem grouping step in chain "
+              "mapping. If set to 0., a mapping is enforced and each model "
+              "chain is assigned to the chem group with maximum sequence "
+              "identity. If larger than 0., a mapping only happens if the "
+              "respective model chain can be aligned to a chem group with the "
+              "specified sequence identity threshold AND if at least "
+              "min-pep-length/min-nuc-length residues are aligned. The same "
+              "threshold is applied to peptide and nucleotide chains.")
+    )
+
+    parser.add_argument(
+        "--seqres",
+        dest="seqres",
+        type = str,
+        default = None,
+        help=("Default: None - manually define chem groups by specifying path "
+              "to a fasta file. Each sequence in that file is considered a "
+              "reference sequence of a chem group. All polymer chains "
+              "in reference will be aligned to these sequences. This only works "
+              "if -rna/--residue-number-alignment is enabled and an error is raised "
+              "otherwise. "
+              "Additionally, you need to manually specify a mapping "
+              "of the polymer chains using trg-seqres-mapping and an error "
+              "is raised otherwise. The one letter codes in the structure must "
+              "exactly match the respective characters in seqres and an error "
+              "is raised if not.")
+    )
+
+    parser.add_argument(
+        "--trg-seqres-mapping",
+        nargs="+",
+        dest="trg_seqres_mapping",
+        default=None,
+        help=("Default: None - Maps each polymer chain in reference to a "
+              "sequence in *seqres*. Each mapping is a key:value pair "
+              "where key is the chain name in reference and value is the "
+              "sequence name in seqres. So let's say you have a homo-dimer "
+              "reference with chains \"A\" and \"B\"for which you provide a "
+              "seqres file containing one sequence with name \"1\". You can "
+              "specify this mapping with: --trg-seqres-mapping A:1 B:1")
+    )
  
     return parser.parse_args()
 
@@ -702,34 +762,33 @@ def _LoadStructure(structure_path, sformat, fault_tolerant, bu_id):
     The returned structure has structure_path attached as structure name
     """
 
+    # thats the return variables
+    # the last two are only set in case of an mmCIF file
+    entity = None
+    seqres = None
+    trg_seqres_mapping = None
+
     # increase loglevel, as we would pollute the info log with weird stuff
     ost.PushVerbosityLevel(ost.LogLevel.Error)
     # Load the structure
     if sformat == "mmcif":
-        if bu_id is not None:
-            cif_entity, cif_seqres, cif_info = \
-            io.LoadMMCIF(structure_path, info=True, seqres=True,
-                         fault_tolerant=fault_tolerant)
-            for biounit in cif_info.biounits:
-                if biounit.id == bu_id:
-                    entity = ost.mol.alg.CreateBU(cif_entity, biounit)
-                    break
-            else:
-                raise RuntimeError(f"No biounit found with ID '{bu_id}'.")
-        else:
-            entity = io.LoadMMCIF(structure_path,
-                                  fault_tolerant = fault_tolerant)
+        # from mmCIF we can get seqres and trg_seqres_mapping
+        entity, seqres, trg_seqres_mapping = \
+        scoring_base.MMCIFPrep(structure_path,
+                               fault_tolerant=fault_tolerant,
+                               biounit=bu_id,
+                               extract_seqres_mapping=True)
         if len(entity.residues) == 0:
             raise Exception(f"No residues found in file: {structure_path}")
     else:
-        entity = io.LoadPDB(structure_path, fault_tolerant = fault_tolerant)
+        entity = scoring_base.PDBPrep(structure_path, fault_tolerant = fault_tolerant)
         if len(entity.residues) == 0:
             raise Exception(f"No residues found in file: {structure_path}")
 
     # restore old loglevel and return
     ost.PopVerbosityLevel()
     entity.SetName(structure_path)
-    return entity
+    return (entity, seqres, trg_seqres_mapping)
 
 def _DumpStructure(entity, structure_path, sformat):
     if sformat == "mmcif":
@@ -744,22 +803,48 @@ def _AlnToFastaStr(aln):
     s2 = aln.GetSequence(1)
     return f">reference:{s1.name}\n{str(s1)}\n>model:{s2.name}\n{str(s2)}"
 
-def _GetInconsistentResidues(alns):
+def _GetInconsistentResidues(alns, ref, mdl):
     lst = list()
     for aln in alns:
+
+        ref_ch = ref.FindChain(aln.GetSequence(0).GetName())
+        mdl_ch = mdl.FindChain(aln.GetSequence(1).GetName())
+
+        if not ref_ch.IsValid():
+            raise RuntimeError("ref lacks requested chain in _GetInconsistentResidues")
+
+        if not mdl_ch.IsValid():
+            raise RuntimeError("mdl lacks requested chain in _GetInconsistentResidues")
+
+        if len(aln.GetSequence(0).GetGaplessString()) != ref_ch.GetResidueCount():
+            raise RuntimeError("aln/chain mismatch in _GetAlignedResidues")
+        if len(aln.GetSequence(1).GetGaplessString()) != mdl_ch.GetResidueCount():
+            raise RuntimeError("aln/chain mismatch in _GetAlignedResidues")
+
+        ref_res = ref_ch.residues
+        mdl_res = mdl_ch.residues
+
+        ref_res_idx = 0
+        mdl_res_idx = 0 
+
         for col in aln:
-            r1 = col.GetResidue(0)
-            r2 = col.GetResidue(1)
-            if r1.IsValid() and r2.IsValid() and r1.GetName() != r2.GetName():
-                ch_1 = r1.GetChain().name
-                num_1 = r1.number.num
-                ins_code_1 = r1.number.ins_code.strip("\u0000")
-                id_1 = f"{ch_1}.{num_1}.{ins_code_1}"
-                ch_2 = r2.GetChain().name
-                num_2 = r2.number.num
-                ins_code_2 = r2.number.ins_code.strip("\u0000")
-                id_2 = f"{ch_2}.{num_2}.{ins_code_2}"
-                lst.append(f"{id_1}-{id_2}")
+            if col[0] != '-' and col[1] != '-':
+                r1 = ref_res[ref_res_idx]
+                r2 = mdl_res[mdl_res_idx]
+                if r1.IsValid() and r2.IsValid() and r1.GetName() != r2.GetName():
+                    ch_1 = r1.GetChain().name
+                    num_1 = r1.number.num
+                    ins_code_1 = r1.number.ins_code.strip("\u0000")
+                    id_1 = f"{ch_1}.{num_1}.{ins_code_1}"
+                    ch_2 = r2.GetChain().name
+                    num_2 = r2.number.num
+                    ins_code_2 = r2.number.ins_code.strip("\u0000")
+                    id_2 = f"{ch_2}.{num_2}.{ins_code_2}"
+                    lst.append(f"{id_1}-{id_2}")
+            if col[0] != '-':
+                ref_res_idx += 1
+            if col[1] != '-':
+                mdl_res_idx += 1
     return lst
 
 def _LocalScoresToJSONDict(score_dict):
@@ -805,29 +890,52 @@ def _PatchScoresToJSONList(interface_dict, score_dict):
             json_list.append(_RoundOrNone(item))
     return json_list
 
-def _GetAlignedResidues(aln):
+def _GetAlignedResidues(aln, ref, mdl):
     aligned_residues = list()
     for a in aln:
         mdl_lst = list()
         ref_lst = list()
+
+        ref_ch = ref.FindChain(a.GetSequence(0).GetName())
+        mdl_ch = mdl.FindChain(a.GetSequence(1).GetName())
+
+        if not ref_ch.IsValid():
+            raise RuntimeError("ref lacks requested chain in _GetAlignedResidues")
+
+        if not mdl_ch.IsValid():
+            raise RuntimeError("mdl lacks requested chain in _GetAlignedResidues")
+
+        if len(a.GetSequence(0).GetGaplessString()) != ref_ch.GetResidueCount():
+            raise RuntimeError("aln/chain mismatch in _GetAlignedResidues")
+        if len(a.GetSequence(1).GetGaplessString()) != mdl_ch.GetResidueCount():
+            raise RuntimeError("aln/chain mismatch in _GetAlignedResidues")
+
+        ref_res = ref_ch.residues
+        mdl_res = mdl_ch.residues
+
+        ref_res_idx = 0
+        mdl_res_idx = 0
+
         for c in a:
-            mdl_r = c.GetResidue(1)
-            ref_r = c.GetResidue(0)
-            if mdl_r.IsValid():
+            if c[1] != '-':
+                mdl_r = mdl_res[mdl_res_idx]
                 olc = mdl_r.one_letter_code
                 num = mdl_r.GetNumber().num
                 ins_code = mdl_r.GetNumber().ins_code.strip("\u0000")
                 mdl_lst.append({"olc": olc,
                                 "num": f"{num}.{ins_code}"})
+                mdl_res_idx += 1
             else:
                 mdl_lst.append(None)
 
-            if ref_r.IsValid():
+            if c[0] != '-':
+                ref_r = ref_res[ref_res_idx]
                 olc = ref_r.one_letter_code
                 num = ref_r.GetNumber().num
                 ins_code = ref_r.GetNumber().ins_code.strip("\u0000")
                 ref_lst.append({"olc": olc,
                                 "num": f"{num}.{ins_code}"})
+                ref_res_idx += 1
             else:
                 ref_lst.append(None)
 
@@ -840,11 +948,29 @@ def _GetAlignedResidues(aln):
                                  "reference": ref_dct})
     return aligned_residues
 
-def _Process(model, reference, args, model_format, reference_format):
+def _Process(model, reference, args, model_format, reference_format,
+             seqres=None, trg_seqres_mapping=None):
 
     mapping = None
     if args.chain_mapping is not None:
         mapping = {x.split(':')[0]: x.split(':')[1] for x in args.chain_mapping}
+
+    # see if seqres/trg-seqres-mapping are set in args
+    # if yes, they're prioritized even if we have these values from
+    # the mmCIF file
+    if args.seqres is not None:
+        if args.trg_seqres_mapping is None:
+            raise RuntimeError("Must provide trg-seqres-mapping if seqres "
+                               "is provided.")
+
+    if args.trg_seqres_mapping is not None:
+        if args.seqres is None:
+            raise RuntimeError("Must provide seqres if trg-seqres-mapping "
+                               "is provided.")
+
+    if args.seqres is not None and args.trg_seqres_mapping is not None:
+        seqres = io.LoadSequenceList(args.seqres)
+        trg_seqres_mapping = {x.split(':')[0]: x.split(':')[1] for x in args.chain_mapping}
 
     scorer = scoring.Scorer(model, reference,
                             resnum_alignments = args.residue_number_alignment,
@@ -858,9 +984,15 @@ def _Process(model, reference, args, model_format, reference_format):
                             min_nuc_length = args.min_nuc_length,
                             lddt_add_mdl_contacts = args.lddt_add_mdl_contacts,
                             dockq_capri_peptide = args.dockq_capri_peptide,
-                            lddt_inclusion_radius = args.lddt_inclusion_radius)
+                            lddt_inclusion_radius = args.lddt_inclusion_radius,
+                            pep_seqid_thr = args.chem_group_seqid_thresh,
+                            nuc_seqid_thr = args.chem_group_seqid_thresh,
+                            mdl_map_pep_seqid_thr = args.chem_map_seqid_thresh,
+                            mdl_map_nuc_seqid_thr = args.chem_map_seqid_thresh,
+                            seqres = seqres,
+                            trg_seqres_mapping = trg_seqres_mapping)
 
-    ir = _GetInconsistentResidues(scorer.aln)
+    ir = _GetInconsistentResidues(scorer.aln, scorer.target, scorer.model)
     if len(ir) > 0 and args.enforce_consistency:
         raise RuntimeError(f"Inconsistent residues observed: {' '.join(ir)}")
 
@@ -869,18 +1001,23 @@ def _Process(model, reference, args, model_format, reference_format):
     out["model_chains"] = [ch.GetName() for ch in scorer.model.chains]
     out["chem_groups"] = scorer.chain_mapper.chem_groups
     out["chem_mapping"] = scorer.mapping.chem_mapping
+    out["mdl_chains_without_chem_mapping"] = \
+    scorer.mapping.mdl_chains_without_chem_mapping
     out["chain_mapping"] = scorer.mapping.GetFlatMapping()
     out["aln"] = [_AlnToFastaStr(aln) for aln in scorer.aln]
     out["inconsistent_residues"] = ir
 
     if args.dump_aligned_residues:
-        out["aligned_residues"] = _GetAlignedResidues(scorer.aln)
+        out["aligned_residues"] = _GetAlignedResidues(scorer.aln, scorer.target,
+                                                      scorer.model)
 
     if args.dump_pepnuc_alns:
         out["pepnuc_aln"] = [_AlnToFastaStr(aln) for aln in scorer.pepnuc_aln]
     
     if args.dump_pepnuc_aligned_residues:
-        out["pepnuc_aligned_residues"] = _GetAlignedResidues(scorer.pepnuc_aln)
+        out["pepnuc_aligned_residues"] = _GetAlignedResidues(scorer.pepnuc_aln,
+                                                             scorer.pepnuc_target,
+                                                             scorer.pepnuc_model)
 
     if args.lddt:
         out["lddt"] = _RoundOrNone(scorer.lddt)
@@ -1045,17 +1182,19 @@ def _Main():
                                "this is the case.")
         reference_format = _GetStructureFormat(args.reference,
                                                sformat=args.reference_format)
-        reference = _LoadStructure(args.reference,
-                                   sformat=reference_format,
-                                   bu_id=args.reference_biounit,
-                                   fault_tolerant = args.fault_tolerant)
+        reference, seqres, trg_seqres_mapping = _LoadStructure(args.reference,
+                                                               sformat=reference_format,
+                                                               bu_id=args.reference_biounit,
+                                                               fault_tolerant = args.fault_tolerant)
         model_format = _GetStructureFormat(args.model,
                                            sformat=args.model_format)
-        model = _LoadStructure(args.model,
-                               sformat=model_format,
-                               bu_id=args.model_biounit,
-                               fault_tolerant = args.fault_tolerant)
-        out = _Process(model, reference, args, model_format, reference_format)
+        model,_,_ = _LoadStructure(args.model,
+                                   sformat=model_format,
+                                   bu_id=args.model_biounit,
+                                   fault_tolerant = args.fault_tolerant)
+
+        out = _Process(model, reference, args, model_format, reference_format,
+                       seqres=seqres, trg_seqres_mapping=trg_seqres_mapping)
 
         # append input arguments
         out["model"] = args.model
@@ -1073,6 +1212,12 @@ def _Main():
         out["lddt_add_mdl_contacts"] = args.lddt_add_mdl_contacts
         out["lddt_inclusion_radius"] = args.lddt_inclusion_radius
         out["dockq_capri_peptide"] = args.dockq_capri_peptide
+        out["seqres"] = args.seqres
+        if args.trg_seqres_mapping:
+            tmp = {x.split(':')[0]: x.split(':')[1] for x in args.trg_seqres_mapping}
+            out["trg_seqres_mapping"] = tmp
+        else:
+            out["trg_seqres_mapping"] = None
         out["ost_version"] = ost.__version__
         out["status"] = "SUCCESS"
         with open(args.output, 'w') as fh:

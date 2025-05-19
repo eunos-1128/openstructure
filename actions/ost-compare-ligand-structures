@@ -20,15 +20,28 @@ nucleotide linking according to the component dictionary 4) removal of atoms
 that are not defined for respective residues in the component dictionary. Except
 step 1), every cleanup is logged and a report is available in the json outfile.
 
+Only polymers (protein and nucleic acids) of model and reference are considered
+for ligand binding sites. The mapping of possible reference/model chain
+assignments requires a preprocessing. In short: identical chains in the
+reference are grouped based on pairwise sequence identity
+(see --chem-group-seqid-thresh). Each model chain is assigned to
+one of these groups (see --chem-map-seqid-thresh param).
+To avoid spurious matches, only polymers of a certain length are considered
+in this matching procedure (see --min_pep_length/--min_nuc_length param).
+Shorter polymers are never mapped and do not contribute to scoring.
+
 Ligands can be given as path to SDF files containing the ligand for both model
 (--model-ligands/-ml) and reference (--reference-ligands/-rl). If omitted,
 ligands are optionally detected from a structure file if it is given in mmCIF
 format. This is based on "non-polymer" _entity.type annotation and the
 respective entries must exist in the PDB component dictionary in order to get
-connectivity information. For example, receptor structure and ligand(s) are
-loaded from the same mmCIF file given as '-m'/'-r'. This does not work for
-structures provided in PDB format and an error is raised if ligands are not
-explitely given in SDF format.
+connectivity information. You can avoid the requirement of the PDB component
+dictionary by enabling --allow-heuristic-conn. In this case, connectivity
+is established through a distance based heuristic if the ligand is not found in
+the component dictionary. Be aware that this might be an issue in ligand
+matching.
+If you provide structures in PDB format, an error is raised if ligands are not
+explicitely given in SDF format.
 
 Ligands undergo gentle processing where hydrogens are removed. Connectivity
 is relevant for scoring. It is read directly from SDF input. If ligands are
@@ -47,19 +60,37 @@ keys:
    the ligand SDF file(s). Otherwise, they will be the chain name, residue
    number and insertion code of the ligand, separated by a dot.
  * "reference_ligands": Same for reference ligands.
+ * "chem_groups": Groups of polypeptides/polynucleotides from reference that
+   are considered chemically equivalent. Predefined if the reference is an mmCIF
+   file or if "seqres"/"trg-seqres-mapping" are provided manually. Alignments
+   of structure to SEQRES are established using residue numbers in these cases
+   and matching structure one letter codes and SEQRES are enforced.
+   In case of a PDB reference without predefined SEQRES, groups are established
+   using clustering based on pairwise alignments. Chains within
+   "chem_group_seqid_thresh" are considered equivalent and alignments are
+   established using residue numbers or Needleman-Wunsch
+   (see "residue-number-alignments" flag)
+   You can derive stoichiometry from this. Contains only chains that are
+   considered in chain mapping, i.e. pass a size threshold (defaults: 6 for
+   peptides, 4 for nucleotides).
+ * "chem_mapping": List of same length as "chem_groups". Assigns model chains to
+   the respective chem group. Again, only contains chains that are considered
+   in chain mapping. That is 1) pass the same size threshold as for chem_groups
+   2) can be aligned to any of the chem groups with a sequence identity
+   threshold that can be controlled by --chem-map-seqid-thresh.
+ * "mdl_chains_without_chem_mapping": Model chains that could be considered in
+   chain mapping, i.e. are long enough, but could not be mapped to any chem
+   group. Depends on --chem-map-seqid-thresh. A mapping for each model chain can
+   be enforced by setting it to 0.
  * "status": SUCCESS if everything ran through. In case of failure, the only
    content of the JSON output will be \"status\" set to FAILURE and an
    additional key: "traceback".
  * "ost_version": The OpenStructure version used for computation.
  * "model_cleanup_log": Lists residues/atoms that have been removed in model
    cleanup process.
- * "reference_cleanup_log": Same for reference. 
- * "reference": Parameter provided for --reference/-r
- * "model": Parameter provided for --model/-m
- * "resnum_alignments": Parameter provided for --residue-number-alignment/-rna
- * "substructure_match": Parameter provided for --substructure-match/-sm
- * "coverage_delta": Parameter provided for --coverage-delta/-cd
- * "max_symmetries": Parameter provided for --max-symmetries/-ms 
+ * "reference_cleanup_log": Same for reference.
+
+Additional keys represent input options.
 
 Each score is opt-in and the respective results are available in three keys:
 
@@ -98,10 +129,10 @@ The following column is always available:
    --by-model-ligand-output flag was set, this will be model ligand instead,
    following the same rules.
 
-If lDDT-PLI was enabled with --lddt-pli, the following columns are added:
+If LDDT-PLI was enabled with --lddt-pli, the following columns are added:
 
  * "lddt_pli", "lddt_pli_coverage" and "lddt_pli_(model|reference)_ligand"
-   are the lDDT-PLI score result, the corresponding coverage and assigned model
+   are the LDDT-PLI score result, the corresponding coverage and assigned model
    ligand (or reference ligand if the --by-model-ligand-output flag was set)
    if an assignment was found, respectively, empty otherwise.
  * "lddt_pli_unassigned" is empty if an assignment was found, otherwise it
@@ -111,7 +142,7 @@ If BiSyRMSD was enabled with --rmsd, the following columns are added:
 
  * "rmsd", "rmsd_coverage". "lddt_lp" "bb_rmsd" and
    "rmsd_(model|reference)_ligand" are the BiSyRMSD, the corresponding
-   coverage, lDDT-LP, backbone RMSD and assigned model ligand (or reference
+   coverage, LDDT-LP, backbone RMSD and assigned model ligand (or reference
    ligand if the --by-model-ligand-output flag was set) if an assignment
    was found, respectively, empty otherwise.
  * "rmsd_unassigned" is empty if an assignment was found, otherwise it
@@ -129,6 +160,7 @@ import traceback
 
 import ost
 from ost import io
+from ost.mol.alg import scoring_base
 from ost.mol.alg import ligand_scoring_base
 from ost.mol.alg import ligand_scoring_lddtpli
 from ost.mol.alg import ligand_scoring_scrmsd
@@ -320,28 +352,28 @@ def _ParseArgs():
         dest="lddt_pli",
         default=False,
         action="store_true",
-        help=("Compute lDDT-PLI scores and store as key \"lddt_pli\"."))
+        help=("Compute LDDT-PLI scores and store as key \"lddt_pli\"."))
 
     parser.add_argument(
         "--lddt-pli-radius",
         dest="lddt_pli_radius",
         default=6.0,
         type=float,
-        help=("lDDT inclusion radius for lDDT-PLI."))
+        help=("LDDT inclusion radius for LDDT-PLI."))
 
     parser.add_argument(
         "--lddt-pli-add-mdl-contacts",
         dest="lddt_pli_add_mdl_contacts",
         default=True,
         action="store_true",
-        help=("Add model contacts when computing lDDT-PLI."))
+        help=("Add model contacts when computing LDDT-PLI."))
 
     parser.add_argument(
         "--no-lddt-pli-add-mdl-contacts",
         dest="lddt_pli_add_mdl_contacts",
         default=True,
         action="store_false",
-        help=("DO NOT add model contacts when computing lDDT-PLI."))
+        help=("DO NOT add model contacts when computing LDDT-PLI."))
 
     # arguments relevant for rmsd
 
@@ -366,7 +398,7 @@ def _ParseArgs():
         dest="lddt_lp_radius",
         default=15.0,
         type=float,
-        help=("lDDT inclusion radius for lDDT-LP."))
+        help=("LDDT inclusion radius for LDDT-LP."))
 
     parser.add_argument(
         "-fbs",
@@ -385,6 +417,98 @@ def _ParseArgs():
         type=int,
         help=("If more than that many isomorphisms exist for a target-ligand "
               "pair, it will be ignored and reported as unassigned."))
+
+    parser.add_argument(
+        "--min-pep-length",
+        dest="min_pep_length",
+        default = 6,
+        type=int,
+        help=("Default: 6 - "
+              "Minimum length of a protein chain to be considered for being "
+              "part of a binding site.")
+    )
+
+    parser.add_argument(
+        "--min-nuc-length",
+        dest="min_nuc_length",
+        default = 4,
+        type=int,
+        help=("Default: 4 - "
+              "Minimum length of a NA chain to be considered for being "
+              "part of a binding site.")
+    )
+
+    parser.add_argument(
+        "--chem-group-seqid-thresh",
+        dest="chem_group_seqid_thresh",
+        type = float,
+        default = 95.,
+        help=("Default: 95 - Sequence identity threshold used to group "
+              "identical chains in reference structure in the chain mapping "
+              "step. The same threshold is applied to peptide and nucleotide "
+              "chains.")
+    )
+
+    parser.add_argument(
+        "--chem-map-seqid-thresh",
+        dest="chem_map_seqid_thresh",
+        type = float,
+        default = 70.,
+        help=("Default: 70 - Sequence identity threshold used to map model "
+              "chains to groups derived in the chem grouping step in chain "
+              "mapping. If set to 0., a mapping is enforced and each model "
+              "chain is assigned to the chem group with maximum sequence "
+              "identity. If larger than 0., a mapping only happens if the "
+              "respective model chain can be aligned to a chem group with the "
+              "specified sequence identity threshold AND if at least "
+              "min-pep-length/min-nuc-length residues are aligned. The same "
+              "threshold is applied to peptide and nucleotide chains.")
+    )
+
+    parser.add_argument(
+        "--seqres",
+        dest="seqres",
+        type = str,
+        default = None,
+        help=("Default: None - manually define chem groups by specifying path "
+              "to a fasta file. Each sequence in that file is considered a "
+              "reference sequence of a chem group. All polymer chains "
+              "in reference will be aligned to these sequences. This only works "
+              "if -rna/--residue-number-alignment is enabled and an error is raised "
+              "otherwise. "
+              "Additionally, you need to manually specify a mapping "
+              "of the polymer chains using trg-seqres-mapping and an error "
+              "is raised otherwise. The one letter codes in the structure must "
+              "exactly match the respective characters in seqres and an error "
+              "is raised if not.")
+    )
+
+    parser.add_argument(
+        "--trg-seqres-mapping",
+        nargs="+",
+        dest="trg_seqres_mapping",
+        default=None,
+        help=("Default: None - Maps each polymer chain in reference to a "
+              "sequence in *seqres*. Each mapping is a key:value pair "
+              "where key is the chain name in reference and value is the "
+              "sequence name in seqres. So let's say you have a homo-dimer "
+              "reference with chains \"A\" and \"B\"for which you provide a "
+              "seqres file containing one sequence with name \"1\". You can "
+              "specify this mapping with: --trg-seqres-mapping A:1 B:1")
+    )
+
+    parser.add_argument(
+        "--allow-heuristic-conn",
+        dest="allow_heuristic_conn",
+        default=False,
+        action="store_true",
+        help=("Default: False - Only relevant if ligands are extracted from "
+              "ref/mdl in mmCIF format. Connectivity in these cases is based "
+              "on the chemical component dictionary. If you enable this flag, "
+              "connectivity can be established by a distance based heuristic "
+              "if the ligand is not present in the component dictionary. This "
+              "might cause issues in ligand matching, i.e. graph matching.")
+    )
 
     args = parser.parse_args()
     if args.output is None:
@@ -464,10 +588,16 @@ def _LoadStructureData(receptor_path,
                        ligand_path,
                        sformat = None,
                        bu_id = None,
-                       fault_tolerant = False):
+                       fault_tolerant = False,
+                       allow_heuristic_conn = False):
 
+    # thats the return variables
+    # the last two are only set in case of an mmCIF file
     receptor = None
     ligands = None
+    seqres = None
+    trg_seqres_mapping = None
+
     receptor_format = _GetStructureFormat(receptor_path, sformat = sformat)
 
     if receptor_format == "pdb":
@@ -478,21 +608,26 @@ def _LoadStructureData(receptor_path,
         if bu_id is not None:
             raise RuntimeError(f"Cannot specify biounit ({bu_id}) for receptor "
                                f"in PDB format ({receptor_path})")
-        receptor = ligand_scoring_base.PDBPrep(receptor_path,
-                                               fault_tolerant=fault_tolerant)
+        receptor = scoring_base.PDBPrep(receptor_path,
+                                        fault_tolerant=fault_tolerant)
         ligands = _LoadLigands(ligand_path)
 
     elif receptor_format == "mmcif":
         if ligand_path is None:
-            receptor, ligands = ligand_scoring_base.MMCIFPrep(receptor_path,
-                                                              biounit = bu_id,
-                                                              extract_nonpoly = True,
-                                                              fault_tolerant = fault_tolerant)
+            receptor, ligands, seqres, trg_seqres_mapping = \
+            scoring_base.MMCIFPrep(receptor_path,
+                                   biounit = bu_id,
+                                   extract_nonpoly = True,
+                                   fault_tolerant = fault_tolerant,
+                                   allow_heuristic_conn = allow_heuristic_conn,
+                                   extract_seqres_mapping=True)
         else:
-            receptor = ligand_scoring_base.MMCIFPrep(receptor_path,
-                                                     biounit = bu_id,
-                                                     extract_nonpoly = False,
-                                                     fault_tolerant = fault_tolerant)
+            receptor, seqres, trg_seqres_mapping = \
+            scoring_base.MMCIFPrep(receptor_path,
+                                   biounit = bu_id,
+                                   extract_nonpoly = False,
+                                   fault_tolerant = fault_tolerant,
+                                   extract_seqres_mapping=True)
             ligands = _LoadLigands(ligand_path)
     else:
         raise RuntimeError("This should never happen")
@@ -500,10 +635,10 @@ def _LoadStructureData(receptor_path,
     # assign filename as name to receptor
     receptor.SetName(receptor_path)
 
-    return (receptor, ligands)
+    return (receptor, ligands, seqres, trg_seqres_mapping)
 
-
-def _SetupLDDTPLIScorer(model, model_ligands, reference, reference_ligands, args):
+def _SetupLDDTPLIScorer(model, model_ligands, reference, reference_ligands, args,
+                        seqres=None, trg_seqres_mapping=None):
     return ligand_scoring_lddtpli.LDDTPLIScorer(model, reference,
                                                 model_ligands = model_ligands,
                                                 target_ligands = reference_ligands,
@@ -513,9 +648,18 @@ def _SetupLDDTPLIScorer(model, model_ligands, reference, reference_ligands, args
                                                 coverage_delta = args.coverage_delta,
                                                 lddt_pli_radius = args.lddt_pli_radius,
                                                 add_mdl_contacts = args.lddt_pli_add_mdl_contacts,
-                                                max_symmetries = args.max_symmetries)
+                                                max_symmetries = args.max_symmetries,
+                                                min_pep_length = args.min_pep_length,
+                                                min_nuc_length = args.min_nuc_length,
+                                                pep_seqid_thr = args.chem_group_seqid_thresh,
+                                                nuc_seqid_thr = args.chem_group_seqid_thresh,
+                                                mdl_map_pep_seqid_thr = args.chem_map_seqid_thresh,
+                                                mdl_map_nuc_seqid_thr = args.chem_map_seqid_thresh,
+                                                seqres=seqres,
+                                                trg_seqres_mapping=trg_seqres_mapping)
 
-def _SetupSCRMSDScorer(model, model_ligands, reference, reference_ligands, args):
+def _SetupSCRMSDScorer(model, model_ligands, reference, reference_ligands, args,
+                       seqres=None, trg_seqres_mapping=None):
     return ligand_scoring_scrmsd.SCRMSDScorer(model, reference,
                                               model_ligands = model_ligands,
                                               target_ligands = reference_ligands,
@@ -526,9 +670,36 @@ def _SetupSCRMSDScorer(model, model_ligands, reference, reference_ligands, args)
                                               bs_radius = args.radius,
                                               lddt_lp_radius = args.lddt_lp_radius,
                                               full_bs_search = args.full_bs_search,
-                                              max_symmetries = args.max_symmetries)
+                                              max_symmetries = args.max_symmetries,
+                                              min_pep_length = args.min_pep_length,
+                                              min_nuc_length = args.min_nuc_length,
+                                              pep_seqid_thr = args.chem_group_seqid_thresh,
+                                              nuc_seqid_thr = args.chem_group_seqid_thresh,
+                                              mdl_map_pep_seqid_thr = args.chem_map_seqid_thresh,
+                                              mdl_map_nuc_seqid_thr = args.chem_map_seqid_thresh,
+                                              seqres=seqres,
+                                              trg_seqres_mapping=trg_seqres_mapping)
 
-def _Process(model, model_ligands, reference, reference_ligands, args):
+def _Process(model, model_ligands, reference, reference_ligands, args,
+             seqres = None, trg_seqres_mapping = None):
+
+    # see if seqres/trg-seqres-mapping are set in args
+    # if yes, they're prioritized even if we have these values from
+    # the mmCIF file
+    if args.seqres is not None:
+        if args.trg_seqres_mapping is None:
+            raise RuntimeError("Must provide trg-seqres-mapping if seqres "
+                               "is provided.")
+
+    if args.trg_seqres_mapping is not None:
+        if args.seqres is None:
+            raise RuntimeError("Must provide seqres if trg-seqres-mapping "
+                               "is provided.")
+
+    if args.seqres is not None and args.trg_seqres_mapping is not None:
+        seqres = io.LoadSequenceList(args.seqres)
+        trg_seqres_mapping = {x.split(':')[0]: x.split(':')[1] for x in args.chain_mapping}
+
 
     out = dict()
 
@@ -542,12 +713,14 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
     if args.lddt_pli:
         lddtpli_scorer = _SetupLDDTPLIScorer(model, model_ligands,
                                              reference, reference_ligands,
-                                             args)
+                                             args, seqres=seqres,
+                                             trg_seqres_mapping=trg_seqres_mapping)
 
     if args.rmsd:
         scrmsd_scorer = _SetupSCRMSDScorer(model, model_ligands,
                                            reference, reference_ligands,
-                                           args)
+                                           args, seqres=seqres,
+                                           trg_seqres_mapping=trg_seqres_mapping)
 
     # basic info on ligands only requires baseclass functionality
     # doesn't matter which scorer we use
@@ -561,7 +734,8 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
         # just create SCRMSD scorer to fill basic ligand info
         scorer = _SetupSCRMSDScorer(model, model_ligands,
                                     reference, reference_ligands,
-                                    args)
+                                    args, seqres=seqres,
+                                    trg_seqres_mapping=trg_seqres_mapping)
 
     ####################################
     # Extract / Map ligand information #
@@ -617,7 +791,7 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
     ##################
 
     if args.lddt_pli:
-        LogScript("Computing lDDT-PLI scores")
+        LogScript("Computing LDDT-PLI scores")
         out["lddt_pli"] = dict()
         out["lddt_pli"]["assigned_scores"] = list()
         for lig_pair in lddtpli_scorer.assignment:
@@ -761,15 +935,12 @@ def _Process(model, model_ligands, reference, reference_ligands, args):
                                                             "reference_ligand": target_key,
                                                             "reason": reason})
 
-    # add cleanup logs and parameters relevant for reproducibility
-    out["model"] = args.model
-    out["reference"] = args.reference
+    # add info relevant for chain mapping and cleanup
+    out["chem_groups"] = scorer._chain_mapper.chem_groups
+    out["chem_mapping"] = scorer._chem_mapping
+    out["mdl_chains_without_chem_mapping"] = scorer._mdl_chains_without_chem_mapping
     out["model_cleanup_log"] = scorer.model_cleanup_log
     out["reference_cleanup_log"] = scorer.target_cleanup_log
-    out["resnum_alignments"] = scorer.resnum_alignments
-    out["substructure_match"] = scorer.substructure_match
-    out["coverage_delta"] = scorer.coverage_delta
-    out["max_symmetries"] = scorer.max_symmetries
 
     return out
 
@@ -857,21 +1028,58 @@ def _Main():
         # Load structures
         LogScript("Loading data")
         LogInfo("Loading reference data")
-        reference, reference_ligands = _LoadStructureData(args.reference,
-                                                          args.reference_ligands,
-                                                          sformat = args.reference_format,
-                                                          bu_id = args.reference_biounit,
-                                                          fault_tolerant = args.fault_tolerant)
+        reference, reference_ligands, seqres, trg_seqres_mapping = \
+        _LoadStructureData(args.reference,
+                           args.reference_ligands,
+                           sformat = args.reference_format,
+                           bu_id = args.reference_biounit,
+                           fault_tolerant = args.fault_tolerant,
+                           allow_heuristic_conn = args.allow_heuristic_conn)
 
         LogInfo("Loading model data")
-        model, model_ligands = _LoadStructureData(args.model,
-                                                  args.model_ligands,
-                                                  sformat = args.model_format,
-                                                  bu_id = args.model_biounit,
-                                                  fault_tolerant = args.fault_tolerant)
+        model, model_ligands, _, _ = _LoadStructureData(args.model,
+                                                        args.model_ligands,
+                                                        sformat = args.model_format,
+                                                        bu_id = args.model_biounit,
+                                                        fault_tolerant = args.fault_tolerant,
+                                                        allow_heuristic_conn = args.allow_heuristic_conn)
 
-        out = _Process(model, model_ligands, reference, reference_ligands, args)
+        out = _Process(model, model_ligands, reference, reference_ligands, args,
+                       seqres = seqres, trg_seqres_mapping = trg_seqres_mapping)
 
+        # append input arguments
+        out["model"] = args.model
+        out["reference"] = args.reference
+        out["model-biounit"] = args.model_biounit
+        out["reference-biounit"] = args.reference_biounit
+        out["fault-tolerant"] = args.fault_tolerant
+        out["residue-number-alignment"] = args.residue_number_alignment
+        out["substructure-match"] = args.substructure_match
+        out["coverage-delta"] = args.coverage_delta
+        out["max-symmetries"] = args.max_symmetries
+        out["min-pep-length"] = args.min_pep_length
+        out["min-nuc-length"] = args.min_nuc_length
+        out["chem-group-seqid-thresh"] = args.chem_group_seqid_thresh
+        out["chem-map-seqid-thresh"] = args.chem_map_seqid_thresh
+        out["seqres"] = args.seqres
+        if args.trg_seqres_mapping:
+            tmp = {x.split(':')[0]: x.split(':')[1] for x in args.trg_seqres_mapping}
+            out["trg_seqres_mapping"] = tmp
+        else:
+            out["trg_seqres_mapping"] = None
+        out["allow_heuristic_conn"] = args.allow_heuristic_conn
+
+        # only add lddtpli if actually computed
+        if args.lddt_pli:
+            out["lddt-pli-radius"] = args.lddt_pli_radius
+            out["lddt-pli-add-mdl-contacts"] = args.lddt_pli_add_mdl_contacts
+        # same for rmsd
+        if args.rmsd:
+            out["radius"] = args.radius
+            out["lddt-lp-radius"] = args.lddt_lp_radius
+            out["full-bs-search"] = args.full_bs_search
+
+        # finalize
         out["ost_version"] = ost.__version__
         out["status"] = "SUCCESS"
         if args.output_format == "json":

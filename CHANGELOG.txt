@@ -1,3 +1,37 @@
+Changes in Release 2.10.0
+--------------------------------------------------------------------------------
+
+ * Fixed a bug in Molck where atoms in unknown residues would not be cleaned up
+   with rm_unk_atoms=True.
+ * Changed default MolckSettings so that rm_unk_atoms defaults to True.
+ * Chain mapping updates:
+   * In a first step, groups of identical chains need to be indentified in the
+     reference structure. The default is sequence based clustering. Now this
+     can be set explicitely and the compare-structures/compare-ligand-structures
+     actions extract this information from the mmCIF entity record if the
+     structure is provided as mmCIF file.
+   * Model chains need to be assigned to any of these groups which is done
+     by maximum sequence identity upon alignment. Previous behavior: use
+     max sequence identity to force an assignment. New behavior: specify a
+     minimum sequence identity below which a model chain is considered
+     unassigned. The comparison actions use 70%.
+   * Add chain mapping method described by AF2-Multimer
+     (https://doi.org/10.1101/2021.10.04.463034). Available as
+     ChainMapper.GetAFMMapping.
+   * Remove "greedy_fast" strategies in ChainMapper.GetlDDTMapping\
+     ChainMapper.GetQSScoreMapping
+ * OMF updates:
+   * Construct assemblies
+   * Getters for residue numbers, backbone traces and occupancies
+   * OMF support in mmCIF writer
+ * Added details in documentation for Molck.
+ * add lDDTScorer.DRMSD - Distance RMSD that operates on distance differences.
+ * Remove custom boost configuration code . Use preferred way of boost provided
+   configuration files for newer cmake/boost versions.
+ * Silence CMake warnings
+ * Several bug fixes and improvements.
+
+
 Changes in Release 2.9.3
 --------------------------------------------------------------------------------
  * Bugfix release to enable OpenStructure in Python 3.13

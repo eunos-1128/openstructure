@@ -49,7 +49,7 @@ void StarWriter::Write(const String& data_name, const String& filename) {
                         ": '" + filename + "'");
   }
   boost::iostreams::filtering_stream<boost::iostreams::output> stream;
-  if (boost::iequals(".gz", boost::filesystem::extension(filename))) {
+  if (boost::iequals(".gz", boost::filesystem::path(filename).extension().string())) {
     stream.push(boost::iostreams::gzip_compressor());
   }
   stream.push(fstream);

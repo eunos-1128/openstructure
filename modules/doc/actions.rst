@@ -53,13 +53,17 @@ Details on the usage (output of ``ost compare-structures --help``):
                                 [--min-nuc-length MIN_NUC_LENGTH] [-v VERBOSITY]
                                 [--lddt-add-mdl-contacts]
                                 [--lddt-inclusion-radius LDDT_INCLUSION_RADIUS]
-  
+                                [--chem-group-seqid-thresh CHEM_GROUP_SEQID_THRESH]
+                                [--chem-map-seqid-thresh CHEM_MAP_SEQID_THRESH]
+                                [--seqres SEQRES]
+                                [--trg-seqres-mapping TRG_SEQRES_MAPPING [TRG_SEQRES_MAPPING ...]]
+
   Evaluate model against reference 
-  
+
   Example: ost compare-structures -m model.pdb -r reference.cif
-  
+
   Loads the structures and performs basic cleanup:
-  
+
    * Assign elements according to the PDB Chemical Component Dictionary
    * Map nonstandard residues to their parent residues as defined by the PDB
      Chemical Component Dictionary, e.g. phospho-serine => serine
@@ -68,24 +72,34 @@ Details on the usage (output of ``ost compare-structures --help``):
    * Remove unknown atoms, i.e. atoms that are not expected according to the PDB
      Chemical Component Dictionary
    * Select for peptide/nucleotide residues
-  
+
   The cleaned structures are optionally dumped using -d/--dump-structures
-  
+
   Output is written in JSON format (default: out.json). In case of no additional
-  options, this is a dictionary with 8 keys describing model/reference comparison:
-  
+  options, this is a dictionary with the following keys describing model/reference
+  comparison:
+
    * "reference_chains": Chain names of reference
    * "model_chains": Chain names of model
    * "chem_groups": Groups of polypeptides/polynucleotides from reference that
-     are considered chemically equivalent. You can derive stoichiometry from this.
-     Contains only chains that are considered in chain mapping, i.e. pass a
-     size threshold (defaults: 6 for peptides, 4 for nucleotides).
+     are considered chemically equivalent, i.e. pass a pairwise sequence identity
+     threshold that can be controlled with --chem-group-seqid-thresh.
+     You can derive stoichiometry from this. Contains only chains that are
+     considered in chain mapping, i.e. pass a size threshold (defaults: 6 for
+     peptides, 4 for nucleotides).
    * "chem_mapping": List of same length as "chem_groups". Assigns model chains to
      the respective chem group. Again, only contains chains that are considered
-     in chain mapping.
+     in chain mapping. That is 1) pass the same size threshold as fo chem_groups
+     2) can be aligned to any of the chem groups with a sequence identity
+     threshold that can be controlled by --chem-map-seqid-thresh.
+   * "mdl_chains_without_chem_mapping": Model chains that could be considered in chain mapping,
+     i.e. are long enough, but could not be mapped to any chem group.
+     Depends on --chem-map-seqid-thresh. A mapping for each model chain can be
+     enforced by setting it to 0.
    * "chain_mapping": A dictionary with reference chain names as keys and the
      mapped model chain names as values. Missing chains are either not mapped
-     (but present in "chem_groups", "chem_mapping") or were not considered in
+     (but present in "chem_groups", "chem_mapping"), were not mapped to any chem
+     group (present in "mdl_chains_without_chem_mapping") or were not considered in
      chain mapping (short peptides etc.)
    * "aln": Pairwise sequence alignment for each pair of mapped chains in fasta
      format.
@@ -98,42 +112,25 @@ Details on the usage (output of ``ost compare-structures --help``):
    * "status": SUCCESS if everything ran through. In case of failure, the only
      content of the JSON output will be "status" set to FAILURE and an
      additional key: "traceback".
-  
-  The following additional keys store relevant input parameters to reproduce
-  results:
-  
-   * "model"
-   * "reference"
-   * "fault_tolerant"
-   * "model_biounit"
-   * "reference_biounit"
-   * "residue_number_alignment"
-   * "enforce_consistency"
-   * "cad_exec"
-   * "usalign_exec"
-   * "lddt_no_stereochecks"
-   * "min_pep_length"
-   * "min_nuc_length"
-   * "lddt_add_mdl_contacts"
-   * "lddt_inclusion_radius"
-   * "dockq_capri_peptide"
-   * "ost_version"
-  
+   * "ost_version": The OpenStructure version used for computation.
+
+  Additional keys represent input options.
+
   The pairwise sequence alignments are computed with Needleman-Wunsch using
   BLOSUM62 (NUC44 for nucleotides). Many benchmarking scenarios preprocess the
   structures to ensure matching residue numbers (CASP/CAMEO). In these cases,
   enabling -rna/--residue-number-alignment is recommended.
-  
+
   Each score is opt-in and can be enabled with optional arguments.
-  
-  Example to compute global and per-residue lDDT values as well as QS-score:
-  
+
+  Example to compute global and per-residue LDDT values as well as QS-score:
+
   ost compare-structures -m model.pdb -r reference.cif --lddt --local-lddt --qs-score
-  
+
   Example to inject custom chain mapping
-  
+
   ost compare-structures -m model.pdb -r reference.cif -c A:B B:A
-  
+
   options:
     -h, --help            show this help message and exit
     -m MODEL, --model MODEL
@@ -187,26 +184,26 @@ Details on the usage (output of ``ost compare-structures --help``):
                           model. Each separate mapping consist of key:value
                           pairs where key is the chain name in reference and
                           value is the chain name in model.
-    --lddt                Compute global lDDT score with default
+    --lddt                Compute global LDDT score with default
                           parameterization and store as key "lddt".
-                          Stereochemical irregularities affecting lDDT are
+                          Stereochemical irregularities affecting LDDT are
                           reported as keys "model_clashes", "model_bad_bonds",
                           "model_bad_angles" and the respective reference
                           counterparts.
-    --local-lddt          Compute per-residue lDDT scores with default
+    --local-lddt          Compute per-residue LDDT scores with default
                           parameterization and store as key "local_lddt". Score
                           for each residue is accessible by key
                           <chain_name>.<resnum>.<resnum_inscode>. Residue with
                           number 42 in chain X can be extracted with:
                           data["local_lddt"]["X.42."]. If there is an insertion
                           code, lets say A, the residue key becomes "X.42.A".
-                          Stereochemical irregularities affecting lDDT are
+                          Stereochemical irregularities affecting LDDT are
                           reported as keys "model_clashes", "model_bad_bonds",
                           "model_bad_angles" and the respective reference
                           counterparts. Atoms specified in there follow the
                           following format:
                           <chain_name>.<resnum>.<resnum_inscode>.<atom_name>
-    --aa-local-lddt       Compute per-atom lDDT scores with default
+    --aa-local-lddt       Compute per-atom LDDT scores with default
                           parameterization and store as key "aa_local_lddt".
                           Score for each atom is accessible by key
                           <chain_name>.<resnum>.<resnum_inscode>.<aname>. Alpha
@@ -214,21 +211,21 @@ Details on the usage (output of ``ost compare-structures --help``):
                           extracted with: data["aa_local_lddt"]["X.42..CA"]. If
                           there is a residue insertion code, lets say A, the
                           atom key becomes "X.42.A.CA". Stereochemical
-                          irregularities affecting lDDT are reported as keys
+                          irregularities affecting LDDT are reported as keys
                           "model_clashes", "model_bad_bonds", "model_bad_angles"
                           and the respective reference counterparts. Atoms
                           specified in there follow the following format:
                           <chain_name>.<resnum>.<resnum_inscode>.<atom_name>
-    --bb-lddt             Compute global lDDT score with default
-                          parameterization and store as key "bb_lddt". lDDT in
+    --bb-lddt             Compute global LDDT score with default
+                          parameterization and store as key "bb_lddt". LDDT in
                           this case is only computed on backbone atoms: CA for
                           peptides and C3' for nucleotides
-    --bb-local-lddt       Compute per-residue lDDT scores with default
+    --bb-local-lddt       Compute per-residue LDDT scores with default
                           parameterization and store as key "bb_local_lddt".
-                          lDDT in this case is only computed on backbone atoms:
+                          LDDT in this case is only computed on backbone atoms:
                           CA for peptides and C3' for nucleotides. Per-residue
                           scores are accessible as described for local_lddt.
-    --ilddt               Compute global lDDT score which is solely based on
+    --ilddt               Compute global LDDT score which is solely based on
                           inter-chain contacts and store as key "ilddt". Same
                           stereochemical irregularities as for lddt apply.
     --cad-score           Compute global CAD's atom-atom (AA) score and store as
@@ -391,7 +388,7 @@ Details on the usage (output of ``ost compare-structures --help``):
                           used 4x4 transformation matrix that superposes model
                           onto reference, "rigid_chain_mapping": equivalent of
                           "chain_mapping" which is used for rigid scores
-                          (optimized for RMSD instead of QS-score/lDDT).
+                          (optimized for RMSD instead of QS-score/LDDT).
     --patch-scores        Local interface quality score used in CASP15. Scores
                           each model residue that is considered in the interface
                           (CB pos within 8A of any CB pos from another chain (CA
@@ -412,7 +409,7 @@ Details on the usage (output of ``ost compare-structures --help``):
                           the mapping are available as keys "tm_score" and
                           "usalign_mapping"
     --lddt-no-stereochecks
-                          Disable stereochecks for lDDT computation
+                          Disable stereochecks for LDDT computation
     --n-max-naive N_MAX_NAIVE
                           Parameter for chain mapping. If the number of possible
                           mappings is <= *n_max_naive*, the full mapping
@@ -455,7 +452,7 @@ Details on the usage (output of ``ost compare-structures --help``):
     -v VERBOSITY, --verbosity VERBOSITY
                           Set verbosity level. Defaults to 2 (Script).
     --lddt-add-mdl-contacts
-                          Only using contacts in lDDT thatare within a certain
+                          Only using contacts in LDDT that are within a certain
                           distance threshold in the reference does not penalize
                           for added model contacts. If set to True, this flag
                           will also consider reference contacts that are within
@@ -464,8 +461,48 @@ Details on the usage (output of ``ost compare-structures --help``):
                           if the respective atom pair is not resolved in the
                           reference.
     --lddt-inclusion-radius LDDT_INCLUSION_RADIUS
-                          Passed to lDDT scorer. Affects all lDDT scores but not
+                          Passed to LDDT scorer. Affects all LDDT scores but not
                           chain mapping.
+    --chem-group-seqid-thresh CHEM_GROUP_SEQID_THRESH
+                          Default: 95 - Sequence identity threshold used to
+                          group identical chains in reference structure in the
+                          chain mapping step. The same threshold is applied to
+                          peptide and nucleotide chains.
+    --chem-map-seqid-thresh CHEM_MAP_SEQID_THRESH
+                          Default: 70 - Sequence identity threshold used to map
+                          model chains to groups derived in the chem grouping
+                          step in chain mapping. If set to 0., a mapping is
+                          enforced and each model chain is assigned to the chem
+                          group with maximum sequence identity. If larger than
+                          0., a mapping only happens if the respective model
+                          chain can be aligned to a chem group with the
+                          specified sequence identity threshold AND if at least
+                          min-pep-length/min-nuc-length residues are aligned.
+                          The same threshold is applied to peptide and
+                          nucleotide chains.
+    --seqres SEQRES       Default: None - manually define chem groups by
+                          specifying path to a fasta file. Each sequence in that
+                          file is considered a reference sequence of a chem
+                          group. All polymer chains in reference will be aligned
+                          to these sequences. This only works if -rna/--residue-
+                          number-alignment is enabled and an error is raised
+                          otherwise. Additionally, you need to manually specify
+                          a mapping of the polymer chains using trg-seqres-
+                          mapping and an error is raised otherwise. The one
+                          letter codes in the structure must exactly match the
+                          respective characters in seqres and an error is raised
+                          if not.
+    --trg-seqres-mapping TRG_SEQRES_MAPPING [TRG_SEQRES_MAPPING ...]
+                          Default: None - Maps each polymer chain in reference
+                          to a sequence in *seqres*. Each mapping is a key:value
+                          pair where key is the chain name in reference and
+                          value is the sequence name in seqres. So let's say you
+                          have a homo-dimer reference with chains "A" and "B"for
+                          which you provide a seqres file containing one
+                          sequence with name "1". You can specify this mapping
+                          with: --trg-seqres-mapping A:1 B:1
+
+
 
 .. _ost compare ligand structures:
 
@@ -473,7 +510,7 @@ Comparing two structures with ligands
 --------------------------------------------------------------------------------
 
 You can compare two structures with non-polymer/small molecule ligands and
-compute lDDT-PLI and ligand RMSD scores from the command line with the
+compute LDDT-PLI and ligand RMSD scores from the command line with the
 ``ost compare-ligand-structures`` action. This can be considered a command
 line interface to :class:`ost.mol.alg.ligand_scoring_base.LigandScorer` and more
 information about arguments and outputs can be found there.
@@ -500,6 +537,13 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
                                        [--radius RADIUS]
                                        [--lddt-lp-radius LDDT_LP_RADIUS] [-fbs]
                                        [-ms MAX_SYMMETRIES]
+                                       [--min-pep-length MIN_PEP_LENGTH]
+                                       [--min-nuc-length MIN_NUC_LENGTH]
+                                       [--chem-group-seqid-thresh CHEM_GROUP_SEQID_THRESH]
+                                       [--chem-map-seqid-thresh CHEM_MAP_SEQID_THRESH]
+                                       [--seqres SEQRES]
+                                       [--trg-seqres-mapping TRG_SEQRES_MAPPING [TRG_SEQRES_MAPPING ...]]
+                                       [--allow-heuristic-conn]
 
   Evaluate model with non-polymer/small molecule ligands against reference.
 
@@ -522,15 +566,28 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
   that are not defined for respective residues in the component dictionary. Except
   step 1), every cleanup is logged and a report is available in the json outfile.
 
+  Only polymers (protein and nucleic acids) of model and reference are considered
+  for ligand binding sites. The mapping of possible reference/model chain
+  assignments requires a preprocessing. In short: identical chains in the
+  reference are grouped based on pairwise sequence identity
+  (see --chem-group-seqid-thresh). Each model chain is assigned to
+  one of these groups (see --chem-map-seqid-thresh param).
+  To avoid spurious matches, only polymers of a certain length are considered
+  in this matching procedure (see --min_pep_length/--min_nuc_length param).
+  Shorter polymers are never mapped and do not contribute to scoring.
+
   Ligands can be given as path to SDF files containing the ligand for both model
   (--model-ligands/-ml) and reference (--reference-ligands/-rl). If omitted,
   ligands are optionally detected from a structure file if it is given in mmCIF
   format. This is based on "non-polymer" _entity.type annotation and the
   respective entries must exist in the PDB component dictionary in order to get
-  connectivity information. For example, receptor structure and ligand(s) are
-  loaded from the same mmCIF file given as '-m'/'-r'. This does not work for
-  structures provided in PDB format and an error is raised if ligands are not
-  explitely given in SDF format.
+  connectivity information. You can avoid the requirement of the PDB component
+  dictionary by enabling --allow-heuristic-conn. In this case, connectivity
+  is established through a distance based heuristic if the ligand is not found in
+  the component dictionary. Be aware that this might be an issue in ligand
+  matching.
+  If you provide structures in PDB format, an error is raised if ligands are not
+  explicitely given in SDF format.
 
   Ligands undergo gentle processing where hydrogens are removed. Connectivity
   is relevant for scoring. It is read directly from SDF input. If ligands are
@@ -549,6 +606,21 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
      the ligand SDF file(s). Otherwise, they will be the chain name, residue
      number and insertion code of the ligand, separated by a dot.
    * "reference_ligands": Same for reference ligands.
+   * "chem_groups": Groups of polypeptides/polynucleotides from reference that
+     are considered chemically equivalent, i.e. pass a pairwise sequence identity
+     threshold that can be controlled with --chem-group-seqid-thresh.
+     You can derive stoichiometry from this. Contains only chains that are
+     considered in chain mapping, i.e. pass a size threshold (defaults: 6 for
+     peptides, 4 for nucleotides).
+   * "chem_mapping": List of same length as "chem_groups". Assigns model chains to
+     the respective chem group. Again, only contains chains that are considered
+     in chain mapping. That is 1) pass the same size threshold as for chem_groups
+     2) can be aligned to any of the chem groups with a sequence identity
+     threshold that can be controlled by --chem-map-seqid-thresh.
+   * "mdl_chains_without_chem_mapping": Model chains that could be considered in
+     chain mapping, i.e. are long enough, but could not be mapped to any chem
+     group. Depends on --chem-map-seqid-thresh. A mapping for each model chain can
+     be enforced by setting it to 0.
    * "status": SUCCESS if everything ran through. In case of failure, the only
      content of the JSON output will be "status" set to FAILURE and an
      additional key: "traceback".
@@ -556,12 +628,8 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
    * "model_cleanup_log": Lists residues/atoms that have been removed in model
      cleanup process.
    * "reference_cleanup_log": Same for reference.
-   * "reference": Parameter provided for --reference/-r
-   * "model": Parameter provided for --model/-m
-   * "resnum_alignments": Parameter provided for --residue-number-alignment/-rna
-   * "substructure_match": Parameter provided for --substructure-match/-sm
-   * "coverage_delta": Parameter provided for --coverage-delta/-cd
-   * "max_symmetries": Parameter provided for --max-symmetries/-ms 
+
+  Additional keys represent input options.
 
   Each score is opt-in and the respective results are available in three keys:
 
@@ -600,10 +668,10 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
      --by-model-ligand-output flag was set, this will be model ligand instead,
      following the same rules.
 
-  If lDDT-PLI was enabled with --lddt-pli, the following columns are added:
+  If LDDT-PLI was enabled with --lddt-pli, the following columns are added:
 
    * "lddt_pli", "lddt_pli_coverage" and "lddt_pli_(model|reference)_ligand"
-     are the lDDT-PLI score result, the corresponding coverage and assigned model
+     are the LDDT-PLI score result, the corresponding coverage and assigned model
      ligand (or reference ligand if the --by-model-ligand-output flag was set)
      if an assignment was found, respectively, empty otherwise.
    * "lddt_pli_unassigned" is empty if an assignment was found, otherwise it
@@ -613,7 +681,7 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
 
    * "rmsd", "rmsd_coverage". "lddt_lp" "bb_rmsd" and
      "rmsd_(model|reference)_ligand" are the BiSyRMSD, the corresponding
-     coverage, lDDT-LP, backbone RMSD and assigned model ligand (or reference
+     coverage, LDDT-LP, backbone RMSD and assigned model ligand (or reference
      ligand if the --by-model-ligand-output flag was set) if an assignment
      was found, respectively, empty otherwise.
    * "rmsd_unassigned" is empty if an assignment was found, otherwise it
@@ -680,20 +748,20 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
                           Set verbosity level. Defaults to 2 (Script).
     --full-results        Outputs scoring results for all model/reference ligand
                           pairs and store as key "full_results"
-    --lddt-pli            Compute lDDT-PLI scores and store as key "lddt_pli".
+    --lddt-pli            Compute LDDT-PLI scores and store as key "lddt_pli".
     --lddt-pli-radius LDDT_PLI_RADIUS
-                          lDDT inclusion radius for lDDT-PLI.
+                          LDDT inclusion radius for LDDT-PLI.
     --lddt-pli-add-mdl-contacts
-                          Add model contacts when computing lDDT-PLI.
+                          Add model contacts when computing LDDT-PLI.
     --no-lddt-pli-add-mdl-contacts
-                          DO NOT add model contacts when computing lDDT-PLI.
+                          DO NOT add model contacts when computing LDDT-PLI.
     --rmsd                Compute RMSD scores and store as key "rmsd".
     --radius RADIUS       Inclusion radius to extract reference binding site
                           that is used for RMSD computation. Any residue with
                           atoms within this distance of the ligand will be
                           included in the binding site.
     --lddt-lp-radius LDDT_LP_RADIUS
-                          lDDT inclusion radius for lDDT-LP.
+                          LDDT inclusion radius for LDDT-LP.
     -fbs, --full-bs-search
                           Enumerate all potential binding sites in the model
                           when searching rigid superposition for RMSD
@@ -702,3 +770,58 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
                           If more than that many isomorphisms exist for a
                           target-ligand pair, it will be ignored and reported as
                           unassigned.
+    --min-pep-length MIN_PEP_LENGTH
+                          Default: 6 - Minimum length of a protein chain to be
+                          considered for being part of a binding site.
+    --min-nuc-length MIN_NUC_LENGTH
+                          Default: 4 - Minimum length of a NA chain to be
+                          considered for being part of a binding site.
+    --chem-group-seqid-thresh CHEM_GROUP_SEQID_THRESH
+                          Default: 95 - Sequence identity threshold used to
+                          group identical chains in reference structure in the
+                          chain mapping step. The same threshold is applied to
+                          peptide and nucleotide chains.
+    --chem-map-seqid-thresh CHEM_MAP_SEQID_THRESH
+                          Default: 70 - Sequence identity threshold used to map
+                          model chains to groups derived in the chem grouping
+                          step in chain mapping. If set to 0., a mapping is
+                          enforced and each model chain is assigned to the chem
+                          group with maximum sequence identity. If larger than
+                          0., a mapping only happens if the respective model
+                          chain can be aligned to a chem group with the
+                          specified sequence identity threshold AND if at least
+                          min-pep-length/min-nuc-length residues are aligned.
+                          The same threshold is applied to peptide and
+                          nucleotide chains.
+    --seqres SEQRES       Default: None - manually define chem groups by
+                          specifying path to a fasta file. Each sequence in that
+                          file is considered a reference sequence of a chem
+                          group. All polymer chains in reference will be aligned
+                          to these sequences. This only works if -rna/--residue-
+                          number-alignment is enabled and an error is raised
+                          otherwise. Additionally, you need to manually specify
+                          a mapping of the polymer chains using trg-seqres-
+                          mapping and an error is raised otherwise. The one
+                          letter codes in the structure must exactly match the
+                          respective characters in seqres and an error is raised
+                          if not.
+    --trg-seqres-mapping TRG_SEQRES_MAPPING [TRG_SEQRES_MAPPING ...]
+                          Default: None - Maps each polymer chain in reference
+                          to a sequence in *seqres*. Each mapping is a key:value
+                          pair where key is the chain name in reference and
+                          value is the sequence name in seqres. So let's say you
+                          have a homo-dimer reference with chains "A" and "B"for
+                          which you provide a seqres file containing one
+                          sequence with name "1". You can specify this mapping
+                          with: --trg-seqres-mapping A:1 B:1
+    --allow-heuristic-conn
+                          Default: False - Only relevant if ligands are
+                          extracted from ref/mdl in mmCIF format. Connectivity
+                          in these cases is based on the chemical component
+                          dictionary. If you enable this flag, connectivity can
+                          be established by a distance based heuristic if the
+                          ligand is not present in the component dictionary.
+                          This might cause issues in ligand matching, i.e. graph
+                          matching.
+
+

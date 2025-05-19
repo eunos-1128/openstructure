@@ -21,7 +21,9 @@ if (COMPOUND_LIB)
   list(APPEND OST_MOL_ALG_UNIT_TESTS test_qsscoring.py
                                      test_nonstandard.py
                                      test_chain_mapping.py
-                                     test_ligand_scoring.py)
+                                     test_ligand_scoring.py
+                                     test_scoring.py
+                                     test_scoring_base.py)
 endif()
 
 ost_unittest(MODULE mol_alg SOURCES "${OST_MOL_ALG_UNIT_TESTS}" LINK ost_io)

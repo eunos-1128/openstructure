@@ -16,10 +16,30 @@ except:
         x2 = x2.reshape(-1, 1)
         return np.sqrt(x2 - 2*xy + y2) # (m, n)  
 
+def blockwise_cdist(A, B, block_size=1000):
+    """ Memory efficient cdist implementation that performs blockwise operations
+
+    scipy cdist uses 64 bit floats (double) which can scratch at the upper
+    memory end for most machines when number of positions become larger.
+    E.g. ~4000 residues might for example have 35000 atom positions. That's
+    Almost 10GB to hold all pairwise distances in 64bit floats. This function
+    calls cdist blockwise and stores the results in a 32bit float matrix.
+
+    This function is adapted from chatgpt output
+    """
+    A = A.astype(np.float32)
+    B = B.astype(np.float32)
+    M, N = A.shape[0], B.shape[0]
+    D = np.empty((M, N), dtype=np.float32)  # Output in float32 to save memory
+    for i in range(0, M, block_size):
+        A_block = A[i:i+block_size]
+        D[i:i+block_size, :] = cdist(A_block, B).astype(np.float32)
+    return D
+
 class CustomCompound:
     """ Defines atoms for custom compounds
 
-    lDDT requires the reference atoms of a compound which are typically
+    LDDT requires the reference atoms of a compound which are typically
     extracted from a :class:`ost.conop.CompoundLib`. This lightweight
     container allows to handle arbitrary compounds which are not
     necessarily in the compound library.
@@ -48,7 +68,7 @@ class CustomCompound:
 class SymmetrySettings:
     """Container for symmetric compounds
 
-    lDDT considers symmetries and selects the one resulting in the highest
+    LDDT considers symmetries and selects the one resulting in the highest
     possible score.
 
     A symmetry is defined as a renaming operation on one or more atoms that
@@ -122,9 +142,9 @@ def GetDefaultSymmetrySettings():
 
 
 class lDDTScorer:
-    """lDDT scorer object for a specific target
+    """LDDT scorer object for a specific target
 
-    Sets up everything to score models of that target. lDDT (local distance
+    Sets up everything to score models of that target. LDDT (local distance
     difference test) is defined as fraction of pairwise distances which exhibit
     a difference < threshold when considering target and model. In case of
     multiple thresholds, the average is returned. See
@@ -287,7 +307,7 @@ class lDDTScorer:
                        self.symmetry_settings, seqres_mapping, self.bb_only)
 
         # distance related members are lazily computed as they're affected
-        # by different flavours of lDDT (e.g. lDDT including inter-chain
+        # by different flavours of LDDT (e.g. LDDT including inter-chain
         # contacts or not etc.)
 
         # stores for each atom the other atoms within inclusion_radius
@@ -440,14 +460,14 @@ class lDDTScorer:
              residue_mapping=None, return_dist_test=False,
              check_resnames=True, add_mdl_contacts=False,
              interaction_data=None, set_atom_props=False):
-        """Computes lDDT of *model* - globally and per-residue
+        """Computes LDDT of *model* - globally and per-residue
 
         :param model: Model to be scored - models are preferably scored upon
                       performing stereo-chemistry checks in order to punish for
                       non-sensical irregularities. This must be done separately
                       as a pre-processing step. Target contacts that are not
                       covered by *model* are considered not conserved, thus
-                      decreasing lDDT score. This also includes missing model
+                      decreasing LDDT score. This also includes missing model
                       chains or model chains for which no mapping is provided in
                       *chain_mapping*.
         :type model: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
@@ -535,11 +555,11 @@ class lDDTScorer:
                                level if *local_lddt_prop*/*local_contact_prop*
                                are set as well.
                                In other words: this is the only way you can
-                               get per-atom lDDT values.
+                               get per-atom LDDT values.
         :type set_atom_props: :class:`bool`
 
-        :returns: global and per-residue lDDT scores as a tuple -
-                  first element is global lDDT score (None if *target* has no
+        :returns: global and per-residue LDDT scores as a tuple -
+                  first element is global LDDT score (None if *target* has no
                   contacts) and second element a list of per-residue scores with
                   length len(*model*.residues). None is assigned to residues that
                   are not covered by target. If a residue is covered but has no
@@ -571,13 +591,12 @@ class lDDTScorer:
         res_indices, ref_res_indices, symmetries = \
         self._ProcessModel(model, chain_mapping,
                            residue_mapping = residue_mapping,
-                           thresholds = thresholds,
+                           nirvana_dist = self.inclusion_radius + max(thresholds),
                            check_resnames = check_resnames)
 
         if no_interchain and no_intrachain:
             raise RuntimeError("no_interchain and no_intrachain flags are "
                                "mutually exclusive")
-
 
         sym_ref_indices = None
         sym_ref_distances = None
@@ -690,7 +709,7 @@ class lDDTScorer:
 
             summed_per_atom_conserved = per_atom_conserved.sum(axis=1)
             if local_lddt_prop:
-                # the only place where actually need to compute per-atom lDDT
+                # the only place where actually need to compute per-atom LDDT
                 # scores
                 for a_idx in range(len(atom_list)):
                     if per_atom_exp[a_idx] != 0:
@@ -714,6 +733,187 @@ class lDDTScorer:
             per_res_exp, per_res_conserved
         else:
             return lDDT, per_res_lDDT
+
+    def DRMSD(self, model, dist_cap = 5,
+              chain_mapping=None, no_interchain=False,
+              no_intrachain=False, residue_mapping=None,
+              check_resnames=True, add_mdl_contacts=False,
+              interaction_data=None):
+        """ DRMSD of *model* - globally and per-residue
+
+        Very similar to LDDT as we operate on distance differences for all
+        interatomic distances within the same inclusion radius as in LDDT.
+        DRMSD is the distance rmsd, i.e. the RMSD of distance differences.
+        Distance differences are capped at *dist_cap* which is also the default
+        value for missing distances.
+
+        :param model: Model to be scored - models are preferably scored upon
+                      performing stereo-chemistry checks in order to punish for
+                      non-sensical irregularities. This must be done separately
+                      as a pre-processing step. Target contacts that are not
+                      covered by *model* are considered not conserved, thus
+                      increasing DRMSD score. This also includes missing model
+                      chains or model chains for which no mapping is provided in
+                      *chain_mapping*.
+        :type model: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
+        :param dist_cap: Cap for distance differences.
+        :type dist_cap: :class:`float`
+        :param chain_mapping: Mapping of model chains (key) onto target chains
+                              (value). This is required if target or model have
+                              more than one chain.
+        :type chain_mapping: :class:`dict` with :class:`str` as keys/values
+        :param no_interchain: Whether to exclude interchain contacts
+        :type no_interchain: :class:`bool`
+        :param no_intrachain: Whether to exclude intrachain contacts (i.e. only
+                              consider interface related contacts)
+        :type no_intrachain: :class:`bool`
+        :param residue_mapping: By default, residue mapping is based on residue
+                                numbers. That means, a model chain and the
+                                respective target chain map to the same
+                                underlying reference sequence (SEQRES).
+                                Alternatively, you can specify one or
+                                several alignment(s) between model and target
+                                chains by providing a dictionary. key: Name
+                                of chain in model (respective target chain is
+                                extracted from *chain_mapping*),
+                                value: Alignment with first sequence
+                                corresponding to target chain and second
+                                sequence to model chain. There is NO reference
+                                sequence involved, so the two sequences MUST
+                                exactly match the actual residues observed in
+                                the respective target/model chains (ATOMSEQ).
+        :type residue_mapping: :class:`dict` with key: :class:`str`,
+                               value: :class:`ost.seq.AlignmentHandle`
+        :param check_resnames: On by default. Enforces residue name matches
+                               between mapped model and target residues.
+        :type check_resnames: :class:`bool`
+        :param add_mdl_contacts: Adds model contacts - Only using contacts that
+                                 are within a certain distance threshold in the
+                                 target does not penalize for added model
+                                 contacts. If set to True, this flag will also
+                                 consider target contacts that are within the
+                                 specified distance threshold in the model but
+                                 not necessarily in the target. No contact will
+                                 be added if the respective atom pair is not
+                                 resolved in the target.
+        :type add_mdl_contacts: :class:`bool`
+        :param interaction_data: Pro param - don't use
+        :type interaction_data: :class:`tuple`
+
+        :returns: global and per-residue DRMSD scores as a tuple -
+                  first element is global DRMSD score (None if *target* has no
+                  contacts) and second element a list of per-residue scores with
+                  length len(*model*.residues). None is assigned to residues that
+                  are not covered by target. If a residue is covered but has no
+                  contacts in *target*, None is assigned.
+        """
+        if chain_mapping is None:
+            if len(self.chain_names) > 1 or len(model.chains) > 1:
+                raise NotImplementedError("Must provide chain mapping if "
+                                          "target or model have > 1 chains.")
+            chain_mapping = {model.chains[0].GetName(): self.chain_names[0]}
+        else:
+            # check whether chains specified in mapping exist
+            for model_chain, target_chain in chain_mapping.items():
+                if target_chain not in self.chain_names:
+                    raise RuntimeError(f"Target chain specified in "
+                                       f"chain_mapping ({target_chain}) does "
+                                       f"not exist. Target has chains: "
+                                       f"{self.chain_names}")
+                ch = model.FindChain(model_chain)
+                if not ch.IsValid():
+                    raise RuntimeError(f"Model chain specified in "
+                                       f"chain_mapping ({model_chain}) does "
+                                       f"not exist. Model has chains: "
+                                       f"{[c.GetName() for c in model.chains]}")
+
+        # data objects defining model data - see _ProcessModel for rough
+        # description
+        pos, res_ref_atom_indices, res_atom_indices, res_atom_hashes, \
+        res_indices, ref_res_indices, symmetries = \
+        self._ProcessModel(model, chain_mapping,
+                           residue_mapping = residue_mapping,
+                           nirvana_dist = self.inclusion_radius + dist_cap,
+                           check_resnames = check_resnames)
+
+        if no_interchain and no_intrachain:
+            raise RuntimeError("no_interchain and no_intrachain flags are "
+                               "mutually exclusive")
+
+        sym_ref_indices = None
+        sym_ref_distances = None
+        ref_indices = None
+        ref_distances = None
+
+        if interaction_data is None:
+            if no_interchain:
+                sym_ref_indices = self.sym_ref_indices_sc
+                sym_ref_distances = self.sym_ref_distances_sc
+                ref_indices = self.ref_indices_sc
+                ref_distances = self.ref_distances_sc
+            elif no_intrachain:
+                sym_ref_indices = self.sym_ref_indices_ic
+                sym_ref_distances = self.sym_ref_distances_ic
+                ref_indices = self.ref_indices_ic
+                ref_distances = self.ref_distances_ic
+            else:
+                sym_ref_indices = self.sym_ref_indices
+                sym_ref_distances = self.sym_ref_distances
+                ref_indices = self.ref_indices
+                ref_distances = self.ref_distances
+
+            if add_mdl_contacts:
+                ref_indices, ref_distances = \
+                self._AddMdlContacts(model, res_atom_indices, res_atom_hashes,
+                                     ref_indices, ref_distances,
+                                     no_interchain, no_intrachain)
+                # recompute symmetry related indices/distances
+                sym_ref_indices, sym_ref_distances = \
+                lDDTScorer._NonSymDistances(self.n_atoms, self.symmetric_atoms,
+                                            ref_indices, ref_distances)
+        else:
+            sym_ref_indices, sym_ref_distances, ref_indices, ref_distances = \
+            interaction_data
+
+        self._ResolveSymmetriesSSD(pos, dist_cap, symmetries, sym_ref_indices,
+                                   sym_ref_distances)
+
+        atom_indices = list(itertools.chain.from_iterable(res_atom_indices))
+
+        per_atom_exp = np.asarray([self._GetNExp(i, ref_indices)
+            for i in atom_indices], dtype=np.int32)
+        per_res_exp = np.asarray([self._GetNExp(res_ref_atom_indices[idx],
+            ref_indices) for idx in range(len(res_indices))], dtype=np.int32)
+        per_atom_ssd = self._EvalAtomsSSD(pos, atom_indices, dist_cap,
+                                          ref_indices, ref_distances)
+
+        # do per residue scores
+        start_idx = 0
+        per_res_drmsd = [None] * model.GetResidueCount()
+        for r_idx in range(len(res_atom_indices)):
+            end_idx = start_idx + len(res_atom_indices[r_idx])
+            n_tot = per_res_exp[r_idx]
+            if n_tot > 0:
+                ssd = np.sum(per_atom_ssd[start_idx:end_idx])
+                # add penalties from distances involving atoms that are not
+                # present in the model
+                n_missing = n_tot - np.sum(per_atom_exp[start_idx:end_idx])
+                ssd += n_missing*dist_cap*dist_cap
+                per_res_drmsd[res_indices[r_idx]] = np.sqrt(ssd/n_tot)
+            start_idx = end_idx
+
+        # do full model score
+        drmsd = None
+        n_tot = sum([len(x) for x in ref_indices])
+        if n_tot > 0:
+            ssd = np.sum(per_atom_ssd)
+            # add penalties from distances involving atoms that are not
+            # present in the model
+            n_missing = n_tot - np.sum(per_atom_exp)
+            ssd += (dist_cap*dist_cap*n_missing)
+            drmsd = np.sqrt(ssd/n_tot)
+
+        return drmsd, per_res_drmsd
 
     def GetNChainContacts(self, target_chain, no_interchain=False):
         """Returns number of contacts expected for a certain chain in *target*
@@ -739,7 +939,7 @@ class lDDTScorer:
             return self._GetNExp(list(range(s, e)), self.ref_indices)
 
     def _ProcessModel(self, model, chain_mapping, residue_mapping = None,
-                      thresholds = [0.5, 1.0, 2.0, 4.0],
+                      nirvana_dist = 100,
                       check_resnames = True):
         """ Helper that generates data structures from model
         """
@@ -748,7 +948,7 @@ class lDDTScorer:
         # set, it should be far away from any position in model.
         max_pos = model.bounds.GetMax()
         max_coordinate = abs(max(max_pos[0], max_pos[1], max_pos[2]))
-        max_coordinate += 42 * max(thresholds)
+        max_coordinate += 42 * nirvana_dist
         pos = np.ones((self.n_atoms, 3), dtype=np.float32) * max_coordinate
 
         # for each scored residue in model a list of indices describing the
@@ -1097,7 +1297,7 @@ class lDDTScorer:
 
         """Compute distance related members of lDDTScorer
 
-        Brute force all vs all distance computation kills lDDT for large
+        Brute force all vs all distance computation kills LDDT for large
         complexes. Instead of building some KD tree data structure, we make use
         of expected spatial proximity of atoms in the same chain. Distances are
         computed as follows:
@@ -1107,8 +1307,8 @@ class lDDTScorer:
         - process potentially interacting chain pairs
         - concatenate distances from all processing steps
         """
-        ref_indices = [np.asarray([], dtype=np.int64) for idx in range(n_atoms)]
-        ref_distances = [np.asarray([], dtype=np.float64) for idx in range(n_atoms)]
+        ref_indices = [np.asarray([], dtype=np.int32) for idx in range(n_atoms)]
+        ref_distances = [np.asarray([], dtype=np.float32) for idx in range(n_atoms)]
 
         indices = [list() for _ in range(n_atoms)]
         distances = [list() for _ in range(n_atoms)]
@@ -1128,7 +1328,7 @@ class lDDTScorer:
                     hash_code = a.handle.GetHashCode()
                     if hash_code in atom_index_mapping:
                         p = a.GetPos()
-                        pos_list.append(np.asarray([p[0], p[1], p[2]]))
+                        pos_list.append(np.asarray([p[0], p[1], p[2]], dtype=np.float32))
                         atom_indices.append(atom_index_mapping[hash_code])
                         n_valid_atoms += 1
                 mask_start.extend([r_start_idx] * n_valid_atoms)
@@ -1140,8 +1340,12 @@ class lDDTScorer:
                 continue
 
             pos = np.vstack(pos_list)
-            atom_indices = np.asarray(atom_indices)
-            dists = cdist(pos, pos)
+            atom_indices = np.asarray(atom_indices, dtype=np.int32)
+
+            if atom_indices.shape[0] > 20000:
+                dists = blockwise_cdist(pos, pos)
+            else:
+                dists = cdist(pos, pos)
 
             # apply masks
             far_away = 2 * inclusion_radius
@@ -1156,6 +1360,8 @@ class lDDTScorer:
                     full_at_idx = atom_indices[idx]
                     indices[full_at_idx].append(indices_to_append)
                     distances[full_at_idx].append(dists[idx, within_mask[idx,:]])
+
+            dists = None
 
             per_chain_pos.append(pos)
             per_chain_indices.append(atom_indices)
@@ -1174,7 +1380,10 @@ class lDDTScorer:
 
         # process potentially interacting chains
         for pair in chain_pairs:
-            dists = cdist(per_chain_pos[pair[0]], per_chain_pos[pair[1]])
+            if per_chain_pos[pair[0]].shape[0] > 20000 or per_chain_pos[pair[1]].shape[0] > 20000:
+                dists = blockwise_cdist(per_chain_pos[pair[0]], per_chain_pos[pair[1]])
+            else:
+                dists = cdist(per_chain_pos[pair[0]], per_chain_pos[pair[1]])
             within = dists <= inclusion_radius
 
             # process pair[0]
@@ -1213,6 +1422,8 @@ class lDDTScorer:
                     indices[at_idx].insert(insertion_idx, indices_to_insert)
                     distances[at_idx].insert(insertion_idx, distances_to_insert)
 
+            dists = None
+
         # concatenate distances from all processing steps
         for at_idx in range(n_atoms):
             if len(indices[at_idx]) > 0:
@@ -1227,8 +1438,8 @@ class lDDTScorer:
         """Select subset of contacts only covering intra-chain contacts
         """
         # init
-        ref_indices_sc = [np.asarray([], dtype=np.int64) for idx in range(n_atoms)]
-        ref_distances_sc = [np.asarray([], dtype=np.float64) for idx in range(n_atoms)]
+        ref_indices_sc = [np.asarray([], dtype=np.int32) for idx in range(n_atoms)]
+        ref_distances_sc = [np.asarray([], dtype=np.float32) for idx in range(n_atoms)]
 
         n_chains = len(chain_start_indices)
         for ch_idx in range(n_chains):
@@ -1251,8 +1462,8 @@ class lDDTScorer:
         """Select subset of contacts only covering inter-chain contacts
         """
         # init
-        ref_indices_ic = [np.asarray([], dtype=np.int64) for idx in range(n_atoms)]
-        ref_distances_ic = [np.asarray([], dtype=np.float64) for idx in range(n_atoms)]
+        ref_indices_ic = [np.asarray([], dtype=np.int32) for idx in range(n_atoms)]
+        ref_distances_ic = [np.asarray([], dtype=np.float32) for idx in range(n_atoms)]
 
         n_chains = len(chain_start_indices)
         for ch_idx in range(n_chains):
@@ -1274,8 +1485,8 @@ class lDDTScorer:
         """Transfer indices/distances of non-symmetric atoms and return
         """
 
-        sym_ref_indices = [np.asarray([], dtype=np.int64) for idx in range(n_atoms)]
-        sym_ref_distances = [np.asarray([], dtype=np.float64) for idx in range(n_atoms)]
+        sym_ref_indices = [np.asarray([], dtype=np.int32) for idx in range(n_atoms)]
+        sym_ref_distances = [np.asarray([], dtype=np.float32) for idx in range(n_atoms)]
 
         for idx in symmetric_atoms:
             indices = list()
@@ -1339,7 +1550,7 @@ class lDDTScorer:
             raise NotImplementedError("Congratulations! You're the first one "
                                       "requesting a non-default "
                                       "sequence_separation in the new and "
-                                      "awesome lDDT implementation. A crate of "
+                                      "awesome LDDT implementation. A crate of "
                                       "beer for Gabriel and he'll implement "
                                       "it.")
 
@@ -1355,7 +1566,7 @@ class lDDTScorer:
 
     def _ResolveSymmetries(self, pos, thresholds, symmetries, sym_ref_indices,
                            sym_ref_distances):
-        """Swaps symmetric positions in-place in order to maximize lDDT scores
+        """Swaps symmetric positions in-place in order to maximize LDDT scores
         towards non-symmetric atoms.
         """
         for sym in symmetries:
@@ -1395,6 +1606,76 @@ class lDDTScorer:
             if sym_one_score >= sym_two_score:
                 # switch back, initial positions were better or equal
                 # for the equal case: we still switch back to reproduce the old
-                # lDDT behaviour
+                # LDDT behaviour
+                for pair in sym:
+                    pos[[pair[0], pair[1]]] = pos[[pair[1], pair[0]]]
+
+    def _EvalAtomSSD(self, pos, atom_idx, dist_cap, ref_indices, ref_distances):
+        """ Computes summed squared distances
+
+        distances are capped at dist_cap
+        """
+        a_p = pos[atom_idx, :]
+        tmp = pos.take(ref_indices[atom_idx], axis=0)
+        np.subtract(tmp, a_p[None, :], out=tmp)
+        np.square(tmp, out=tmp)
+        tmp = tmp.sum(axis=1)
+        np.sqrt(tmp, out=tmp)  # distances against all relevant atoms
+        np.subtract(ref_distances[atom_idx], tmp, out=tmp) # distance difference
+        np.square(tmp, out=tmp) # squared distance difference
+        squared_dist_cap = dist_cap*dist_cap
+        tmp[tmp > squared_dist_cap] = squared_dist_cap
+        return tmp.sum()
+
+    def _EvalAtomsSSD(
+        self, pos, atom_indices, dist_cap, ref_indices, ref_distances
+    ):
+        """Calls _EvalAtomSSD for several atoms
+        """
+        return np.asarray([self._EvalAtomSSD(pos, a, dist_cap, ref_indices,
+                                             ref_distances) for a in atom_indices],
+                          dtype=np.float32)
+
+    def _ResolveSymmetriesSSD(self, pos, dist_cap, symmetries, sym_ref_indices,
+                              sym_ref_distances):
+        """Swaps symmetric positions in-place in order to maximize summed
+        squared distances towards non-symmetric atoms.
+        """
+        for sym in symmetries:
+
+            atom_indices = list()
+            for sym_tuple in sym:
+                atom_indices += [sym_tuple[0], sym_tuple[1]]
+            tot = self._GetNExp(atom_indices, sym_ref_indices)
+
+            if tot == 0:
+                continue  # nothing to do
+
+            # score as is
+            sym_one_ssd = self._EvalAtomsSSD(
+                pos,
+                atom_indices,
+                dist_cap,
+                sym_ref_indices,
+                sym_ref_distances,
+            )
+
+            # switch positions and score again
+            for pair in sym:
+                pos[[pair[0], pair[1]]] = pos[[pair[1], pair[0]]]
+
+            sym_two_ssd = self._EvalAtomsSSD(
+                pos,
+                atom_indices,
+                dist_cap,
+                sym_ref_indices,
+                sym_ref_distances,
+            )
+
+            sym_one_score = np.sum(sym_one_ssd)
+            sym_two_score = np.sum(sym_two_ssd)
+
+            if sym_one_score < sym_two_score:
+                # switch back, initial positions were better
                 for pair in sym:
                     pos[[pair[0], pair[1]]] = pos[[pair[1], pair[0]]]

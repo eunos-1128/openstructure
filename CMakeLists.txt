@@ -2,7 +2,7 @@
 # Author: Marco Biasini
 #-------------------------------------------------------------------------------
 
-cmake_minimum_required(VERSION 3.12.1 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.22 FATAL_ERROR)
 
 # Set CMake policies
 # Behaviour of target_link_libraries, always link by full path. CMP0060 can
@@ -11,11 +11,31 @@ cmake_minimum_required(VERSION 3.12.1 FATAL_ERROR)
 # manually forced CMake to the new scheme.
 cmake_policy(SET CMP0060 NEW)
 
+if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.31.0")
+  # See CMP0177 for more information
+  # To summarize: all paths given to the install command are normalized starting
+  # from cmake version 3.31. Starting from 3.31 you'll start to see warnings if
+  # you use the OLD behaviour but some paths would need normalization.
+  # The problem with ost: some of the paths that we give install look like:
+  # xyz/./bla. So its actually a good thing to run them through normalization
+  # which would give xyz/bla
+  cmake_policy(SET CMP0177 NEW)
+endif()
+
+if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.30.0")
+  # See CMP0167 for more information
+  # to summarize: Starting from boost 1.70, boost comes with a package
+  # configuration file BoostConfig.cmake. Starting from cmake 3.30,
+  # this is the way to go and users get warned if the old FindBoost module
+  # gets used.
+  cmake_policy(SET CMP0167 NEW)
+endif()
+
 project(OpenStructure CXX C)
 set (CMAKE_EXPORT_COMPILE_COMMANDS 1)
 set (OST_VERSION_MAJOR 2)
-set (OST_VERSION_MINOR 9)
-set (OST_VERSION_PATCH 3)
+set (OST_VERSION_MINOR 10)
+set (OST_VERSION_PATCH 0)
 set (OST_VERSION_STRING ${OST_VERSION_MAJOR}.${OST_VERSION_MINOR}.${OST_VERSION_PATCH} )
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake_support)
 include(OST)
@@ -183,11 +203,22 @@ find_package(Python 3.6 REQUIRED COMPONENTS Interpreter Development)
 # where Python modules live
 set(PYTHON_MODULE_PATH "python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/")
 
+set(_BOOST_MIN_VERSION 1.70)
+
 if(BOOST_VERSION)
   message(STATUS "forcing boost to version ${BOOST_VERSION}")
   set(_BOOST_MIN_VERSION ${BOOST_VERSION})
 endif()
-setup_boost()
+find_package(Boost ${_BOOST_MIN_VERSION} 
+             COMPONENTS unit_test_framework
+                        filesystem
+                        system
+                        iostreams
+                        program_options
+                        regex
+                        thread
+                        python
+             REQUIRED)
 if (WIN32)
    ADD_DEFINITIONS("-DBOOST_ALL_NO_LIB")
 endif()
