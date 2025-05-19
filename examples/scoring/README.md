@@ -92,18 +92,17 @@ PDB format, ligands must be provided in SDF format.
 For complete documentation on using Docker with OpenStructure, 
 [click here](https://git.scicore.unibas.ch/schwede/openstructure/tree/master/docker).
 This section provides a quick-start guide to help you get up and running with scoring using Docker.
-Most docker installations require you to add `sudo` in front of the following commands.
 
 Get the latest Docker image from the OpenStructure registry:
 
 ```
-docker pull registry.scicore.unibas.ch/schwede/openstructure:latest
+sudo docker pull registry.scicore.unibas.ch/schwede/openstructure:latest
 ```
 
 run one of the scoring examples, other examples need to be adapted accordingly:
 
 ```
-docker run --rm -v $(pwd):/home registry.scicore.unibas.ch/schwede/openstructure:latest compare-structures -m model.pdb -r reference.cif.gz --lddt --local-lddt --qs-score
+sudo docker run --rm -v $(pwd):/home registry.scicore.unibas.ch/schwede/openstructure:latest compare-structures -m model.pdb -r reference.cif.gz --lddt --local-lddt --qs-score
 ```
 
 # Singularity
