@@ -1,8 +1,7 @@
 {
     "reference_chains": [
         "A",
-        "B",
-        "C"
+        "B"
     ],
     "model_chains": [
         "A",
@@ -20,6 +19,7 @@
             "B"
         ]
     ],
+    "mdl_chains_without_chem_mapping": [],
     "chain_mapping": {
         "A": "B",
         "B": "A"
@@ -29,7 +29,7 @@
         ">reference:B\nLALSLTADQMVSALLDAEPPILYSEYDPTRPFSEASMMGLLTNLADRELVHMINWAKRVPGFVDLTLHDQVHLLESAWLEILMIGLVWRSMEHPGKLLFAPNLLLDRNQGKSVEGMVEIFDMLLATSSRFRMMNLQGEEFVCLKSIILLNSGVY---------LEEKDHIHRVLDKITDTLIHLMAKAGLTLQQQHQRLAQLLLILSHIRHMSNKGMEHLYS-----VVPLSDLLLEMLDA-\n>model:A\n-----TADQMVSALLDAEPPILYSEYDPTRPFSEASMMGLLTNLADRELVHMINWAKRVPGFVDLTLHDQVHLLESAWLEILMIGLVWRSMEHPGKLLFAPNLLLDRNQGKSVEGMVEIFDMLLATSSRFRMMNLQGEEFVCLKSIILLNSGVYTFLSSTLKSLEEKDHIHRVLDKITDTLIHLMAKAGLTLQQQHQRLAQLLLILSHIRHMSNKGMEHLYSMKSKNVVPLSDLLLEMLDAH"
     ],
     "inconsistent_residues": [],
-    "lddt": 0.874,
+    "lddt": 0.875,
     "local_lddt": {
         "A.19.": 0.797,
         "A.20.": 0.868,
@@ -313,15 +313,15 @@
         "B.60.": 0.928,
         "B.61.": 0.968,
         "B.62.": 0.936,
-        "B.63.": 0.905,
-        "B.64.": 0.945,
+        "B.63.": 0.915,
+        "B.64.": 0.947,
         "B.65.": 0.961,
-        "B.66.": 0.908,
-        "B.67.": 0.895,
+        "B.66.": 0.915,
+        "B.67.": 0.915,
         "B.68.": 0.964,
         "B.69.": 0.942,
-        "B.70.": 0.875,
-        "B.71.": 0.773,
+        "B.70.": 0.887,
+        "B.71.": 0.777,
         "B.72.": 0.909,
         "B.73.": 0.884,
         "B.74.": 0.854,
@@ -330,7 +330,7 @@
         "B.77.": 0.8,
         "B.78.": 0.812,
         "B.79.": 0.81,
-        "B.80.": 0.809,
+        "B.80.": 0.81,
         "B.81.": 0.755,
         "B.82.": 0.822,
         "B.83.": 0.895,
@@ -497,16 +497,16 @@
         "B.244.": 0.429,
         "B.245.": 0.76,
         "B.246.": 0.881,
-        "B.247.": 0.885,
+        "B.247.": 0.887,
         "B.248.": 0.889,
-        "B.249.": 0.874,
-        "B.250.": 0.792,
-        "B.251.": 0.84,
-        "B.252.": 0.819,
-        "B.253.": 0.649,
-        "B.254.": 0.581,
-        "B.255.": 0.517,
-        "B.256.": 0.34
+        "B.249.": 0.878,
+        "B.250.": 0.819,
+        "B.251.": 0.861,
+        "B.252.": 0.831,
+        "B.253.": 0.674,
+        "B.254.": 0.608,
+        "B.255.": 0.565,
+        "B.256.": 0.385
     },
     "model_clashes": [],
     "model_bad_bonds": [],
@@ -557,6 +557,8 @@
     "lddt_add_mdl_contacts": false,
     "lddt_inclusion_radius": 15.0,
     "dockq_capri_peptide": false,
-    "ost_version": "2.9.2",
+    "seqres": null,
+    "trg_seqres_mapping": null,
+    "ost_version": "2.10.0",
     "status": "SUCCESS"
 }
