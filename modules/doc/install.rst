@@ -16,10 +16,12 @@ a link to OpenStructure's own `GitLab Docker registry <https://git.scicore.uniba
 If you wish to compile OpenStructure outside of a container, you need to follow
 the steps which we describe in detail below. In essence, these steps are:
 
-* Installing the Dependencies
-* Checking out the source code from GIT
-* Configuring the build with cmake
-* Compiling an Linking
+* `Installing the Dependencies`_
+* `Getting the Source Code`_
+* `Configuring the build`_
+* `Building the Project`_
+* `Building the Compound Library`_
+* `Running the tests`_
 
 
 Installing the Dependencies
@@ -109,7 +111,7 @@ specific features. To change to a specific branch, use
   git checkout <branch-name>
 
 
-Configuring
+Configuring the build
 --------------------------------------------------------------------------------
 
 OpenStructure uses `CMake <http://cmake.org>`_ for compiling and building the
@@ -339,8 +341,11 @@ Building the Project
 Type ``make``. If you are using a multi-core machine, you can use the `-j` flag
 to run multiple jobs at once.
 
+.. code-block:: bash
 
-What's next?
+  make
+
+Building the Compound Library
 --------------------------------------------------------------------------------
 
 One thing is missing for a fully functional OpenStructure installation.
@@ -353,15 +358,28 @@ into our internal format:
 .. code-block:: bash
 
   wget https://files.wwpdb.org/pub/pdb/data/monomers/components.cif.gz
-  stage/bin/chemdict_tool create components.cif.gz <compounds.chemlib>
+  stage/bin/chemdict_tool create components.cif.gz compounds.chemlib
 
 We can rerun cmake and make. All cmake parameters from the original
 configuration remain in the cache.
 
 .. code-block:: bash
 
-  cmake .. -DCOMPOUND_LIB=<compounds.chemlib>
+  cmake .. -DCOMPOUND_LIB=compounds.chemlib
   make
+
+Running the tests
+--------------------------------------------------------------------------------
+
+Many parts of OpenStructure are covered by unit tests. You can run them with:
+
+.. code-block:: bash
+
+  make check
+
+
+What's next?
+--------------------------------------------------------------------------------
 
 On Linux and macOS, you can start dng from the command-line. The binaries are
 all located in stage/bin:
@@ -375,13 +393,7 @@ or, to start the command-line interpreter:
 .. code-block:: bash
 
   stage/bin/ost
-  
-But hey, good citizen run the unit tests first:
 
-.. code-block:: bash
-
-  make check
-  
 If you repeatedly use OpenStructure, it is recommended to add
 /path/to/ost/stage/bin to your path.
 
@@ -400,6 +412,7 @@ And then you can simply import ost as a module:
 .. code-block:: python
 
   import ost
+
 
 Getting the newest changes
 --------------------------------------------------------------------------------
