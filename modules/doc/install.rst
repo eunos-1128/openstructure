@@ -344,13 +344,13 @@ One thing is missing for a fully functional OpenStructure installation.
 The compound library. It is used at various places for connectivity
 information and certain algorithms do not work without.
 Besides an OpenStructure executable, we just built the
-chemdict_tool which converts the PDB chemical component dictionary
+:ref:`chemdict_tool <mmcif-convert>` which converts the PDB chemical component dictionary
 into our internal format:
 
 .. code-block:: bash
 
   wget https://files.wwpdb.org/pub/pdb/data/monomers/components.cif.gz
-  stage/bin/chemdict_tool create components.cif.gz compounds.chemlib
+  stage/bin/chemdict_tool create components.cif.gz compounds.chemlib -i
 
 We can rerun cmake and make. All cmake parameters from the original
 configuration remain in the cache.
