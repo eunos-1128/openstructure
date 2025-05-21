@@ -378,6 +378,16 @@ Many parts of OpenStructure are covered by unit tests. You can run them with:
   make check
 
 
+Building the documentation
+--------------------------------------------------------------------------------
+
+Many parts of OpenStructure are covered by unit tests. You can run them with:
+
+.. code-block:: bash
+
+  stage/bin/ost doc/make.py
+
+
 What's next?
 --------------------------------------------------------------------------------
 
