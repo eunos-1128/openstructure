@@ -39,8 +39,8 @@ docker pull registry.scicore.unibas.ch/schwede/openstructure:latest
 And run a test script:
 
 ```
-echo print\(\"Hello OST\"\) > test.py
-docker run --rm -v $(pwd):/home registry.scicore.unibas.ch/schwede/openstructure:latest test.py
+wget https://git.scicore.unibas.ch/schwede/openstructure/-/raw/master/docker/test_docker.py -O test_ost.py
+docker run --rm -v $(pwd):/home registry.scicore.unibas.ch/schwede/openstructure:latest test_ost.py
 ```
 ### Singularity
 
@@ -58,8 +58,8 @@ sudo singularity build ost.img Singularity
 And run a test script:
 
 ```
-echo print\(\"Hello OST\"\) > test.py
-singularity run --app OST ost.img test.py
+wget https://git.scicore.unibas.ch/schwede/openstructure/-/raw/master/docker/test_docker.py -O test_ost.py
+singularity run --app OST ost.img test_ost.py
 ```
 
 ### Build from source
