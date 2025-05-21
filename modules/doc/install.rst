@@ -404,6 +404,15 @@ or, to start the command-line interpreter:
 
   stage/bin/ost
 
+The `ost` executable can run python scripts. For instance we can run the Docker
+test script:
+
+.. code-block:: bash
+
+  stage/bin/ost docker/test_docker.py
+
+This should produce some output and announce that "OST is working!"
+
 If you repeatedly use OpenStructure, it is recommended to add
 /path/to/ost/stage/bin to your path.
 
