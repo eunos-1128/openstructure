@@ -22,6 +22,7 @@ the steps which we describe in detail below. In essence, these steps are:
 * `Building the Project`_
 * `Building the Compound Library`_
 * `Running the tests`_
+* `Installing OpenStructure`_
 
 
 Installing the Dependencies
@@ -379,6 +380,41 @@ Many parts of OpenStructure are covered by unit tests. You can run them with:
   stage/bin/ost doc/make.py
 
 
+Installing OpenStructure
+--------------------------------------------------------------------------------
+
+To make OpenStructure available system-wide, the easiest is to install it with:
+
+.. code-block:: bash
+
+  make install
+
+This will install the OpenStructure binaries and libraries to the prefix
+folder specified by `CMAKE_INSTALL_PREFIX` in the cmake configuration step
+(usually this will be `/usr/local`).
+
+In many distributions (such as Ubuntu), libraries are not picked up 
+automatically from `/usr/local` so you will need to export a few environment 
+variables to make things work:
+
+.. code-block:: bash
+
+  export OST_ROOT="/usr/local"
+  export PYTHONPATH="/usr/local/lib64/python3.10/site-packages"
+  export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/lib64:/usr/local/openmm/lib/"
+
+
+If you don't want to install OpenStructure system-wide, for instance if this is
+a development build, you can also configure environment variables to point 
+directly to the `stage` folder.
+
+.. code-block:: bash
+
+  export OST_ROOT=/path/to/ost/stage
+  export PATH=$OST_ROOT/bin:$PATH
+  export PYTHONPATH=$OST_ROOT/lib64/python3.10/site-packages/:$PYTHONPATH
+
+
 What's next?
 --------------------------------------------------------------------------------
 
@@ -387,25 +423,22 @@ all located in stage/bin:
 
 .. code-block:: bash
 
-  stage/bin/dng
+  dng
   
 or, to start the command-line interpreter:
 
 .. code-block:: bash
 
-  stage/bin/ost
+  ost
 
 The `ost` executable can run python scripts. For instance we can run the Docker
 test script:
 
 .. code-block:: bash
 
-  stage/bin/ost docker/test_docker.py
+  ost docker/test_docker.py
 
 This should produce some output and announce that "OST is working!"
-
-If you repeatedly use OpenStructure, it is recommended to add
-/path/to/ost/stage/bin to your path.
 
 You can also import OpenStructure directly into your existing python scripts,
 jupyter notebooks etc. Simply make sure to point the following environment
