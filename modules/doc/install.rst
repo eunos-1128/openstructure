@@ -414,18 +414,6 @@ And then you can simply import ost as a module:
   import ost
 
 
-Getting the newest changes
---------------------------------------------------------------------------------
-
-To get the newest changes from the central git repository, enter
-
-.. code-block:: bash
-
-  git pull
-
-in your terminal. This will fetch the newest changes.
-
-
 ..  LocalWords:  Homebrew cmake CMake zlib SQLite FFTW libtiff libpng PyQt OST
 ..  LocalWords:  SSL macOS Makefiles PDB qmake PNG libz libsqlite OPTIMIZE dng
 ..  LocalWords:  DNDEBUG RPATH rpath SHADER shader SPNAV DConnexion profiler
