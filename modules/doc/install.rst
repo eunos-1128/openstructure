@@ -128,15 +128,6 @@ that let you tell CMake where to find the dependencies. All of them are passed
 to CMake via `-D<opt>=<value>`.
 
 
-Flag to choose build generator
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-CMake supports different build generators. On UNIX, i.e. macOS and Linux, the
-default build generator is Makefiles, but it is also possible to use other
-programs. For a list of supported build generators on your platform, run
-`cmake` without parameters.
-
-
 .. _cmake-flags:
 
 Flags to Control the Dependencies
