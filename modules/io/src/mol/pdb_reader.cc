@@ -17,7 +17,7 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 //------------------------------------------------------------------------------
 #include <boost/iostreams/filter/gzip.hpp>
-#include <boost/filesystem/convenience.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/trim.hpp>
 
