@@ -4,8 +4,8 @@ Installing OpenStructure From Source
 Brief Overview
 --------------------------------------------------------------------------------
 
-For a simple and portable way to use OpenStructure we recommend using a
-container solution. We provide recipes to build images for
+For a simple and portable way to use OpenStructure we recommend using conda or a
+container solution.  We provide a conda package and recipes to build images for
 `Docker <https://www.docker.com/>`_ and
 `Singularity <https://sylabs.io/singularity/>`_.
 The latest recipes and instructions can be found on our

@@ -20,10 +20,11 @@ unzip -j example.zip
 
 The example commands here assume an OpenStructure installation
 ([compile instructions](https://openstructure.org/docs/install/)).
-Running the computations in containers provide a considerably easier setup than
-compiling OpenStructure from source. Instructions for setup and running
-equivalent computations are available below for
+Running the computations in conda or containers provide a considerably easier
+setup than compiling OpenStructure from source. Instructions for setup and
+running equivalent computations are available below for
 
+* [Conda](#conda)
 * [Docker](#docker)
 * [Singularity](#singularity)
 
@@ -86,6 +87,16 @@ instructions on how to set the latest dictionary, i.e. "Compound Library".
 You can override automatic extraction by providing SDF files with ligand
 coordinates and connectivity information. If the receptor is provided in
 PDB format, ligands must be provided in SDF format.
+
+# Conda
+
+Installing OpenStructure in Conda is as easy as:
+
+```
+conda install bioconda::openstructure
+```
+
+Commands can be run as usual. Tested with [miniforge](https://conda-forge.org/miniforge/).
 
 # Docker
 
