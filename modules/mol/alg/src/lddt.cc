@@ -24,7 +24,7 @@
 #endif
 #include <boost/program_options.hpp>
 #include <boost/filesystem/fstream.hpp>
-#include <boost/filesystem/convenience.hpp>
+#include <boost/filesystem.hpp>
 #include <ost/base.hh>
 #include <ost/boost_filesystem_helper.hh>
 #include <ost/mol/chain_view.hh>

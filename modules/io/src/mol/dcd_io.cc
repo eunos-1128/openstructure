@@ -25,7 +25,7 @@
 #include <algorithm>
 
 #include <boost/iostreams/filter/gzip.hpp>
-#include <boost/filesystem/convenience.hpp>
+#include <boost/filesystem.hpp>
 
 #include <ost/stdint.hh>
 #include <ost/log.hh>

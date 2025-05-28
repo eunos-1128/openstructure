@@ -29,7 +29,7 @@
 #include <string>
 #include <fstream>
 
-#include <boost/filesystem/convenience.hpp>
+#include <boost/filesystem.hpp>
 #include <ost/log.hh>
 
 #include <QFile>

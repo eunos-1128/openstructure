@@ -19,7 +19,7 @@
 #include "fasta_io_handler.hh"
 #include <ost/message.hh>
 #include <boost/filesystem/fstream.hpp>
-#include <boost/filesystem/convenience.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
 
