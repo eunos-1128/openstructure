@@ -15,15 +15,11 @@ Please do not hesitate to contact us for feedback or troubleshooting:
 
 ## OpenStructure Installation
 
-For a simple and portable setup, we recommend using a conda or a containerized
-solution. OpenStructure provides its own Docker container registry,
-making deployment easier. Deploying a docker image just needs a
-docker pull which typically finishes in about a minute depending
-on your local hardware and internet connection. Singularity
-containers bootstrap from the docker container but must be built
-by the user. 
-
 ### Conda
+
+OpenStructure is available as a [conda package on
+Bioconda](https://bioconda.github.io/recipes/openstructure/README.html) for a simple and portable setup.
+You can install it with the following command:
 
 ```
 conda install bioconda::openstructure
@@ -31,8 +27,25 @@ conda install bioconda::openstructure
 
 Tested with [miniforge](https://conda-forge.org/miniforge/).
 
+You can then run a test script:
 
-### Docker
+```
+wget https://git.scicore.unibas.ch/schwede/openstructure/-/raw/master/docker/test_docker.py -O test_ost.py
+ost test_ost.py
+```
+
+### Containers
+
+For a fully portable setup, we provide containerized solutions.
+OpenStructure provides its own Docker container registry,
+making deployment easier. Deploying a docker image just needs a
+docker pull which typically finishes in about a minute depending
+on your local hardware and internet connection. Singularity
+containers bootstrap from the docker container but must be built
+by the user. Both solutions require root permissions.
+
+
+#### Docker
 
 For complete documentation on using Docker with OpenStructure, 
 [click here](https://git.scicore.unibas.ch/schwede/openstructure/tree/master/docker).
@@ -51,7 +64,8 @@ And run a test script:
 wget https://git.scicore.unibas.ch/schwede/openstructure/-/raw/master/docker/test_docker.py -O test_ost.py
 docker run --rm -v $(pwd):/home registry.scicore.unibas.ch/schwede/openstructure:latest test_ost.py
 ```
-### Singularity
+
+#### Singularity
 
 For complete documentation on using Singularity with OpenStructure, 
 [click here](https://git.scicore.unibas.ch/schwede/openstructure/tree/master/singularity).

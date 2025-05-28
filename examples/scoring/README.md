@@ -20,8 +20,8 @@ unzip -j example.zip
 
 The example commands here assume an OpenStructure installation
 ([compile instructions](https://openstructure.org/docs/install/)).
-Running the computations in conda or containers provide a considerably easier
-setup than compiling OpenStructure from source. Instructions for setup and
+To simplify the setup, we recommend Conda or containers instead of compiling
+OpenStructure from source. Instructions for setup and
 running equivalent computations are available below for
 
 * [Conda](#conda)
@@ -90,6 +90,8 @@ PDB format, ligands must be provided in SDF format.
 
 # Conda
 
+OpenStructure is available as a [conda package on
+Bioconda](https://bioconda.github.io/recipes/openstructure/README.html)
 Installing OpenStructure in Conda is as easy as:
 
 ```
