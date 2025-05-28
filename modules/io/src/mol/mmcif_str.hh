@@ -24,7 +24,7 @@
 #include <ost/mol/entity_handle.hh>
 #include <ost/io/mmcif_reader.hh>
 #include <ost/io/mol/io_profile.hh>
-#include <ost/io/mmcif_writer.hh>
+#include <ost/io/mol/mmcif_writer.hh>
 #include <ost/io/mol/omf.hh>
 
 namespace ost { namespace io {

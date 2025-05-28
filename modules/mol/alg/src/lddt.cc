@@ -32,7 +32,7 @@
 #include <ost/mol/alg/filter_clashes.hh>
 #include <ost/io/mol/pdb_reader.hh>
 #include <ost/io/io_exception.hh>
-#include <ost/io/stereochemical_params_reader.hh>
+#include <ost/io/mol/stereochemical_params_reader.hh>
 #include <ost/conop/conop.hh>
 #include <ost/conop/compound_lib.hh>
 #include <ost/string_ref.hh>

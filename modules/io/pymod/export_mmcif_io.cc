@@ -28,7 +28,7 @@ using namespace boost::python;
 #include <ost/io/mol/mmcif_info.hh>
 #include <ost/io/mol/star_writer.hh>
 #include <ost/io/mol/mmcif_writer.hh>
-#include <ost/io/mmcif_str.hh>
+#include <ost/io/mol/mmcif_str.hh>
 using namespace ost;
 using namespace ost::io;
 using namespace ost::mol;

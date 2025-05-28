@@ -18,7 +18,7 @@
 //------------------------------------------------------------------------------
 #include <boost/filesystem/fstream.hpp>
 #include <ost/platform.hh>
-#include <ost/io/stereochemical_params_reader.hh>
+#include <ost/io/mol/stereochemical_params_reader.hh>
 
 
 namespace ost { namespace io {

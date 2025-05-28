@@ -27,7 +27,7 @@ using namespace boost::python;
 #include <ost/io/mol/io_profile.hh>
 #include <ost/io/mol/sdf_reader.hh>
 #include <ost/io/mol/sdf_writer.hh>
-#include <ost/io/sdf_str.hh>
+#include <ost/io/mol/sdf_str.hh>
 using namespace ost;
 using namespace ost::io;
 using namespace ost::mol;

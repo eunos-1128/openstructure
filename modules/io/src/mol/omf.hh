@@ -26,7 +26,7 @@
 #include <ost/mol/entity_handle.hh>
 #include <ost/geom/mat4.hh>
 #include <ost/io/io_exception.hh>
-#include <ost/io/mmcif_info.hh>
+#include <ost/io/mol/mmcif_info.hh>
 
 namespace ost { namespace io {
 

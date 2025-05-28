@@ -20,7 +20,7 @@
 #define OST_MOL_ALG_BIOUNIT_HH
 
 #include <ost/mol/entity_handle.hh>
-#include <ost/io/mmcif_info.hh>
+#include <ost/io/mol/mmcif_info.hh>
 
 namespace ost { namespace mol { namespace alg {
 

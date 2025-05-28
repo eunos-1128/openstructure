@@ -32,7 +32,7 @@ using namespace boost::python;
 #include <ost/io/mol/entity_io_mae_handler.hh>
 #include <ost/io/mol/pdb_reader.hh>
 #include <ost/io/mol/dcd_io.hh>
-#include <ost/io/stereochemical_params_reader.hh>
+#include <ost/io/mol/stereochemical_params_reader.hh>
 using namespace ost;
 using namespace ost::io;
 
