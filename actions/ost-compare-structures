@@ -768,8 +768,6 @@ def _LoadStructure(structure_path, sformat, fault_tolerant, bu_id):
     seqres = None
     trg_seqres_mapping = None
 
-    # increase loglevel, as we would pollute the info log with weird stuff
-    ost.PushVerbosityLevel(ost.LogLevel.Error)
     # Load the structure
     if sformat == "mmcif":
         # from mmCIF we can get seqres and trg_seqres_mapping
@@ -785,8 +783,6 @@ def _LoadStructure(structure_path, sformat, fault_tolerant, bu_id):
         if len(entity.residues) == 0:
             raise Exception(f"No residues found in file: {structure_path}")
 
-    # restore old loglevel and return
-    ost.PopVerbosityLevel()
     entity.SetName(structure_path)
     return (entity, seqres, trg_seqres_mapping)
 
