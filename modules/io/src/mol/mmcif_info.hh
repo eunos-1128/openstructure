@@ -984,7 +984,7 @@ class DLLEXPORT_OST_IO MMCifInfo {
 public:
   /// \brief Create an info object.
   MMCifInfo(): exptl_method_(""), resolution_(0), em_resolution_(0), r_free_(0),
-    r_work_(0) { }
+    r_work_(0), data_block_name_("") { }
 
   /// \brief Add an item to the list of citations
   ///
@@ -1061,6 +1061,9 @@ public:
   ///
   /// \return experiment R-work value
   Real GetRWork() const { return r_work_; }
+
+  void SetDataBlockName(const String& name) {data_block_name_ = name; }
+  String GetDataBlockName() const {return data_block_name_;}
 
   /// \brief Add a new mmCIF/ PDB chain name tuple.
   ///
@@ -1230,6 +1233,7 @@ private:
   Real em_resolution_;
   Real r_free_;
   Real r_work_;
+  String data_block_name_;
   MMCifInfoStructDetails struct_details_;     ///< mmCIF struct category
   MMCifInfoObsolete obsolete_;                ///< obsolete/ superseded entry
   MMCifInfoRevisions revisions_;              ///< list of revisions
