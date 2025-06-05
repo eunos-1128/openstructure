@@ -34,6 +34,14 @@ namespace{
     return ost::mol::alg::BUInfo::FromString(str);
   }
 
+  ost::mol::alg::BUInfo wrap_au_copy(const boost::python::list& l) {
+    std::vector<String> au_cnames;
+    for (int i = 0; i < boost::python::len(l); ++i){
+      au_cnames.push_back(boost::python::extract<String>(l[i]));
+    }
+    return ost::mol::alg::BUInfo::AUCopy(au_cnames);
+  }
+
   list wrap_get_au_chains(const ost::mol::alg::BUInfo& info) {
     list return_list;
     const std::vector<std::vector<String> >& au_chains = info.GetAUChains();
@@ -94,6 +102,7 @@ void export_biounit() {
   class_<ost::mol::alg::BUInfo>("BUInfo", init<const ost::io::MMCifInfoBioUnit&>())
     .def("FromBytes", &wrap_from_bytes).staticmethod("FromBytes")
     .def("ToBytes", &wrap_to_bytes)
+    .def("AUCopy", &wrap_au_copy).staticmethod("AUCopy")
     .def("GetAUChains", &wrap_get_au_chains)
     .def("GetTransformations", &wrap_get_transformations)
     .def("GetBUChains", &wrap_get_bu_chains)

@@ -105,6 +105,40 @@ class TestBioUnit(unittest.TestCase):
     self.assertEqual(sorted(asu_bonds_desc), sorted(asu_copy_one_bonds_desc))
     self.assertEqual(sorted(asu_bonds_desc), sorted(asu_copy_two_bonds_desc))
 
+  def test_au_copy(self):
+    ent, seqres, info = io.LoadMMCIF("testfiles/1out.cif.gz", 
+                                     seqres=True,
+                                     info=True)
+
+    # Create BUInfo that does nothing else than constructing a biounit as a copy
+    # of the assymetric unit
+    au_cnames = [ch.GetName() for ch in ent.chains]
+    bu_info = BUInfo.AUCopy(au_cnames)
+
+    # check whether properties in BUInfo object are correctly set
+    asu_chains = bu_info.GetAUChains()
+    self.assertEqual(asu_chains, [["A", "B", "C", "D", "E", "F"]])
+    transformations = bu_info.GetTransformations()
+    self.assertEqual(len(transformations), 1)
+    self.assertEqual(len(transformations[0]), 1)
+    self.assertEqual(transformations[0][0], geom.Mat4()) # identity
+
+    # check whether we can extract the expected chain names of the
+    # resulting biounit
+    self.assertEqual(bu_info.GetBUChains(),
+                     [[["1.A", "1.B", "1.C", "1.D", "1.E", "1.F"]]])
+
+    # reconstruct biounit
+    bu = mol.alg.CreateBU(ent, bu_info)
+    self.assertEqual([ch.GetName() for ch in bu.chains],
+                     ["1.A", "1.B", "1.C", "1.D", "1.E", "1.F"])
+
+    # it should be an exact copy
+    self.assertEqual(ent.GetAtomCount(), bu.GetAtomCount())
+    for a,b in zip(ent.atoms, bu.atoms):
+      self.assertEqual(a.name, b.name)
+      self.assertAlmostEqual(geom.Distance(a.pos, b.pos), 0, places=5)
+
 
 if __name__ == "__main__":
   from ost import testutils

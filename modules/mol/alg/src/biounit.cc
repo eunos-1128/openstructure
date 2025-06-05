@@ -166,6 +166,18 @@ BUInfo BUInfo::FromString(const String& s) {
   return info;
 }
 
+BUInfo BUInfo::AUCopy(const std::vector<String>& au_cnames) {
+  BUInfo info;
+  info.au_chains = au_cnames;
+  info.chain_intvl.push_back(0);
+  info.chain_intvl.push_back(au_cnames.size());
+  info.operations.push_back(std::vector<geom::Mat4>());
+  info.operations.back().push_back(geom::Mat4::Identity());
+  info.op_intvl.push_back(0);
+  info.op_intvl.push_back(1);
+  return info;
+}
+
 String BUInfo::ToString() const {
   std::ostringstream out_stream;
   this->ToStream(out_stream);

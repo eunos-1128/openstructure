@@ -38,6 +38,8 @@ struct BUInfo {
 
   static BUInfo FromString(const String& s);
 
+  static BUInfo AUCopy(const std::vector<String>& au_chains);
+
   const std::vector<std::vector<String> >& GetAUChains() const;
 
   const std::vector<std::vector<geom::Mat4> >& GetTransformations() const;
