@@ -804,11 +804,7 @@ def _Process(model, model_ligands, reference, reference_ligands, args,
                                                        "coverage": coverage,
                                                        "lddt_pli_n_contacts": aux_data["lddt_pli_n_contacts"],
                                                        "model_ligand": model_key,
-                                                       "reference_ligand": target_key,
-                                                       "bs_ref_res": [_QualifiedResidueNotation(r) for r in
-                                                                      aux_data["bs_ref_res"]],
-                                                       "bs_mdl_res": [_QualifiedResidueNotation(r) for r in
-                                                                      aux_data["bs_mdl_res"]]})
+                                                       "reference_ligand": target_key})
 
         out["lddt_pli"]["model_ligand_unassigned_reason"] = dict()
         for i in lddtpli_scorer.unassigned_model_ligands:
@@ -838,11 +834,7 @@ def _Process(model, model_ligands, reference, reference_ligands, args,
                                                                 "coverage": coverage,
                                                                 "lddt_pli_n_contacts": aux_data["lddt_pli_n_contacts"],
                                                                 "model_ligand": model_key,
-                                                                "reference_ligand": target_key,
-                                                                "bs_ref_res": [_QualifiedResidueNotation(r) for r in
-                                                                               aux_data["bs_ref_res"]],
-                                                                "bs_mdl_res": [_QualifiedResidueNotation(r) for r in
-                                                                               aux_data["bs_mdl_res"]]})
+                                                                "reference_ligand": target_key})
 
                     else:
                         reason = lddtpli_scorer.state_decoding[state]

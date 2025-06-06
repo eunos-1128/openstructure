@@ -430,11 +430,9 @@ class TestLigandScoringFancy(unittest.TestCase):
         self.assertAlmostEqual(sc.score["F"][mol.ResNum(1)], 0.915929203539823, 5)
         # lddt_pli_details
         self.assertEqual(sc.aux["J"][mol.ResNum(1)]["lddt_pli_n_contacts"], 653)
-        self.assertEqual(len(sc.aux["J"][mol.ResNum(1)]["bs_ref_res"]), 15)
         self.assertEqual(sc.aux["J"][mol.ResNum(1)]["target_ligand"].qualified_name, 'I.G3D1')
         self.assertEqual(sc.aux["J"][mol.ResNum(1)]["model_ligand"].qualified_name, 'J.G3D1')
         self.assertEqual(sc.aux["F"][mol.ResNum(1)]["lddt_pli_n_contacts"], 678)
-        self.assertEqual(len(sc.aux["F"][mol.ResNum(1)]["bs_ref_res"]), 15)
         self.assertEqual(sc.aux["F"][mol.ResNum(1)]["target_ligand"].qualified_name, 'K.G3D1')
         self.assertEqual(sc.aux["F"][mol.ResNum(1)]["model_ligand"].qualified_name, 'F.G3D1')
 
@@ -445,11 +443,9 @@ class TestLigandScoringFancy(unittest.TestCase):
         self.assertAlmostEqual(sc.score["F"][mol.ResNum(1)], 0.9039735099337749, 5)
         # lddt_pli_details
         self.assertEqual(sc.aux["J"][mol.ResNum(1)]["lddt_pli_n_contacts"], 729)
-        self.assertEqual(len(sc.aux["J"][mol.ResNum(1)]["bs_ref_res"]), 63)
         self.assertEqual(sc.aux["J"][mol.ResNum(1)]["target_ligand"].qualified_name, 'I.G3D1')
         self.assertEqual(sc.aux["J"][mol.ResNum(1)]["model_ligand"].qualified_name, 'J.G3D1')
         self.assertEqual(sc.aux["F"][mol.ResNum(1)]["lddt_pli_n_contacts"], 755)
-        self.assertEqual(len(sc.aux["F"][mol.ResNum(1)]["bs_ref_res"]), 62)
         self.assertEqual(sc.aux["F"][mol.ResNum(1)]["target_ligand"].qualified_name, 'K.G3D1')
         self.assertEqual(sc.aux["F"][mol.ResNum(1)]["model_ligand"].qualified_name, 'F.G3D1')
 
