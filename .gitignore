@@ -76,3 +76,4 @@ modules/gui/src/dngr.qrc.depends
 /modules/mol/mm/src/settings.hh
 *.img
 build
+modules/mol/mm/tests/test.ff
