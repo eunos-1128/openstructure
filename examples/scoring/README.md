@@ -66,7 +66,7 @@ The same example also contains small molecule ligands.
 We can compute LDDT-PLI and BiSyRMSD with:
 
 ```
-ost compare-ligand-structures -m model.pdb -r reference.cif.gz -ml *.sdf --rmsd --lddt-pli
+ost compare-ligand-structures -m model.pdb -r reference.cif.gz -ml *.sdf --rmsd --lddt-pli -rna
 ```
 
 Results should be computed within seconds and saved in the `out.json` file
