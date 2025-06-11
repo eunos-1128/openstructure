@@ -132,10 +132,19 @@ def MMCIFPrep(mmcif_path, biounit=None, extract_nonpoly=False,
 
     if len(missing_entity_types) > 0:
         msg = f"mmCIF file does not define _entity.type for chains "
-        msg += f"{missing_entity_types}. Fallback to select polymers based "
-        msg += f"on peptide/nucleotide residues as defined in chemical "
-        msg += f"component dictionary."
+        msg += f"{missing_entity_types}. "
+        
+        if not fault_tolerant:
+            msg += f"Use fault tolerant mode to ignore this error and "
+            msg += f"fallback to select polymers based on peptide/nucleotide "
+            msg += f"residues as defined in chemical component dictionary."
+            raise RuntimeError(msg)
+
+        msg += f"Fallback to select polymers based on peptide/nucleotide "
+        msg += f"residues as defined in chemical component dictionary (fault "
+        msg += f"tolerant mode)."
         ost.LogWarning(msg)
+
         poly_sel = mmcif_entity.Select("peptide=true or nucleotide=true")
         poly_ent = mol.CreateEntityFromView(poly_sel, True)
     else:
@@ -246,9 +255,17 @@ def MMCIFPrep(mmcif_path, biounit=None, extract_nonpoly=False,
         if len(missing_seqres) > 0:
             msg = f"Extracting chem grouping from mmCIF file requires all "
             msg += f"SEQRES information set. SEQRES is missing for polymer "
-            msg += f"chain(s) {missing_seqres}. Don't extract chem grouping "
-            msg += f"from mmCIF file."
+            msg += f"chain(s) {missing_seqres}. "
+            
+            if not fault_tolerant:
+                msg += f"Use fault tolerant mode to ignore this error and "
+                msg += f"fallback sequence identity-based chem grouping."
+                raise RuntimeError(msg)
+            
+            msg += f"Chem grouping will be based on sequence identity (fault "
+            msg += f"tolerant mode)."
             ost.LogWarning(msg)
+
             seqres = None
             trg_seqres_mapping = None
         else:
