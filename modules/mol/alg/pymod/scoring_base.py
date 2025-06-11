@@ -31,8 +31,7 @@ def CleanHydrogens(ent, clib):
 
 
 def MMCIFPrep(mmcif_path, biounit=None, extract_nonpoly=False,
-              fault_tolerant=False, allow_heuristic_conn=False,
-              extract_seqres_mapping=False):
+              fault_tolerant=False, extract_seqres_mapping=False):
     """ Scoring helper - Prepares input from mmCIF
 
     Only performs gentle cleanup of hydrogen atoms. Further cleanup is delegated
@@ -66,15 +65,6 @@ def MMCIFPrep(mmcif_path, biounit=None, extract_nonpoly=False,
     :type extract_nonpoly: :class:`bool`
     :param fault_tolerant: Passed as parameter to :func:`ost.io.LoadMMCIF`
     :type fault_tolerant: :class:`bool`
-    :param allow_heuristic_conn: Only relevant if extract_nonpoly is True.
-                                 The chemical component dictionary is relevant
-                                 for connectivity information. By default, we
-                                 enforce the presence of each non-polymer in
-                                 the dictionary to ensure correct connectity.
-                                 If you enable this flag, you allow the use
-                                 of a distance based heuristic as fallback.
-                                 With all its consequences in ligand matching.
-    :type allow_heuristic_conn: :class:`bool`
     :param extract_seqres_mapping: Controls return value
     :type extract_seqres_mapping: :class:`bool`
     :returns: poly_ent if *extract_nonpoly*/*extract_seqres_mapping* are False.
@@ -203,13 +193,20 @@ def MMCIFPrep(mmcif_path, biounit=None, extract_nonpoly=False,
                                    f"{mmcif_path} to contain exactly 1 "
                                    f"residue. Got {view.GetResidueCount()} "
                                    f"in chain {view.chains[0].name}")
-            if not allow_heuristic_conn:
-                compound = clib.FindCompound(view.residues[0].name)
-                if compound is None:
-                    raise RuntimeError(f"Can only extract non-polymer entities if "
-                                       f"respective residues are available in PDB "
-                                       f"component dictionary. Can't find "
-                                       f"\"{view.residues[0].name}\"")
+            compound = clib.FindCompound(view.residues[0].name)
+            if compound is None:
+                error_msg = f"\"{view.residues[0].name}\" is not available in " \
+                            f"the compound library."
+                if fault_tolerant:
+                    error_msg += f"A distance-based heuristic was used to " \
+                                 f"connect the ligand atoms (fault tolerant " \
+                                 f"mode)."
+                    ost.LogWarning(error_msg)
+                else:
+                    error_msg += f"Use fault tolerant mode to ignore this " \
+                                 f"error and use a distance based heuristic " \
+                                 f"to connect the ligand atoms."
+                    raise RuntimeError(error_msg)
 
             non_poly_entities.append(mol.CreateEntityFromView(view, True))
 

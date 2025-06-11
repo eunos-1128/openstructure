@@ -312,7 +312,6 @@
     "chem-map-seqid-thresh": 70.0,
     "seqres": null,
     "trg_seqres_mapping": null,
-    "allow_heuristic_conn": false,
     "lddt-pli-radius": 6.0,
     "lddt-pli-add-mdl-contacts": true,
     "radius": 4.0,

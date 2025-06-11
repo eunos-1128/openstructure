@@ -7,47 +7,44 @@ Example: ost compare-ligand-structures \\
     -r reference.cif \\
     --lddt-pli --rmsd
 
-Structures of polymer entities (proteins and nucleotides) can be given in PDB
-or mmCIF format. In case of PDB format, the full loaded structure undergoes
-processing described below. In case of mmCIF format, chains representing
-"polymer" entities according to _entity.type are selected and further processed
-as described below.
+Structures of polymer entities (proteins and nucleotides) can be given in 
+legacy PDB or mmCIF format. In case of PDB format, the full loaded structure
+undergoes processing described below. In case of mmCIF format, chains
+representing "polymer" entities according to _entity.type are selected and
+further processed as described below.
 
-Structure cleanup is heavily based on the PDB component dictionary and performs
-1) removal of hydrogens, 2) removal of residues for which there is no entry in
-component dictionary, 3) removal of residues that are not peptide linking or
-nucleotide linking according to the component dictionary 4) removal of atoms
-that are not defined for respective residues in the component dictionary. Except
-step 1), every cleanup is logged and a report is available in the json outfile.
+Structure cleanup of polymer chains is heavily based on the compound library
+and performs: 1) removal of hydrogens, 2) removal of residues for which there
+is no entry in compound library, 3) removal of residues that are not peptide
+linking or nucleotide linking according to the compound library 4) removal of
+atoms that are not defined for respective residues in the compound library.
+Except step 1), every cleanup is logged and a report is available in the json
+outfile.
 
 Only polymers (protein and nucleic acids) of model and reference are considered
 for ligand binding sites. The mapping of possible reference/model chain
 assignments requires a preprocessing. In short: identical chains in the
-reference are grouped based on pairwise sequence identity
-(see --chem-group-seqid-thresh). Each model chain is assigned to
-one of these groups (see --chem-map-seqid-thresh param).
-To avoid spurious matches, only polymers of a certain length are considered
-in this matching procedure (see --min_pep_length/--min_nuc_length param).
-Shorter polymers are never mapped and do not contribute to scoring.
+reference are grouped based on pairwise sequence identity (see
+--chem-group-seqid-thresh). Each model chain is assigned to one of these
+groups (see --chem-map-seqid-thresh param). To avoid spurious matches, only
+polymers of a certain length are considered in this matching procedure (see
+--min_pep_length/--min_nuc_length param). Shorter polymers are never mapped
+and do not contribute to scoring.
 
 Ligands can be given as path to SDF files containing the ligand for both model
 (--model-ligands/-ml) and reference (--reference-ligands/-rl). If omitted,
 ligands are optionally detected from a structure file if it is given in mmCIF
-format. This is based on "non-polymer" _entity.type annotation and the
-respective entries must exist in the PDB component dictionary in order to get
-connectivity information. You can avoid the requirement of the PDB component
-dictionary by enabling --allow-heuristic-conn. In this case, connectivity
-is established through a distance based heuristic if the ligand is not found in
-the component dictionary. Be aware that this might be an issue in ligand
-matching.
-If you provide structures in PDB format, an error is raised if ligands are not
-explicitely given in SDF format.
+format (based on "non-polymer" _entity.type annotation). If you provide
+structures in PDB format, an error is raised if ligands are not explicitly
+given in SDF format.
 
 Ligands undergo gentle processing where hydrogens are removed. Connectivity
 is relevant for scoring. It is read directly from SDF input. If ligands are
-extracted from mmCIF, connectivity is derived from the PDB component
-dictionary. Polymer/oligomeric ligands (saccharides, peptides, nucleotides)
-are not supported.
+extracted from mmCIF, connectivity is derived from the compound library. 
+Ligands that are not present in the compound library are only supported in
+fault-tolerant mode, where a distance based heuristic is used to connect the
+ligand atoms. Be aware that this is unreliable and might cause issues with
+ligand matching
 
 Output can be written in two format: JSON (default) or CSV, controlled by the
 --output-format/-of argument.
@@ -497,19 +494,6 @@ def _ParseArgs():
               "specify this mapping with: --trg-seqres-mapping A:1 B:1")
     )
 
-    parser.add_argument(
-        "--allow-heuristic-conn",
-        dest="allow_heuristic_conn",
-        default=False,
-        action="store_true",
-        help=("Default: False - Only relevant if ligands are extracted from "
-              "ref/mdl in mmCIF format. Connectivity in these cases is based "
-              "on the chemical component dictionary. If you enable this flag, "
-              "connectivity can be established by a distance based heuristic "
-              "if the ligand is not present in the component dictionary. This "
-              "might cause issues in ligand matching, i.e. graph matching.")
-    )
-
     args = parser.parse_args()
     if args.output is None:
         args.output = "out.%s" % args.output_format
@@ -588,8 +572,7 @@ def _LoadStructureData(receptor_path,
                        ligand_path,
                        sformat = None,
                        bu_id = None,
-                       fault_tolerant = False,
-                       allow_heuristic_conn = False):
+                       fault_tolerant = False):
 
     # thats the return variables
     # the last two are only set in case of an mmCIF file
@@ -619,7 +602,6 @@ def _LoadStructureData(receptor_path,
                                    biounit = bu_id,
                                    extract_nonpoly = True,
                                    fault_tolerant = fault_tolerant,
-                                   allow_heuristic_conn = allow_heuristic_conn,
                                    extract_seqres_mapping=True)
         else:
             receptor, seqres, trg_seqres_mapping = \
@@ -1025,16 +1007,14 @@ def _Main():
                            args.reference_ligands,
                            sformat = args.reference_format,
                            bu_id = args.reference_biounit,
-                           fault_tolerant = args.fault_tolerant,
-                           allow_heuristic_conn = args.allow_heuristic_conn)
+                           fault_tolerant = args.fault_tolerant)
 
         LogInfo("Loading model data")
         model, model_ligands, _, _ = _LoadStructureData(args.model,
                                                         args.model_ligands,
                                                         sformat = args.model_format,
                                                         bu_id = args.model_biounit,
-                                                        fault_tolerant = args.fault_tolerant,
-                                                        allow_heuristic_conn = args.allow_heuristic_conn)
+                                                        fault_tolerant = args.fault_tolerant)
 
         out = _Process(model, model_ligands, reference, reference_ligands, args,
                        seqres = seqres, trg_seqres_mapping = trg_seqres_mapping)
@@ -1059,7 +1039,6 @@ def _Main():
             out["trg_seqres_mapping"] = tmp
         else:
             out["trg_seqres_mapping"] = None
-        out["allow_heuristic_conn"] = args.allow_heuristic_conn
 
         # only add lddtpli if actually computed
         if args.lddt_pli:
