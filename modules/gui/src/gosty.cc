@@ -111,11 +111,7 @@ String setup_python_search_path(const String& root, PythonInterpreter& pi)
 #ifdef _MSC_VER
   String loc=root+"\\lib\\"+site_pkgs.str()+"\\site-packages";
 #else  
-# if (defined(__ppc64__) || defined(__x86_64__)) && !defined(__APPLE__) && !OST_UBUNTU_LAYOUT
-  String loc=root+"/lib64/"+site_pkgs.str()+"/site-packages";
-# else
   String loc=root+"/lib/"+site_pkgs.str()+"/site-packages";
-# endif
 #endif
   pi.AppendModulePath(QString::fromStdString(loc));
   // dng is an interactive python session, so add '.' to search path
