@@ -717,8 +717,7 @@ class _LogSink(ost.LogSink):
     def __init__(self):
         super().__init__()
         self.messages = []
-        self._log_levels_map = ["Error", "Warning", "Script", "Info",
-                                "Verbose", "Debug", "Trace"]
+        self._log_levels_map = {v: k for k, v in ost.LogLevel.names.items()}
         
     def LogMessage(self, message, severity):
         clean_message = message.rstrip('\n')
