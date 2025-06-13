@@ -114,10 +114,13 @@ Details on the usage (output of ``ost compare-structures --help``):
     Inconsistencies may lead to corrupt results but do not abort the program.
     Program abortion in these cases can be enforced with
     -ec/--enforce-consistency.
+  * "arguments": Dictionary of input arguments.
+  * "log": List of log messages (same as those printed to stderr) as a 
+    dictionary with keys "message" and "level".
+  * "ost_version": The OpenStructure version used for computation.
   * "status": SUCCESS if everything ran through. In case of failure, the only
     content of the JSON output will be "status" set to FAILURE and an
     additional key: "traceback".
-  * "ost_version": The OpenStructure version used for computation.
 
   Additional keys represent input options.
 
@@ -543,13 +546,16 @@ Details on the usage (output of ``ost compare-ligand-structures --help``):
     chain mapping, i.e. are long enough, but could not be mapped to any chem
     group. Depends on --chem-map-seqid-thresh. A mapping for each model chain can
     be enforced by setting it to 0.
-  * "status": SUCCESS if everything ran through. In case of failure, the only
-    content of the JSON output will be "status" set to FAILURE and an
-    additional key: "traceback".
-  * "ost_version": The OpenStructure version used for computation.
   * "model_cleanup_log": Lists residues/atoms that have been removed in model
     cleanup process.
   * "reference_cleanup_log": Same for reference.
+  * "arguments": Dictionary of input arguments.
+  * "log": List of log messages (same as those printed to stderr) as a 
+    dictionary with keys "message" and "level".
+  * "ost_version": The OpenStructure version used for computation.
+  * "status": SUCCESS if everything ran through. In case of failure, the only
+    content of the JSON output will be "status" set to FAILURE and an
+    additional key: "traceback".
 
   Additional keys represent input options.
 
