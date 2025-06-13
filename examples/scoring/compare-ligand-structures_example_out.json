@@ -297,26 +297,75 @@
             "unknown_atoms": []
         }
     },
-    "model": "model.pdb",
-    "reference": "reference.cif.gz",
-    "model-biounit": null,
-    "reference-biounit": null,
-    "fault-tolerant": false,
-    "residue-number-alignment": true,
-    "substructure-match": false,
-    "coverage-delta": 0.2,
-    "max-symmetries": 10000.0,
-    "min-pep-length": 6,
-    "min-nuc-length": 4,
-    "chem-group-seqid-thresh": 95.0,
-    "chem-map-seqid-thresh": 70.0,
-    "seqres": null,
-    "trg_seqres_mapping": null,
-    "lddt-pli-radius": 6.0,
-    "lddt-pli-add-mdl-contacts": true,
-    "radius": 4.0,
-    "lddt-lp-radius": 15.0,
-    "full-bs-search": false,
+    "arguments": {
+        "model": "model.pdb",
+        "model_ligands": [
+            "model_ligand-1.sdf",
+            "model_ligand-2.sdf",
+            "model_ligand-3.sdf"
+        ],
+        "reference": "reference.cif.gz",
+        "reference_ligands": null,
+        "output": "compare-ligand-structures_example_out.json",
+        "model_format": null,
+        "reference_format": null,
+        "output_format": "json",
+        "output_by_model_ligand": false,
+        "csv_extra_header": null,
+        "csv_extra_data": null,
+        "model_biounit": null,
+        "reference_biounit": null,
+        "fault_tolerant": false,
+        "residue_number_alignment": true,
+        "substructure_match": false,
+        "coverage_delta": 0.2,
+        "verbosity": 2,
+        "full_results": false,
+        "lddt_pli": true,
+        "lddt_pli_radius": 6.0,
+        "lddt_pli_add_mdl_contacts": true,
+        "rmsd": true,
+        "radius": 4.0,
+        "lddt_lp_radius": 15.0,
+        "full_bs_search": false,
+        "max_symmetries": 10000.0,
+        "min_pep_length": 6,
+        "min_nuc_length": 4,
+        "chem_group_seqid_thresh": 95.0,
+        "chem_map_seqid_thresh": 70.0,
+        "seqres": null,
+        "trg_seqres_mapping": null
+    },
+    "log": [
+        {
+            "message": "Loading data",
+            "level": "Script"
+        },
+        {
+            "message": "Computing LDDT-PLI scores",
+            "level": "Script"
+        },
+        {
+            "message": "Computing pairwise scores for all 3 x 3 ligands",
+            "level": "Script"
+        },
+        {
+            "message": "Computing ligand assignment",
+            "level": "Script"
+        },
+        {
+            "message": "Computing BiSyRMSD scores",
+            "level": "Script"
+        },
+        {
+            "message": "Computing pairwise scores for all 3 x 3 ligands",
+            "level": "Script"
+        },
+        {
+            "message": "Computing ligand assignment",
+            "level": "Script"
+        }
+    ],
     "ost_version": "2.10.0",
     "status": "SUCCESS"
 }
