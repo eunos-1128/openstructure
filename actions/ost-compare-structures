@@ -57,10 +57,12 @@ comparison:
    Inconsistencies may lead to corrupt results but do not abort the program.
    Program abortion in these cases can be enforced with
    -ec/--enforce-consistency.
+ * "log": List of log messages (same as those printed to stderr) as a 
+   dictionary with keys "message" and "level".
+ * "ost_version": The OpenStructure version used for computation.
  * "status": SUCCESS if everything ran through. In case of failure, the only
    content of the JSON output will be \"status\" set to FAILURE and an
    additional key: "traceback".
- * "ost_version": The OpenStructure version used for computation.
 
 Additional keys represent input options.
 
