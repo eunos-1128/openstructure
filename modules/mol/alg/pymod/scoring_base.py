@@ -198,7 +198,7 @@ def MMCIFPrep(mmcif_path, biounit=None, extract_nonpoly=False,
         for i in range(1,nonpoly_id):
             view = mmcif_entity.Select(f"gcnonpolyid:0={i}")
             if view.GetResidueCount() != 1:
-                raise RuntimeError(f"Expect non-polymer entities in "
+                raise RuntimeError(f"Expected non-polymer entities in "
                                    f"{mmcif_path} to contain exactly 1 "
                                    f"residue. Got {view.GetResidueCount()} "
                                    f"in chain {view.chains[0].name}")

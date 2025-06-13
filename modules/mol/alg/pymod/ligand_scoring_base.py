@@ -1327,7 +1327,7 @@ class LigandScorer:
         if len(not_in_clib) > 0:
             cleanup_log["cleaned_residues"]["no_clib"] = \
             [_QualifiedResidueNotation(r) for r in not_in_clib]
-            msg = ("Expect all residues in receptor structure to be defined in "
+            msg = ("Expected all residues in receptor structure to be defined in "
                    "compound library but this is not the case. "
                    "Please refer to the OpenStructure website if an updated "
                    "library is sufficient to solve the problem: "
@@ -1345,7 +1345,7 @@ class LigandScorer:
         if len(not_linking) > 0:
             cleanup_log["cleaned_residues"]["not_linking"] = \
             [_QualifiedResidueNotation(r) for r in not_linking]
-            msg = ("Expect all residues in receptor structure to be peptide "
+            msg = ("Expected all residues in receptor structure to be peptide "
                    "linking or nucleotide linking according to the compound "
                    "library but this is not the case. "
                    "Please refer to the OpenStructure website if an updated "
@@ -1364,7 +1364,7 @@ class LigandScorer:
         if len(unknown_atom) > 0:
             cleanup_log["cleaned_atoms"]["unknown_atoms"] = \
             [_QualifiedAtomNotation(a) for a in unknown_atom]
-            msg = ("Expect atom names according to the compound library but "
+            msg = ("Expected atom names according to the compound library but "
                    "this is not the case."
                    "Please refer to the OpenStructure website if an updated "
                    "library is sufficient to solve the problem: "

@@ -710,6 +710,21 @@ def _ParseArgs():
  
     return parser.parse_args()
 
+class _LogSink(ost.LogSink):
+    def __init__(self):
+        super().__init__()
+        self.messages = []
+        self._log_levels_map = ["Error", "Warning", "Script", "Info",
+                                "Verbose", "Debug", "Trace"]
+        
+    def LogMessage(self, message, severity):
+        clean_message = message.rstrip('\n')
+        self.messages.append({
+            "message": clean_message,
+            "level": self._log_levels_map[severity]
+        })
+        print(clean_message, file=sys.stderr)
+
 def _CheckCompoundLib():
     clib = ost.conop.GetDefaultLib()
     if not clib:
@@ -1164,11 +1179,16 @@ def _Process(model, reference, args, model_format, reference_format,
 def _Main():
 
     args = _ParseArgs()
+    
+    # Setup logging
+    action_logger = _LogSink()
+    ost.PushLogSink(action_logger)
     ost.PushVerbosityLevel(args.verbosity)
     if args.verbosity < 4:
         # Hide tracebacks by default
         # Run script with -v 4 (Verbose) or higher to display them
         sys.tracebacklimit = 0
+
     _CheckCompoundLib()
     try:
         compute_cad = args.cad_score or args.local_cad_score
@@ -1214,6 +1234,10 @@ def _Main():
             out["trg_seqres_mapping"] = tmp
         else:
             out["trg_seqres_mapping"] = None
+        
+        # Save log messages
+        out["log"] = action_logger.messages
+        
         out["ost_version"] = ost.__version__
         out["status"] = "SUCCESS"
         with open(args.output, 'w') as fh:

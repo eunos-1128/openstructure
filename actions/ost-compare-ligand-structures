@@ -501,6 +501,22 @@ def _ParseArgs():
     return args
 
 
+class _LogSink(ost.LogSink):
+    def __init__(self):
+        super().__init__()
+        self.messages = []
+        self._log_levels_map = ["Error", "Warning", "Script", "Info",
+                                "Verbose", "Debug", "Trace"]
+        
+    def LogMessage(self, message, severity):
+        clean_message = message.rstrip('\n')
+        self.messages.append({
+            "message": clean_message,
+            "level": self._log_levels_map[severity]
+        })
+        print(clean_message, file=sys.stderr)
+
+
 def _CheckCompoundLib():
     clib = ost.conop.GetDefaultLib()
     if not clib:
@@ -992,11 +1008,16 @@ def _WriteCSV(out, args):
 def _Main():
 
     args = _ParseArgs()
+
+    # Setup logging
+    action_logger = _LogSink()
+    ost.PushLogSink(action_logger)
     ost.PushVerbosityLevel(args.verbosity)
     if args.verbosity < 4:
         # Hide tracebacks by default
         # Run script with -v 4 (Verbose) or higher to display them
         sys.tracebacklimit = 0
+    
     _CheckCompoundLib()
     try:
         # Load structures
@@ -1049,6 +1070,9 @@ def _Main():
             out["radius"] = args.radius
             out["lddt-lp-radius"] = args.lddt_lp_radius
             out["full-bs-search"] = args.full_bs_search
+        
+        # Save log messages
+        out["log"] = action_logger.messages
 
         # finalize
         out["ost_version"] = ost.__version__

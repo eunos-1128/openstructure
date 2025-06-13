@@ -3253,10 +3253,10 @@ class Scorer:
         # - check whether chain names are unique and available in structures
         # - check whether the mapped chains actually map to the same chem groups
         if len(mapping) != len(set(mapping.keys())):
-            raise RuntimeError(f"Expect unique trg chain names in mapping. Got "
+            raise RuntimeError(f"Expected unique trg chain names in mapping. Got "
                                f"{mapping.keys()}")
         if len(mapping) != len(set(mapping.values())):
-            raise RuntimeError(f"Expect unique mdl chain names in mapping. Got "
+            raise RuntimeError(f"Expected unique mdl chain names in mapping. Got "
                                f"{mapping.values()}")
 
         trg_chains = set([ch.GetName() for ch in chain_mapper.target.chains])
