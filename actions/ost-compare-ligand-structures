@@ -82,6 +82,7 @@ keys:
  * "model_cleanup_log": Lists residues/atoms that have been removed in model
    cleanup process.
  * "reference_cleanup_log": Same for reference.
+ * "arguments": Dictionary of input arguments.
  * "log": List of log messages (same as those printed to stderr) as a 
    dictionary with keys "message" and "level".
  * "ost_version": The OpenStructure version used for computation.
@@ -1043,35 +1044,10 @@ def _Main():
                        seqres = seqres, trg_seqres_mapping = trg_seqres_mapping)
 
         # append input arguments
-        out["model"] = args.model
-        out["reference"] = args.reference
-        out["model-biounit"] = args.model_biounit
-        out["reference-biounit"] = args.reference_biounit
-        out["fault-tolerant"] = args.fault_tolerant
-        out["residue-number-alignment"] = args.residue_number_alignment
-        out["substructure-match"] = args.substructure_match
-        out["coverage-delta"] = args.coverage_delta
-        out["max-symmetries"] = args.max_symmetries
-        out["min-pep-length"] = args.min_pep_length
-        out["min-nuc-length"] = args.min_nuc_length
-        out["chem-group-seqid-thresh"] = args.chem_group_seqid_thresh
-        out["chem-map-seqid-thresh"] = args.chem_map_seqid_thresh
-        out["seqres"] = args.seqres
+        out["arguments"] = args.__dict__
         if args.trg_seqres_mapping:
             tmp = {x.split(':')[0]: x.split(':')[1] for x in args.trg_seqres_mapping}
-            out["trg_seqres_mapping"] = tmp
-        else:
-            out["trg_seqres_mapping"] = None
-
-        # only add lddtpli if actually computed
-        if args.lddt_pli:
-            out["lddt-pli-radius"] = args.lddt_pli_radius
-            out["lddt-pli-add-mdl-contacts"] = args.lddt_pli_add_mdl_contacts
-        # same for rmsd
-        if args.rmsd:
-            out["radius"] = args.radius
-            out["lddt-lp-radius"] = args.lddt_lp_radius
-            out["full-bs-search"] = args.full_bs_search
+            out_args["trg_seqres_mapping"] = tmp
         
         # Save log messages
         out["log"] = action_logger.messages
