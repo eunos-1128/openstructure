@@ -24,7 +24,7 @@
 #include "hhm_io_handler.hh"
 
 #include <boost/algorithm/string/predicate.hpp>
-#include <boost/filesystem/convenience.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
 #include <boost/iostreams/filtering_stream.hpp>

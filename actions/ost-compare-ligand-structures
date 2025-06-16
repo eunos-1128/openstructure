@@ -7,47 +7,44 @@ Example: ost compare-ligand-structures \\
     -r reference.cif \\
     --lddt-pli --rmsd
 
-Structures of polymer entities (proteins and nucleotides) can be given in PDB
-or mmCIF format. In case of PDB format, the full loaded structure undergoes
-processing described below. In case of mmCIF format, chains representing
-"polymer" entities according to _entity.type are selected and further processed
-as described below.
+Structures of polymer entities (proteins and nucleotides) can be given in 
+legacy PDB or mmCIF format. In case of PDB format, the full loaded structure
+undergoes processing described below. In case of mmCIF format, chains
+representing "polymer" entities according to _entity.type are selected and
+further processed as described below.
 
-Structure cleanup is heavily based on the PDB component dictionary and performs
-1) removal of hydrogens, 2) removal of residues for which there is no entry in
-component dictionary, 3) removal of residues that are not peptide linking or
-nucleotide linking according to the component dictionary 4) removal of atoms
-that are not defined for respective residues in the component dictionary. Except
-step 1), every cleanup is logged and a report is available in the json outfile.
+Structure cleanup of polymer chains is heavily based on the compound library
+and performs: 1) removal of hydrogens, 2) removal of residues for which there
+is no entry in compound library, 3) removal of residues that are not peptide
+linking or nucleotide linking according to the compound library 4) removal of
+atoms that are not defined for respective residues in the compound library.
+Except step 1), every cleanup is logged and a report is available in the json
+outfile.
 
 Only polymers (protein and nucleic acids) of model and reference are considered
 for ligand binding sites. The mapping of possible reference/model chain
 assignments requires a preprocessing. In short: identical chains in the
-reference are grouped based on pairwise sequence identity
-(see --chem-group-seqid-thresh). Each model chain is assigned to
-one of these groups (see --chem-map-seqid-thresh param).
-To avoid spurious matches, only polymers of a certain length are considered
-in this matching procedure (see --min_pep_length/--min_nuc_length param).
-Shorter polymers are never mapped and do not contribute to scoring.
+reference are grouped based on pairwise sequence identity (see
+--chem-group-seqid-thresh). Each model chain is assigned to one of these
+groups (see --chem-map-seqid-thresh param). To avoid spurious matches, only
+polymers of a certain length are considered in this matching procedure (see
+--min_pep_length/--min_nuc_length param). Shorter polymers are never mapped
+and do not contribute to scoring.
 
 Ligands can be given as path to SDF files containing the ligand for both model
 (--model-ligands/-ml) and reference (--reference-ligands/-rl). If omitted,
 ligands are optionally detected from a structure file if it is given in mmCIF
-format. This is based on "non-polymer" _entity.type annotation and the
-respective entries must exist in the PDB component dictionary in order to get
-connectivity information. You can avoid the requirement of the PDB component
-dictionary by enabling --allow-heuristic-conn. In this case, connectivity
-is established through a distance based heuristic if the ligand is not found in
-the component dictionary. Be aware that this might be an issue in ligand
-matching.
-If you provide structures in PDB format, an error is raised if ligands are not
-explicitely given in SDF format.
+format (based on "non-polymer" _entity.type annotation). If you provide
+structures in PDB format, an error is raised if ligands are not explicitly
+given in SDF format.
 
 Ligands undergo gentle processing where hydrogens are removed. Connectivity
 is relevant for scoring. It is read directly from SDF input. If ligands are
-extracted from mmCIF, connectivity is derived from the PDB component
-dictionary. Polymer/oligomeric ligands (saccharides, peptides, nucleotides)
-are not supported.
+extracted from mmCIF, connectivity is derived from the compound library. 
+Ligands that are not present in the compound library are only supported in
+fault-tolerant mode, where a distance based heuristic is used to connect the
+ligand atoms. Be aware that this is unreliable and might cause issues with
+ligand matching
 
 Output can be written in two format: JSON (default) or CSV, controlled by the
 --output-format/-of argument.
@@ -82,13 +79,16 @@ keys:
    chain mapping, i.e. are long enough, but could not be mapped to any chem
    group. Depends on --chem-map-seqid-thresh. A mapping for each model chain can
    be enforced by setting it to 0.
- * "status": SUCCESS if everything ran through. In case of failure, the only
-   content of the JSON output will be \"status\" set to FAILURE and an
-   additional key: "traceback".
- * "ost_version": The OpenStructure version used for computation.
  * "model_cleanup_log": Lists residues/atoms that have been removed in model
    cleanup process.
  * "reference_cleanup_log": Same for reference.
+ * "arguments": Dictionary of input arguments.
+ * "log": List of log messages (same as those printed to stderr) as a 
+   dictionary with keys "message" and "level".
+ * "ost_version": The OpenStructure version used for computation.
+ * "status": SUCCESS if everything ran through. In case of failure, the only
+   content of the JSON output will be \"status\" set to FAILURE and an
+   additional key: "traceback".
 
 Additional keys represent input options.
 
@@ -497,24 +497,26 @@ def _ParseArgs():
               "specify this mapping with: --trg-seqres-mapping A:1 B:1")
     )
 
-    parser.add_argument(
-        "--allow-heuristic-conn",
-        dest="allow_heuristic_conn",
-        default=False,
-        action="store_true",
-        help=("Default: False - Only relevant if ligands are extracted from "
-              "ref/mdl in mmCIF format. Connectivity in these cases is based "
-              "on the chemical component dictionary. If you enable this flag, "
-              "connectivity can be established by a distance based heuristic "
-              "if the ligand is not present in the component dictionary. This "
-              "might cause issues in ligand matching, i.e. graph matching.")
-    )
-
     args = parser.parse_args()
     if args.output is None:
         args.output = "out.%s" % args.output_format
 
     return args
+
+
+class _LogSink(ost.LogSink):
+    def __init__(self):
+        super().__init__()
+        self.messages = []
+        self._log_levels_map = {v: k for k, v in ost.LogLevel.names.items()}
+        
+    def LogMessage(self, message, severity):
+        clean_message = message.rstrip('\n')
+        self.messages.append({
+            "message": clean_message,
+            "level": self._log_levels_map[severity]
+        })
+        print(clean_message, file=sys.stderr)
 
 
 def _CheckCompoundLib():
@@ -588,8 +590,7 @@ def _LoadStructureData(receptor_path,
                        ligand_path,
                        sformat = None,
                        bu_id = None,
-                       fault_tolerant = False,
-                       allow_heuristic_conn = False):
+                       fault_tolerant = False):
 
     # thats the return variables
     # the last two are only set in case of an mmCIF file
@@ -619,7 +620,6 @@ def _LoadStructureData(receptor_path,
                                    biounit = bu_id,
                                    extract_nonpoly = True,
                                    fault_tolerant = fault_tolerant,
-                                   allow_heuristic_conn = allow_heuristic_conn,
                                    extract_seqres_mapping=True)
         else:
             receptor, seqres, trg_seqres_mapping = \
@@ -804,11 +804,7 @@ def _Process(model, model_ligands, reference, reference_ligands, args,
                                                        "coverage": coverage,
                                                        "lddt_pli_n_contacts": aux_data["lddt_pli_n_contacts"],
                                                        "model_ligand": model_key,
-                                                       "reference_ligand": target_key,
-                                                       "bs_ref_res": [_QualifiedResidueNotation(r) for r in
-                                                                      aux_data["bs_ref_res"]],
-                                                       "bs_mdl_res": [_QualifiedResidueNotation(r) for r in
-                                                                      aux_data["bs_mdl_res"]]})
+                                                       "reference_ligand": target_key})
 
         out["lddt_pli"]["model_ligand_unassigned_reason"] = dict()
         for i in lddtpli_scorer.unassigned_model_ligands:
@@ -838,11 +834,7 @@ def _Process(model, model_ligands, reference, reference_ligands, args,
                                                                 "coverage": coverage,
                                                                 "lddt_pli_n_contacts": aux_data["lddt_pli_n_contacts"],
                                                                 "model_ligand": model_key,
-                                                                "reference_ligand": target_key,
-                                                                "bs_ref_res": [_QualifiedResidueNotation(r) for r in
-                                                                               aux_data["bs_ref_res"]],
-                                                                "bs_mdl_res": [_QualifiedResidueNotation(r) for r in
-                                                                               aux_data["bs_mdl_res"]]})
+                                                                "reference_ligand": target_key})
 
                     else:
                         reason = lddtpli_scorer.state_decoding[state]
@@ -1018,11 +1010,16 @@ def _WriteCSV(out, args):
 def _Main():
 
     args = _ParseArgs()
+
+    # Setup logging
+    action_logger = _LogSink()
+    ost.PushLogSink(action_logger)
     ost.PushVerbosityLevel(args.verbosity)
     if args.verbosity < 4:
         # Hide tracebacks by default
         # Run script with -v 4 (Verbose) or higher to display them
         sys.tracebacklimit = 0
+    
     _CheckCompoundLib()
     try:
         # Load structures
@@ -1033,51 +1030,26 @@ def _Main():
                            args.reference_ligands,
                            sformat = args.reference_format,
                            bu_id = args.reference_biounit,
-                           fault_tolerant = args.fault_tolerant,
-                           allow_heuristic_conn = args.allow_heuristic_conn)
+                           fault_tolerant = args.fault_tolerant)
 
         LogInfo("Loading model data")
         model, model_ligands, _, _ = _LoadStructureData(args.model,
                                                         args.model_ligands,
                                                         sformat = args.model_format,
                                                         bu_id = args.model_biounit,
-                                                        fault_tolerant = args.fault_tolerant,
-                                                        allow_heuristic_conn = args.allow_heuristic_conn)
+                                                        fault_tolerant = args.fault_tolerant)
 
         out = _Process(model, model_ligands, reference, reference_ligands, args,
                        seqres = seqres, trg_seqres_mapping = trg_seqres_mapping)
 
         # append input arguments
-        out["model"] = args.model
-        out["reference"] = args.reference
-        out["model-biounit"] = args.model_biounit
-        out["reference-biounit"] = args.reference_biounit
-        out["fault-tolerant"] = args.fault_tolerant
-        out["residue-number-alignment"] = args.residue_number_alignment
-        out["substructure-match"] = args.substructure_match
-        out["coverage-delta"] = args.coverage_delta
-        out["max-symmetries"] = args.max_symmetries
-        out["min-pep-length"] = args.min_pep_length
-        out["min-nuc-length"] = args.min_nuc_length
-        out["chem-group-seqid-thresh"] = args.chem_group_seqid_thresh
-        out["chem-map-seqid-thresh"] = args.chem_map_seqid_thresh
-        out["seqres"] = args.seqres
+        out["arguments"] = args.__dict__
         if args.trg_seqres_mapping:
             tmp = {x.split(':')[0]: x.split(':')[1] for x in args.trg_seqres_mapping}
-            out["trg_seqres_mapping"] = tmp
-        else:
-            out["trg_seqres_mapping"] = None
-        out["allow_heuristic_conn"] = args.allow_heuristic_conn
-
-        # only add lddtpli if actually computed
-        if args.lddt_pli:
-            out["lddt-pli-radius"] = args.lddt_pli_radius
-            out["lddt-pli-add-mdl-contacts"] = args.lddt_pli_add_mdl_contacts
-        # same for rmsd
-        if args.rmsd:
-            out["radius"] = args.radius
-            out["lddt-lp-radius"] = args.lddt_lp_radius
-            out["full-bs-search"] = args.full_bs_search
+            out_args["trg_seqres_mapping"] = tmp
+        
+        # Save log messages
+        out["log"] = action_logger.messages
 
         # finalize
         out["ost_version"] = ost.__version__

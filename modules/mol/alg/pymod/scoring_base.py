@@ -31,8 +31,7 @@ def CleanHydrogens(ent, clib):
 
 
 def MMCIFPrep(mmcif_path, biounit=None, extract_nonpoly=False,
-              fault_tolerant=False, allow_heuristic_conn=False,
-              extract_seqres_mapping=False):
+              fault_tolerant=False, extract_seqres_mapping=False):
     """ Scoring helper - Prepares input from mmCIF
 
     Only performs gentle cleanup of hydrogen atoms. Further cleanup is delegated
@@ -41,13 +40,21 @@ def MMCIFPrep(mmcif_path, biounit=None, extract_nonpoly=False,
     Depending on input flags, the following outputs can be retrieved:
 
     * poly_ent (:class:`ost.mol.EntityHandle`): An OpenStructure entity with only
-      polymer chains.
+      polymer chains. This is based on _entity.type extracted from *mmcif_path*.
+      If _entity.type is not defined for every chain, a warning is logged
+      and the returned poly_ent is a selection for peptide and nucleotide
+      residues as defined in the chemical component dictionary.
     * non_poly_entities (:class:`list` of :class:`ost.mol.EntityHandle`):
       OpenStructure entities representing all non-polymer (ligand) entities.
+      This is based on _entity.type extracted from *mmcif_path*. If _entity.type
+      is not defined for every chain, an error is raised.
     * seqres (:class:`ost.seq.SequenceList`): Seqres sequences with entity id
-      as sequence names and the respective canonical seqres as sequence.
+      as sequence names and the respective canonical seqres as sequence. Set to
+      None and triggers a warning if information is missing in *mmcif_path*.
     * trg_seqres_mapping (:class:`dict`): Dictionary with chain names in
       poly_ent as keys and the respective entity ids as values.
+      Set to None and triggers a warning if information is missing in
+      *mmcif_path*.
 
     :param mmcif_path: Path to mmCIF file that contains polymer and optionally
                        non-polymer entities
@@ -58,15 +65,6 @@ def MMCIFPrep(mmcif_path, biounit=None, extract_nonpoly=False,
     :type extract_nonpoly: :class:`bool`
     :param fault_tolerant: Passed as parameter to :func:`ost.io.LoadMMCIF`
     :type fault_tolerant: :class:`bool`
-    :param allow_heuristic_conn: Only relevant if extract_nonpoly is True.
-                                 The chemical component dictionary is relevant
-                                 for connectivity information. By default, we
-                                 enforce the presence of each non-polymer in
-                                 the dictionary to ensure correct connectity.
-                                 If you enable this flag, you allow the use
-                                 of a distance based heuristic as fallback.
-                                 With all its consequences in ligand matching.
-    :type allow_heuristic_conn: :class:`bool`
     :param extract_seqres_mapping: Controls return value
     :type extract_seqres_mapping: :class:`bool`
     :returns: poly_ent if *extract_nonpoly*/*extract_seqres_mapping* are False.
@@ -89,24 +87,14 @@ def MMCIFPrep(mmcif_path, biounit=None, extract_nonpoly=False,
     seqres = None
     trg_seqres_mapping = None
 
-
+    # increase loglevel, as we would pollute the info log with weird stuff
+    ost.PushVerbosityLevel(ost.LogLevel.Error)
     mmcif_entity, mmcif_seqres, mmcif_info = io.LoadMMCIF(mmcif_path, seqres=True, info=True,
                                                           fault_tolerant=fault_tolerant)
+    # restore old loglevel and return
+    ost.PopVerbosityLevel()
+
     mmcif_entity = CleanHydrogens(mmcif_entity, clib)
-
-    # get AU chain names representing polymer entities
-    polymer_entity_ids = mmcif_info.GetEntityIdsOfType("polymer")
-    polymer_chain_names = list()
-    for ch in mmcif_entity.chains:
-        if mmcif_info.GetMMCifEntityIdTr(ch.name) in polymer_entity_ids:
-            polymer_chain_names.append(ch.name)
-
-    # get AU chain names representing non-polymer entities
-    non_polymer_entity_ids = mmcif_info.GetEntityIdsOfType("non-polymer")
-    non_polymer_chain_names = list()
-    for ch in mmcif_entity.chains:
-        if mmcif_info.GetMMCifEntityIdTr(ch.name) in non_polymer_entity_ids:
-            non_polymer_chain_names.append(ch.name)
 
     # construct biounit if necessary
     if biounit is not None:
@@ -120,8 +108,8 @@ def MMCIFPrep(mmcif_path, biounit=None, extract_nonpoly=False,
             raise RuntimeError(f"Specified biounit '{biounit}' not in "
                                f"{mmcif_path}")
 
-    # assign generic properties for selection later on
-    non_poly_id = 0
+    # check if we have entity types defined for each chain
+    missing_entity_types = list()
     for ch in mmcif_entity.chains:
         cname = None
         if biounit is not None:
@@ -135,33 +123,99 @@ def MMCIFPrep(mmcif_path, biounit=None, extract_nonpoly=False,
                 cname = ch.name[dot_index+1:]
         else:
             cname = ch.name
-        
-        if cname in polymer_chain_names:
-            ch.SetIntProp("poly", 1)
-        if cname in non_polymer_chain_names:
-            ch.SetIntProp("nonpolyid", non_poly_id)
-            non_poly_id += 1
+        try:
+            entity_id = mmcif_info.GetMMCifEntityIdTr(cname)
+            # the following raises if there is no desc for entity_id
+            entity_desc = mmcif_info.GetEntityDesc(entity_id)
+        except:
+            missing_entity_types.append(cname)
 
-    poly_sel = mmcif_entity.Select("gcpoly:0=1")
-    poly_ent = mol.CreateEntityFromView(poly_sel, True)
+    if len(missing_entity_types) > 0:
+        msg = f"mmCIF file does not define _entity.type for chains "
+        msg += f"{missing_entity_types}. "
+        
+        if not fault_tolerant:
+            msg += f"Use fault tolerant mode to ignore this error and "
+            msg += f"fallback to select polymers based on peptide/nucleotide "
+            msg += f"residues as defined in chemical component dictionary."
+            raise RuntimeError(msg)
+
+        msg += f"Fallback to select polymers based on peptide/nucleotide "
+        msg += f"residues as defined in chemical component dictionary (fault "
+        msg += f"tolerant mode)."
+        ost.LogWarning(msg)
+
+        poly_sel = mmcif_entity.Select("peptide=true or nucleotide=true")
+        poly_ent = mol.CreateEntityFromView(poly_sel, True)
+    else:
+        polymer_entity_ids = mmcif_info.GetEntityIdsOfType("polymer")
+        for ch in mmcif_entity.chains:
+            cname = None
+            if biounit is not None:
+                # if a biounit is constructed, you get chain names like: 1.YOLO
+                # we cannot simply split by '.' since '.' is an allowed character
+                # in chain names. => split by first occurence
+                dot_index = ch.name.find('.')
+                if dot_index == -1:
+                    cname = ch.name
+                else:
+                    cname = ch.name[dot_index+1:]
+            else:
+                cname = ch.name
+            if mmcif_info.GetMMCifEntityIdTr(cname) in polymer_entity_ids:
+                ch.SetIntProp("poly", 1)
+        poly_sel = mmcif_entity.Select("gcpoly:0=1")
+        poly_ent = mol.CreateEntityFromView(poly_sel, True)
 
     if extract_nonpoly:
-        non_poly_sel = mmcif_entity.Select("gcnonpoly:0=1")
+        if len(missing_entity_types) > 0:
+            msg = f"mmCIF file does not contain _entity.type for the following "
+            msg += f"chain(s): {missing_entity_types}. Extracting non-polymers "
+            msg += f"from mmCIF files requires _entity.type to be set for all "
+            msg += f"chains."
+            raise RuntimeError(msg)
+
+        non_polymer_entity_ids = mmcif_info.GetEntityIdsOfType("non-polymer")
+        nonpoly_id = 1
+        for ch in mmcif_entity.chains:
+            cname = None
+            if biounit is not None:
+                # if a biounit is constructed, you get chain names like: 1.YOLO
+                # we cannot simply split by '.' since '.' is an allowed character
+                # in chain names. => split by first occurence
+                dot_index = ch.name.find('.')
+                if dot_index == -1:
+                    cname = ch.name
+                else:
+                    cname = ch.name[dot_index+1:]
+            else:
+                cname = ch.name
+            if mmcif_info.GetMMCifEntityIdTr(cname) in non_polymer_entity_ids:
+                ch.SetIntProp("nonpolyid", nonpoly_id)
+                nonpoly_id += 1
+
         non_poly_entities = list()
-        for i in range(non_poly_id):
-            view = mmcif_entity.Select(f"gcnonpolyid:{non_poly_id}={i}")
+        for i in range(1,nonpoly_id):
+            view = mmcif_entity.Select(f"gcnonpolyid:0={i}")
             if view.GetResidueCount() != 1:
-                raise RuntimeError(f"Expect non-polymer entities in "
+                raise RuntimeError(f"Expected non-polymer entities in "
                                    f"{mmcif_path} to contain exactly 1 "
-                                   f"residue. Got {ch.GetResidueCount()} "
-                                   f"in chain {ch.name}")
-            if not allow_heuristic_conn:
-                compound = clib.FindCompound(view.residues[0].name)
-                if compound is None:
-                    raise RuntimeError(f"Can only extract non-polymer entities if "
-                                       f"respective residues are available in PDB "
-                                       f"component dictionary. Can't find "
-                                       f"\"{view.residues[0].name}\"")
+                                   f"residue. Got {view.GetResidueCount()} "
+                                   f"in chain {view.chains[0].name}")
+            compound = clib.FindCompound(view.residues[0].name)
+            if compound is None:
+                error_msg = f"\"{view.residues[0].name}\" is not available in " \
+                            f"the compound library."
+                if fault_tolerant:
+                    error_msg += f"A distance-based heuristic was used to " \
+                                 f"connect the ligand atoms (fault tolerant " \
+                                 f"mode)."
+                    ost.LogWarning(error_msg)
+                else:
+                    error_msg += f"Use fault tolerant mode to ignore this " \
+                                 f"error and use a distance based heuristic " \
+                                 f"to connect the ligand atoms."
+                    raise RuntimeError(error_msg)
 
             non_poly_entities.append(mol.CreateEntityFromView(view, True))
 
@@ -178,20 +232,56 @@ def MMCIFPrep(mmcif_path, biounit=None, extract_nonpoly=False,
                 seqres_processed.add(entity_id)
                 seqres.AddSequence(seq.CreateSequence(entity_id, s.GetGaplessString()))
 
-        trg_seqres_mapping = dict()
-        if biounit is None:
-            cnames = [ch.name for ch in poly_ent.chains]
-            for cname in cnames:
-                trg_seqres_mapping[cname] = mmcif_info.GetMMCifEntityIdTr(cname)
-        else:
-            bu_cnames = [ch.name for ch in poly_ent.chains]
-            au_cnames = list()
-            for bu_cname in bu_cnames:
-                dot_idx = bu_cname.index(".")
-                au_cnames.append(bu_cname[dot_idx + 1 :])
-            for au_cname, bu_cname in zip(au_cnames, bu_cnames):
-                trg_seqres_mapping[bu_cname] = mmcif_info.GetMMCifEntityIdTr(au_cname)
+        # check if we have SEQRES defined for each polymer chain
+        missing_seqres = list()
+        for ch in poly_ent.chains:
+            cname = None
+            if biounit is not None:
+                # if a biounit is constructed, you get chain names like: 1.YOLO
+                # we cannot simply split by '.' since '.' is an allowed character
+                # in chain names. => split by first occurence
+                dot_index = ch.name.find('.')
+                if dot_index == -1:
+                    cname = ch.name
+                else:
+                    cname = ch.name[dot_index+1:]
+            else:
+                cname = ch.name
+            
+            entity_id = mmcif_info.GetMMCifEntityIdTr(cname)
+            if entity_id not in seqres_processed:
+                missing_seqres.append(cname)
 
+        if len(missing_seqres) > 0:
+            msg = f"Extracting chem grouping from mmCIF file requires all "
+            msg += f"SEQRES information set. SEQRES is missing for polymer "
+            msg += f"chain(s) {missing_seqres}. "
+            
+            if not fault_tolerant:
+                msg += f"Use fault tolerant mode to ignore this error and "
+                msg += f"fallback sequence identity-based chem grouping."
+                raise RuntimeError(msg)
+            
+            msg += f"Chem grouping will be based on sequence identity (fault "
+            msg += f"tolerant mode)."
+            ost.LogWarning(msg)
+
+            seqres = None
+            trg_seqres_mapping = None
+        else:
+            trg_seqres_mapping = dict()
+            if biounit is None:
+                cnames = [ch.name for ch in poly_ent.chains]
+                for cname in cnames:
+                    trg_seqres_mapping[cname] = mmcif_info.GetMMCifEntityIdTr(cname)
+            else:
+                bu_cnames = [ch.name for ch in poly_ent.chains]
+                au_cnames = list()
+                for bu_cname in bu_cnames:
+                    dot_idx = bu_cname.index(".")
+                    au_cnames.append(bu_cname[dot_idx + 1 :])
+                for au_cname, bu_cname in zip(au_cnames, bu_cnames):
+                    trg_seqres_mapping[bu_cname] = mmcif_info.GetMMCifEntityIdTr(au_cname)
 
     if extract_nonpoly and extract_seqres_mapping:
         return (poly_ent, non_poly_entities, seqres, trg_seqres_mapping)
@@ -223,7 +313,11 @@ def PDBPrep(pdb_path, fault_tolerant=False):
                      "https://openstructure.org/docs/conop/compoundlib/.")
         raise RuntimeError("No compound library found")
 
+    # increase loglevel, as we would pollute the info log with weird stuff
+    ost.PushVerbosityLevel(ost.LogLevel.Error)
     pdb_entity = io.LoadPDB(pdb_path, fault_tolerant=fault_tolerant)
+    # restore old loglevel and return
+    ost.PopVerbosityLevel()
     pdb_entity = CleanHydrogens(pdb_entity, clib)
 
     return pdb_entity

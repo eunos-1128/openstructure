@@ -582,6 +582,7 @@ void export_mmcif_io()
                   &MMCifInfo::SetEMResolution)
     .add_property("r_free", &MMCifInfo::GetRFree, &MMCifInfo::SetRFree)
     .add_property("r_work", &MMCifInfo::GetRWork, &MMCifInfo::SetRWork)
+    .add_property("data_block_name", &MMCifInfo::GetDataBlockName, &MMCifInfo::SetDataBlockName)
     .add_property("operations", make_function(&MMCifInfo::GetOperations,
                                    return_value_policy<copy_const_reference>()))
     .add_property("struct_details", &MMCifInfo::GetStructDetails,

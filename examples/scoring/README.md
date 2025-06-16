@@ -20,10 +20,11 @@ unzip -j example.zip
 
 The example commands here assume an OpenStructure installation
 ([compile instructions](https://openstructure.org/docs/install/)).
-Running the computations in containers provide a considerably easier setup than
-compiling OpenStructure from source. Instructions for setup and running
-equivalent computations are available below for
+To simplify the setup, we recommend Conda or containers instead of compiling
+OpenStructure from source. Instructions for setup and
+running equivalent computations are available below for
 
+* [Conda](#conda)
 * [Docker](#docker)
 * [Singularity](#singularity)
 
@@ -65,7 +66,7 @@ The same example also contains small molecule ligands.
 We can compute LDDT-PLI and BiSyRMSD with:
 
 ```
-ost compare-ligand-structures -m model.pdb -r reference.cif.gz -ml *.sdf --rmsd --lddt-pli
+ost compare-ligand-structures -m model.pdb -r reference.cif.gz -ml *.sdf --rmsd --lddt-pli -rna
 ```
 
 Results should be computed within seconds and saved in the `out.json` file
@@ -86,6 +87,18 @@ instructions on how to set the latest dictionary, i.e. "Compound Library".
 You can override automatic extraction by providing SDF files with ligand
 coordinates and connectivity information. If the receptor is provided in
 PDB format, ligands must be provided in SDF format.
+
+# Conda
+
+OpenStructure is available as a [conda package on
+Bioconda](https://bioconda.github.io/recipes/openstructure/README.html)
+Installing OpenStructure in Conda is as easy as:
+
+```
+conda install bioconda::openstructure
+```
+
+Commands can be run as usual. Tested with [miniforge](https://conda-forge.org/miniforge/).
 
 # Docker
 

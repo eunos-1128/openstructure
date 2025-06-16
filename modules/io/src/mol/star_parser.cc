@@ -437,6 +437,8 @@ void StarParser::ParseDataItem()
                                 "More than 1 value for data item "+ identifier,
                                                    line_num_));
         }
+        // StarParser::SplitLine trims quotation marks, let's use that version
+        value = nv[1].str();
         this->ConsumeLine();        
       }
       break;
@@ -446,6 +448,7 @@ void StarParser::ParseDataItem()
                                                "Unexpected end of input",
                                                line_num_));
     }
+
     StringRef id_ref(identifier.data(), identifier.size());
     StringRef cat;
     StringRef name;

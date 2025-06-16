@@ -4,8 +4,8 @@ Installing OpenStructure From Source
 Brief Overview
 --------------------------------------------------------------------------------
 
-For a simple and portable way to use OpenStructure we recommend using a
-container solution. We provide recipes to build images for
+For a simple and portable way to use OpenStructure we recommend using conda or a
+container solution.  We provide a conda package and recipes to build images for
 `Docker <https://www.docker.com/>`_ and
 `Singularity <https://sylabs.io/singularity/>`_.
 The latest recipes and instructions can be found on our
@@ -16,10 +16,13 @@ a link to OpenStructure's own `GitLab Docker registry <https://git.scicore.uniba
 If you wish to compile OpenStructure outside of a container, you need to follow
 the steps which we describe in detail below. In essence, these steps are:
 
-* Installing the Dependencies
-* Checking out the source code from GIT
-* Configuring the build with cmake
-* Compiling an Linking
+* `Installing the Dependencies`_
+* `Getting the Source Code`_
+* `Configuring the build`_
+* `Building the Project`_
+* `Building the Compound Library`_
+* `Running the tests`_
+* `Installing OpenStructure`_
 
 
 Installing the Dependencies
@@ -109,7 +112,7 @@ specific features. To change to a specific branch, use
   git checkout <branch-name>
 
 
-Configuring
+Configuring the build
 --------------------------------------------------------------------------------
 
 OpenStructure uses `CMake <http://cmake.org>`_ for compiling and building the
@@ -124,15 +127,6 @@ There are two kinds of options: Options that let you control the building
 behaviour, enabling and disabling the compilation of certain modules and options
 that let you tell CMake where to find the dependencies. All of them are passed
 to CMake via `-D<opt>=<value>`.
-
-
-Flag to choose build generator
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-CMake supports different build generators. On UNIX, i.e. macOS and Linux, the
-default build generator is Makefiles, but it is also possible to use other
-programs. For a list of supported build generators on your platform, run
-`cmake` without parameters.
 
 
 .. _cmake-flags:
@@ -339,51 +333,112 @@ Building the Project
 Type ``make``. If you are using a multi-core machine, you can use the `-j` flag
 to run multiple jobs at once.
 
+.. code-block:: bash
 
-What's next?
+  make
+
+Building the Compound Library
 --------------------------------------------------------------------------------
 
 One thing is missing for a fully functional OpenStructure installation.
 The compound library. It is used at various places for connectivity
 information and certain algorithms do not work without.
 Besides an OpenStructure executable, we just built the
-chemdict_tool which converts the PDB chemical component dictionary
+:ref:`chemdict_tool <mmcif-convert>` which converts the PDB chemical component dictionary
 into our internal format:
 
 .. code-block:: bash
 
   wget https://files.wwpdb.org/pub/pdb/data/monomers/components.cif.gz
-  stage/bin/chemdict_tool create components.cif.gz <compounds.chemlib>
+  stage/bin/chemdict_tool create components.cif.gz compounds.chemlib -i
 
 We can rerun cmake and make. All cmake parameters from the original
 configuration remain in the cache.
 
 .. code-block:: bash
 
-  cmake .. -DCOMPOUND_LIB=<compounds.chemlib>
+  cmake .. -DCOMPOUND_LIB=compounds.chemlib
   make
+
+Running the tests
+--------------------------------------------------------------------------------
+
+Many parts of OpenStructure are covered by unit tests. You can run them with:
+
+.. code-block:: bash
+
+  make check
+
+
+Building the documentation
+--------------------------------------------------------------------------------
+
+Many parts of OpenStructure are covered by unit tests. You can run them with:
+
+.. code-block:: bash
+
+  stage/bin/ost doc/make.py
+
+
+Installing OpenStructure
+--------------------------------------------------------------------------------
+
+To make OpenStructure available system-wide, the easiest is to install it with:
+
+.. code-block:: bash
+
+  make install
+
+This will install the OpenStructure binaries and libraries to the prefix
+folder specified by `CMAKE_INSTALL_PREFIX` in the cmake configuration step
+(usually this will be `/usr/local`).
+
+In many distributions (such as Ubuntu), libraries are not picked up 
+automatically from `/usr/local` so you will need to export a few environment 
+variables to make things work:
+
+.. code-block:: bash
+
+  export OST_ROOT="/usr/local"
+  export PYTHONPATH="/usr/local/lib64/python3.10/site-packages"
+  export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/lib64:/usr/local/openmm/lib/"
+
+
+If you don't want to install OpenStructure system-wide, for instance if this is
+a development build, you can also configure environment variables to point 
+directly to the `stage` folder.
+
+.. code-block:: bash
+
+  export OST_ROOT=/path/to/ost/stage
+  export PATH=$OST_ROOT/bin:$PATH
+  export PYTHONPATH=$OST_ROOT/lib64/python3.10/site-packages/:$PYTHONPATH
+
+
+What's next?
+--------------------------------------------------------------------------------
 
 On Linux and macOS, you can start dng from the command-line. The binaries are
 all located in stage/bin:
 
 .. code-block:: bash
 
-  stage/bin/dng
+  dng
   
 or, to start the command-line interpreter:
 
 .. code-block:: bash
 
-  stage/bin/ost
-  
-But hey, good citizen run the unit tests first:
+  ost
+
+The `ost` executable can run python scripts. For instance we can run the Docker
+test script:
 
 .. code-block:: bash
 
-  make check
-  
-If you repeatedly use OpenStructure, it is recommended to add
-/path/to/ost/stage/bin to your path.
+  ost docker/test_docker.py
+
+This should produce some output and announce that "OST is working!"
 
 You can also import OpenStructure directly into your existing python scripts,
 jupyter notebooks etc. Simply make sure to point the following environment
@@ -400,17 +455,6 @@ And then you can simply import ost as a module:
 .. code-block:: python
 
   import ost
-
-Getting the newest changes
---------------------------------------------------------------------------------
-
-To get the newest changes from the central git repository, enter
-
-.. code-block:: bash
-
-  git pull
-
-in your terminal. This will fetch the newest changes.
 
 
 ..  LocalWords:  Homebrew cmake CMake zlib SQLite FFTW libtiff libpng PyQt OST

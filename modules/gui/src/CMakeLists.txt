@@ -452,7 +452,6 @@ module(NAME gui SOURCES ${OST_GUI_MOCS} ${OST_GUI_SOURCES}
                ${OST_GUI_HEADERS}
        DEPENDS_ON ost_gfx ost_io ost_mol_alg ost_seq_alg
        LINK ${QT_LIBRARIES}
-            ${Python_LIBRARIES} 
             Boost::python
             ${SPNAV_LIBRARIES}
         NO_STATIC)
@@ -469,10 +468,17 @@ qt5_wrap_cpp(OST_GOSTY_MOC "gosty.hh"
              OPTIONS -DBOOST_TT_HAS_OPERATOR_HPP_INCLUDED
                      -DBOOST_NO_TEMPLATE_PARTIAL_SPECIALIZATION)
 
-set(LINK LINK ${QT_LIBRARIES} Boost::program_options)
+find_package(Python 3 COMPONENTS Interpreter Development REQUIRED)
 
-executable_libexec(NAME gosty SOURCES gosty.cc ${OST_GOSTY_MOC}
-                   ${OST_QT_RESOURCE} DEPENDS_ON ost_gui ${LINK})
+set(GOSTY_LINK_LIBS
+    ${QT_LIBRARIES}
+    ${BOOST_PROGRAM_OPTIONS_LIBRARIES}
+    Python::Python)
+
+executable_libexec(NAME gosty
+                   SOURCES gosty.cc ${OST_GOSTY_MOC} ${OST_QT_RESOURCE}
+                   DEPENDS_ON ost_gui
+                   LINK ${GOSTY_LINK_LIBS})
            
 file(GLOB MOC_CXX_FILES moc_*.cxx)
 

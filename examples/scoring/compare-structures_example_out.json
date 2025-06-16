@@ -542,23 +542,82 @@
     "per_interface_qs_best": [
         0.907
     ],
-    "model": "model.pdb",
-    "reference": "reference.cif.gz",
-    "fault_tolerant": false,
-    "model_biounit": null,
-    "reference_biounit": null,
-    "residue_number_alignment": true,
-    "enforce_consistency": false,
-    "cad_exec": null,
-    "usalign_exec": null,
-    "lddt_no_stereochecks": false,
-    "min_pep_length": 6,
-    "min_nuc_length": 4,
-    "lddt_add_mdl_contacts": false,
-    "lddt_inclusion_radius": 15.0,
-    "dockq_capri_peptide": false,
-    "seqres": null,
-    "trg_seqres_mapping": null,
-    "ost_version": "2.10.0",
+    "arguments": {
+        "model": "model.pdb",
+        "reference": "reference.cif.gz",
+        "output": "compare-structures_example_out.json",
+        "model_format": null,
+        "reference_format": null,
+        "model_biounit": null,
+        "reference_biounit": null,
+        "residue_number_alignment": true,
+        "enforce_consistency": false,
+        "dump_structures": false,
+        "dump_suffix": "_compare_structures",
+        "fault_tolerant": false,
+        "chain_mapping": null,
+        "lddt": true,
+        "local_lddt": true,
+        "aa_local_lddt": false,
+        "bb_lddt": false,
+        "bb_local_lddt": false,
+        "ilddt": false,
+        "cad_score": false,
+        "local_cad_score": false,
+        "cad_exec": null,
+        "usalign_exec": null,
+        "oum": false,
+        "qs_score": true,
+        "dockq": false,
+        "dockq_capri_peptide": false,
+        "ics": false,
+        "ics_trimmed": false,
+        "ips": false,
+        "ips_trimmed": false,
+        "rigid_scores": false,
+        "patch_scores": false,
+        "tm_score": false,
+        "lddt_no_stereochecks": false,
+        "n_max_naive": 40320,
+        "dump_aligned_residues": false,
+        "dump_pepnuc_alns": false,
+        "dump_pepnuc_aligned_residues": false,
+        "min_pep_length": 6,
+        "min_nuc_length": 4,
+        "verbosity": 2,
+        "lddt_add_mdl_contacts": false,
+        "lddt_inclusion_radius": 15.0,
+        "chem_group_seqid_thresh": 95.0,
+        "chem_map_seqid_thresh": 70.0,
+        "seqres": null,
+        "trg_seqres_mapping": null
+    },
+    "log": [
+        {
+            "message": "Loading data",
+            "level": "Script"
+        },
+        {
+            "message": "Cleaning up input structures",
+            "level": "Script"
+        },
+        {
+            "message": "Computing chain mapping",
+            "level": "Script"
+        },
+        {
+            "message": "Computing all-atom LDDT",
+            "level": "Script"
+        },
+        {
+            "message": "Computing global QS-score",
+            "level": "Script"
+        },
+        {
+            "message": "Computing per-interface QS-score",
+            "level": "Script"
+        }
+    ],
+    "ost_version": "2.11.0",
     "status": "SUCCESS"
 }

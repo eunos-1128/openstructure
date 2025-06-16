@@ -22,7 +22,7 @@
 #include <sstream>
 
 #include <ost/log.hh>
-#include <boost/filesystem/convenience.hpp>
+#include <boost/filesystem.hpp>
 #include "surface_io_msms_handler.hh"
 
 namespace bf = boost::filesystem;

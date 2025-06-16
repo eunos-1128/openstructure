@@ -57,10 +57,13 @@ comparison:
    Inconsistencies may lead to corrupt results but do not abort the program.
    Program abortion in these cases can be enforced with
    -ec/--enforce-consistency.
+ * "arguments": Dictionary of input arguments.
+ * "log": List of log messages (same as those printed to stderr) as a 
+   dictionary with keys "message" and "level".
+ * "ost_version": The OpenStructure version used for computation.
  * "status": SUCCESS if everything ran through. In case of failure, the only
    content of the JSON output will be \"status\" set to FAILURE and an
    additional key: "traceback".
- * "ost_version": The OpenStructure version used for computation.
 
 Additional keys represent input options.
 
@@ -710,6 +713,20 @@ def _ParseArgs():
  
     return parser.parse_args()
 
+class _LogSink(ost.LogSink):
+    def __init__(self):
+        super().__init__()
+        self.messages = []
+        self._log_levels_map = {v: k for k, v in ost.LogLevel.names.items()}
+        
+    def LogMessage(self, message, severity):
+        clean_message = message.rstrip('\n')
+        self.messages.append({
+            "message": clean_message,
+            "level": self._log_levels_map[severity]
+        })
+        print(clean_message, file=sys.stderr)
+
 def _CheckCompoundLib():
     clib = ost.conop.GetDefaultLib()
     if not clib:
@@ -768,8 +785,6 @@ def _LoadStructure(structure_path, sformat, fault_tolerant, bu_id):
     seqres = None
     trg_seqres_mapping = None
 
-    # increase loglevel, as we would pollute the info log with weird stuff
-    ost.PushVerbosityLevel(ost.LogLevel.Error)
     # Load the structure
     if sformat == "mmcif":
         # from mmCIF we can get seqres and trg_seqres_mapping
@@ -785,8 +800,6 @@ def _LoadStructure(structure_path, sformat, fault_tolerant, bu_id):
         if len(entity.residues) == 0:
             raise Exception(f"No residues found in file: {structure_path}")
 
-    # restore old loglevel and return
-    ost.PopVerbosityLevel()
     entity.SetName(structure_path)
     return (entity, seqres, trg_seqres_mapping)
 
@@ -1168,11 +1181,16 @@ def _Process(model, reference, args, model_format, reference_format,
 def _Main():
 
     args = _ParseArgs()
+    
+    # Setup logging
+    action_logger = _LogSink()
+    ost.PushLogSink(action_logger)
     ost.PushVerbosityLevel(args.verbosity)
     if args.verbosity < 4:
         # Hide tracebacks by default
         # Run script with -v 4 (Verbose) or higher to display them
         sys.tracebacklimit = 0
+
     _CheckCompoundLib()
     try:
         compute_cad = args.cad_score or args.local_cad_score
@@ -1180,12 +1198,15 @@ def _Main():
             raise RuntimeError("Only support CAD score when residue numbers in "
                                "model and reference match. Use -rna flag if "
                                "this is the case.")
+        LogScript("Loading data")
+        LogInfo("Loading reference data")
         reference_format = _GetStructureFormat(args.reference,
                                                sformat=args.reference_format)
         reference, seqres, trg_seqres_mapping = _LoadStructure(args.reference,
                                                                sformat=reference_format,
                                                                bu_id=args.reference_biounit,
                                                                fault_tolerant = args.fault_tolerant)
+        LogInfo("Loading model data")
         model_format = _GetStructureFormat(args.model,
                                            sformat=args.model_format)
         model,_,_ = _LoadStructure(args.model,
@@ -1197,27 +1218,14 @@ def _Main():
                        seqres=seqres, trg_seqres_mapping=trg_seqres_mapping)
 
         # append input arguments
-        out["model"] = args.model
-        out["reference"] = args.reference
-        out["fault_tolerant"] = args.fault_tolerant
-        out["model_biounit"] = args.model_biounit
-        out["reference_biounit"] = args.reference_biounit
-        out["residue_number_alignment"] = args.residue_number_alignment
-        out["enforce_consistency"] = args.enforce_consistency
-        out["cad_exec"] = args.cad_exec
-        out["usalign_exec"] = args.usalign_exec
-        out["lddt_no_stereochecks"] = args.lddt_no_stereochecks
-        out["min_pep_length"] = args.min_pep_length
-        out["min_nuc_length"] = args.min_nuc_length
-        out["lddt_add_mdl_contacts"] = args.lddt_add_mdl_contacts
-        out["lddt_inclusion_radius"] = args.lddt_inclusion_radius
-        out["dockq_capri_peptide"] = args.dockq_capri_peptide
-        out["seqres"] = args.seqres
+        out["arguments"] = args.__dict__
         if args.trg_seqres_mapping:
             tmp = {x.split(':')[0]: x.split(':')[1] for x in args.trg_seqres_mapping}
-            out["trg_seqres_mapping"] = tmp
-        else:
-            out["trg_seqres_mapping"] = None
+            out_args["trg_seqres_mapping"] = tmp
+        
+        # Save log messages
+        out["log"] = action_logger.messages
+        
         out["ost_version"] = ost.__version__
         out["status"] = "SUCCESS"
         with open(args.output, 'w') as fh:

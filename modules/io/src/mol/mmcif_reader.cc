@@ -110,6 +110,7 @@ bool MMCifReader::OnBeginData(const StringRef& data_name)
   // IDs in mmCIF files can be any string, so no restrictions here
 
   this->ClearState();
+  data_block_name_ = data_name.str();
 
   return true;
 }
@@ -2046,6 +2047,7 @@ void MMCifReader::OnEndData()
       }
     }
     info_.SetEntityDesc(entity_it.first, entity_it.second);
+    info_.SetDataBlockName(data_block_name_);
   }
 
   LOG_INFO("imported "

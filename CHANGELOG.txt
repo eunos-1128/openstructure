@@ -1,3 +1,13 @@
+Changes in Release 2.11.0
+--------------------------------------------------------------------------------
+
+ * Scoring actions:
+   * Relaxed strict requirement for mmCIF files to contain _entity.type and SEQRES
+     information with fallbacks available in fault tolerant mode.
+   * Replaced allow_heuristic_conn flag with fault_tolerant.
+   * Improved logging
+ * Several bug fixes and improvements.
+
 Changes in Release 2.10.0
 --------------------------------------------------------------------------------
 

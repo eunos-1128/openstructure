@@ -179,6 +179,10 @@ of the annotation available.
     Also available as :meth:`GetRWork`. May also be modified by
     :meth:`SetRWork`.
 
+  .. attribute:: data_block_name
+
+    Name of data block - the string after the data\_ directive
+
   .. attribute:: operations
 
     Stores the operations needed to transform a crystal structure into a

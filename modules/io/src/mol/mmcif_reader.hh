@@ -711,6 +711,7 @@ private:
   // for storing entity_poly_seq
   std::map<String, std::map<int, String> > entity_poly_seq_map_;
   std::map<String, std::vector<std::pair<int, String> > > entity_poly_seq_h_map_;
+  String data_block_name_;
 };
 
 /// \brief Translate mmCIF info on bond type (e.g.

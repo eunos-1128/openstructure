@@ -49,11 +49,6 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
     * model_ligand: The actual model ligand for which the score was computed
     * chain_mapping: :class:`dict` with a chain mapping of chains involved in
       binding site - key: trg chain name, value: mdl chain name
-    * bs_ref_res: :class:`set` of residues with potentially non-zero
-      contribution to score. That is every residue with at least one
-      atom within *lddt_pli_radius* + max(*lddt_pli_thresholds*) of
-      the ligand.
-    * bs_mdl_res: Same for model
 
     :param model: Passed to parent constructor - see :class:`LigandScorer`.
     :type model: :class:`ost.mol.EntityHandle`/:class:`ost.mol.EntityView`
@@ -563,8 +558,6 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
         # fill misc info to result object
         best_result["target_ligand"] = target_ligand
         best_result["model_ligand"] = model_ligand
-        best_result["bs_ref_res"] = trg_residues
-        best_result["bs_mdl_res"] = mdl_residues
 
         return best_result
 
@@ -606,9 +599,7 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
                     "lddt_pli_n_contacts": 0,
                     "chain_mapping": None,
                     "target_ligand": target_ligand,
-                    "model_ligand": model_ligand,
-                    "bs_ref_res": trg_residues,
-                    "bs_mdl_res": mdl_residues}
+                    "model_ligand": model_ligand}
 
         # Distance hacking... remove any interchain distance except the ones
         # with the ligand
@@ -700,8 +691,6 @@ class LDDTPLIScorer(ligand_scoring_base.LigandScorer):
         best_result["lddt_pli_n_contacts"] = n_exp
         best_result["target_ligand"] = target_ligand
         best_result["model_ligand"] = model_ligand
-        best_result["bs_ref_res"] = trg_residues
-        best_result["bs_mdl_res"] = mdl_residues
 
         return best_result
 
