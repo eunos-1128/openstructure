@@ -2,6 +2,8 @@ import ost
 from ost.mol.alg import scoring, qsscoring
 from ost import conop
 
+print("This is OpenStructure version " + ost.__version__)
+
 lib = conop.GetDefaultLib()
 if lib is not None:
     print("You have a valid compound library, last updated on " +
