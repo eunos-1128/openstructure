@@ -3,24 +3,27 @@ OST Docker
 
 .. note::
 
-  For many docker installations it is required to run docker commands as root. As
+  For most docker installations it is required to run docker commands as root. As
   this depends on set up, we skip the ``sudo`` in all commands.
 
 Obtain Docker image from the OST registry
 -----------------------------------------
 
-OST has its own container registry inside GitLab. There we try to keep one
-image for the latest stable version of OST. You can import it by
+OST has its own container registry inside GitLab. We always keep an
+image for the latest stable version of OST. You can import it with:
 
 .. code-block:: bash
 
-  docker pull registry.scicore.unibas.ch/schwede/openstructure:<TAG>
+  docker pull registry.scicore.unibas.ch/schwede/openstructure:latest
 
-and just start using it without the overhead to build it yourself. A list of
-available tags can be found on our
-`GitLab registry page <https://git.scicore.unibas.ch/schwede/openstructure/container_registry/>`_.
-A tag named ``latest`` is always available, pointing to the current stable OST release.
+and just start using it without the overhead to build it yourself:
 
+.. code-block:: bash
+
+  docker run --rm -v $(pwd):/home registry.scicore.unibas.ch/schwede/openstructure:latest --version
+
+In the rest of this documentation, the ``<IMAGE NAME>`` we refer to will be
+``registry.scicore.unibas.ch/schwede/openstructure:latest``.
 
 Build Docker image
 ------------------
