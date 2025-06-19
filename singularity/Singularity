@@ -37,7 +37,7 @@ cat > $JUPYTER_PATH/kernels/ost-kernel/kernel.json <<EOF
     "-m", "ipykernel",
         "-f", "{connection_file}",
     "--InteractiveShellApp.exec_PYTHONSTARTUP=False",
-    "--InteractiveShellApp.exec_files=/usr/local/lib64/python3.10/site-packages/ost/ost_startup.py"
+    "--InteractiveShellApp.exec_files=/usr/local/lib/python3.10/site-packages/ost/ost_startup.py"
   ],
   "env": {
   }
