@@ -35,7 +35,7 @@ cat > $JUPYTER_PATH/kernels/ost-kernel/kernel.json <<EOF
   "argv": [
     "python",
     "-m", "ipykernel",
-        "-f", "{connection_file}",
+    "-f", "{connection_file}",
     "--InteractiveShellApp.exec_PYTHONSTARTUP=False",
     "--InteractiveShellApp.exec_files=/usr/local/lib/python3.10/site-packages/ost/ost_startup.py"
   ],
