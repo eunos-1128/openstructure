@@ -1,9 +1,10 @@
 OST Docker
 ==========
 
-> [!note]
-> For most docker installations it is required to run docker commands as root. As
-> this depends on set up, we skip the ``sudo`` in all commands.
+.. note::
+
+  For most docker installations it is required to run docker commands as root. As
+  this depends on set up, we skip the ``sudo`` in all commands.
 
 Obtain Docker image from the OST registry
 -----------------------------------------
@@ -62,13 +63,14 @@ As the last line you should see ``OST is working!``.
 Run script and action with OST
 ------------------------------
 
-> [!note]
-> If script or action requires some external files eg. PDBs, they have to be located in the
-> path accessible via mounted volume and should be accessed via docker (NOT LOCAL)
-> path. Eg. assuming that we have a struc.pdb file in /home/user/pdbs directory and
-> a script.py in /home/user we could mount the /home/user to /home in docker as
-> above by specifying -v /home/user:/home. To run the script we thus need to
-> provide the (relative) path to the script and (relative) path to the file eg:
+.. note::
+
+  If script or action requires some external files eg. PDBs, they have to be located in the
+  path accessible via mounted volume and should be accessed via docker (NOT LOCAL)
+  path. Eg. assuming that we have a struc.pdb file in /home/user/pdbs directory and
+  a script.py in /home/user we could mount the /home/user to /home in docker as
+  above by specifying -v /home/user:/home. To run the script we thus need to
+  provide the (relative) path to the script and (relative) path to the file eg:
 
   .. code-block:: bash
 
@@ -184,8 +186,9 @@ Eg. to run molck type:
 
   docker run --rm -ti --entrypoint molck <IMAGE NAME> --help
 
-> [!note]
-> Note how the options to the command are specified after the image name.
+.. note::
+
+  Note how the options to the command are specified after the image name.
 
 .. _docker_compound_lib:
 
