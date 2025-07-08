@@ -51,6 +51,16 @@ namespace{
     return VecToList<String>(omf->GetChainNames());
   }
 
+  boost::python::list wrap_get_chain_types(OMFPtr omf) {
+
+    boost::python::list chain_types;
+    std::vector<String> chain_names = omf->GetChainNames();
+    for(auto const &cname: chain_names){
+      chain_types.append(omf->GetChainData(cname)->chain_type);
+    }
+    return chain_types;
+  }
+
   OMFPtr wrap_to_assembly(OMFPtr omf,
                           const ost::mol::alg::BUInfo& bu_info) {
     return omf->ToAssembly(bu_info.GetAUChains(),
@@ -108,6 +118,7 @@ void export_omf_io() {
     .def("GetEntityChain", &OMF::GetEntityChain)
     .def("GetName", &OMF::GetName)
     .def("GetChainNames", &wrap_get_chain_names)
+    .def("GetChainTypes", &wrap_get_chain_types)
     .def("GetPositions", &OMF::GetPositions, return_value_policy<reference_existing_object>(),(arg("cname")))
     .def("GetBFactors", &OMF::GetBFactors, return_value_policy<reference_existing_object>(),(arg("cname")))
     .def("GetOccupancies", &OMF::GetOccupancies, return_value_policy<reference_existing_object>(),(arg("cname")))
